@@ -2,7 +2,7 @@ import './globals.css';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'ACLP',
+  title: 'Sistema de Controle de Comparecimento',
   description: 'Controle de Comparecimento de Liberdade Provisória',
   icons: {
     icon: '/favicon.ico',

@@ -1,12 +1,15 @@
-// 📁 app/dashboard/criar/page.tsx
 'use client';
 
 import { useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
-function formatCpf(value: string) {
-  return value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2').slice(0, 14);
+function formatCpf(value: string): string {
+  const numeric = value.replace(/\D/g, '').slice(0, 11); 
+  return numeric
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
 }
 
 function formatRg(value: string) {
@@ -58,7 +61,7 @@ export default function CriarComparecimento() {
 
   return (
     <div className="max-w-2xl mx-auto bg-card-bg p-6 rounded-lg shadow-md">
-      <h2 className="text-h2 text-primary mb-4">Cadastro de Acusado</h2>
+      <h2 className="text-h2 text-primary mb-4">Cadastro</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input label="Nome Completo" name="nome" value={form.nome} onChange={handleChange} required />
         <Input label="CPF" name="cpf" value={form.cpf} onChange={handleChange} required />

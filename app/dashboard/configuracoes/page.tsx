@@ -1,9 +1,7 @@
 import React from 'react'
 
 function page() {
-  return (
-    <div>page</div>
-  )
+  return <h2 className="text-xl font-bold">Em construção</h2>;
 }
 
 export default page
