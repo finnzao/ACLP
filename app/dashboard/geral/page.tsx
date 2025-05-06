@@ -1,14 +1,10 @@
-// 📁 app/dashboard/geral/page.tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
-import DetalhesAcusadoModal from '@/components/detalhesAcusado';
-
-function limparMascaraProcesso(processo: string) {
-  return processo.replace(/\D/g, '');
-}
+import DetalhesAcusadoModal from '@/components/detalhesSubmetido';
+import EditarAcusadoModal from '@/components/editarSubmetido';
 
 export default function GeralPage() {
   const [filtro, setFiltro] = useState('');
@@ -17,6 +13,7 @@ export default function GeralPage() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [selecionado, setSelecionado] = useState<Comparecimento | null>(null);
+  const [editando, setEditando] = useState<Comparecimento | null>(null);
   const [dados, setDados] = useState<Comparecimento[]>([]);
   const [page, setPage] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,20 +38,48 @@ export default function GeralPage() {
     return () => observer.disconnect();
   }, []);
 
-  function filtrarDados(data: Comparecimento[]): Comparecimento[] {
-    return data.filter((item) => {
-      const termo = filtro.toLowerCase();
-      const nomeMatch = item.nome.toLowerCase().includes(termo);
-      const processoMatch =
-        item.processo.includes(termo) ||
-        limparMascaraProcesso(item.processo).includes(limparMascaraProcesso(termo));
+  function limparMascaraProcesso(processo: string) {
+    return processo.replace(/\D/g, '');
+  }
 
-      const dentroPeriodo = !dataInicio || !dataFim
+  function normalizarTexto(texto: string) {
+    return texto
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function filtrarDados(data: Comparecimento[]): Comparecimento[] {
+    const termo = filtro.trim();
+    const temFiltroTexto = termo.length > 0;
+    const primeiraLetra = termo[0];
+    const buscandoProcesso = /\d/.test(primeiraLetra);
+
+    const termoNormalizado = normalizarTexto(termo);
+    const termoSomenteNumeros = limparMascaraProcesso(termo);
+
+    return data.filter((item) => {
+      const nomeNormalizado = normalizarTexto(item.nome);
+      const processoSemMascara = limparMascaraProcesso(item.processo);
+
+      const matchNome = nomeNormalizado.includes(termoNormalizado);
+      const matchProcesso =
+        item.processo.includes(termo) ||
+        processoSemMascara.includes(termoSomenteNumeros);
+
+      const matchTexto = !temFiltroTexto
+        ? true
+        : buscandoProcesso
+          ? matchProcesso
+          : matchNome;
+
+      const dentroPeriodo = (!dataInicio || !dataFim)
         ? true
         : new Date(item.proximoComparecimento) >= new Date(dataInicio) &&
-          new Date(item.proximoComparecimento) <= new Date(dataFim);
+        new Date(item.proximoComparecimento) <= new Date(dataFim);
 
-      return (nomeMatch || processoMatch) && dentroPeriodo;
+      return matchTexto && dentroPeriodo;
     });
   }
 
@@ -172,8 +197,33 @@ export default function GeralPage() {
       </div>
 
       {selecionado && (
-        <DetalhesAcusadoModal dados={selecionado} onClose={() => setSelecionado(null)} />
+        <DetalhesAcusadoModal
+          dados={selecionado}
+          onClose={() => setSelecionado(null)}
+          onEditar={(dados) => {
+            setSelecionado(null);
+            setEditando(dados);
+          }}
+        />
       )}
+
+      {editando && (
+        <EditarAcusadoModal
+          dados={editando}
+          onClose={() => setEditando(null)}
+          onVoltar={() => {
+            setSelecionado(editando);
+            setEditando(null);
+          }}
+          onSave={(novo: Comparecimento) => {
+            setDados((prev) =>
+              prev.map((item) => (item.processo === novo.processo ? novo : item))
+            );
+            setEditando(null);
+          }}
+        />
+      )}
+
     </div>
   );
 }

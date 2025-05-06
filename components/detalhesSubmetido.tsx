@@ -1,14 +1,18 @@
 'use client';
 
 import { X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { Comparecimento } from '@/types';
 
 interface Props {
   dados: Comparecimento;
   onClose: () => void;
+  onEditar: (dados: Comparecimento) => void;
 }
 
-export default function DetalhesAcusadoModal({ dados, onClose }: Props) {
+export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Props) {
+  const router = useRouter();
+
   return (
     <div className="fixed inset-0 bg-overlay-blue flex items-center justify-center z-50 px-4">
       <div className="relative bg-white p-6 rounded-xl shadow-xl w-full max-w-md space-y-4">
@@ -42,10 +46,16 @@ export default function DetalhesAcusadoModal({ dados, onClose }: Props) {
           <button className="bg-secondary text-white px-4 py-2 rounded hover:bg-green-600">
             Marcar
           </button>
-          <button className="bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark">
+          <button
+            onClick={() => onEditar(dados)}
+            className="bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark"
+          >
             Editar
           </button>
-          <button className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">
+          <button
+            onClick={() => router.push(`/justificarSubmetido?processo=${dados.processo}`)}
+            className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+          >
             Justificar
           </button>
           <button className="bg-danger text-white px-4 py-2 rounded hover:bg-red-700">

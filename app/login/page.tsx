@@ -21,11 +21,11 @@ export default function LoginPage() {
     try {
       const result = await loginFicticio(email, password);
       if (!result.success) {
-        setError(result.message!);
+        setError(result.message ?? 'Usuário ou senha inválidos.');
+        return;
       } else {
         router.push('/dashboard');
       }
-
       setError('');
     }
     catch (e) {

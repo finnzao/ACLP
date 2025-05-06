@@ -43,7 +43,7 @@ function decode(token: string, secret: string): JwtPayload | null {
 
   return payload;
 }
-// 2 horas
+// 2 horas .:. 7200 segundos
 export function signJwt(payload: Omit<JwtPayload, 'exp'>, expiresIn = 7200): string {
   return encode(payload, secret, expiresIn);
 }
