@@ -20,11 +20,16 @@ export default function JustificarSubmetidoPage() {
     setProcesso(proc);
 
     const datas = usuarios
+      .map((item) => ({
+        ...item,
+        periodicidade: item.periodicidade as Comparecimento['periodicidade'],
+        status: item.status as Comparecimento['status'],
+      }))
       .filter((item: Comparecimento) => item.processo === proc)
       .map((item: Comparecimento) => item.ultimoComparecimento)
       .filter(Boolean);
 
-    const unicas = Array.from(new Set(datas)); // evita datas duplicadas
+    const unicas = Array.from(new Set(datas));
     setDatasDisponiveis(unicas);
   }, [searchParams]);
 
