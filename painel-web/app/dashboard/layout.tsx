@@ -8,7 +8,7 @@ import { FiHome, FiPlus, FiSettings, FiGrid } from 'react-icons/fi';
 
 const menuItems = [
   { label: 'Dashboard', path: '/dashboard', icon: FiHome },
-  { label: 'Criar', path: '/dashboard/criar', icon: FiPlus },
+  { label: 'Registrar', path: '/dashboard/registrar', icon: FiPlus },
   { label: 'Geral', path: '/dashboard/geral', icon: FiGrid },
   { label: 'Configurações', path: '/dashboard/configuracoes', icon: FiSettings },
 ];

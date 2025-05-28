@@ -1,0 +1,52 @@
+// app/marcarPresenca/page.tsx
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+export default function MarcarPresencaPage() {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [imageData, setImageData] = useState<string | null>(null);
+    const searchParams = useSearchParams();
+    const processo = searchParams.get('processo');
+
+    useEffect(() => {
+        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        });
+    }, []);
+
+    const capturarFoto = () => {
+        const canvas = document.createElement('canvas');
+        const video = videoRef.current!;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d')?.drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setImageData(dataUrl);
+
+        fetch('/api/verify-face', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ processo, image: dataUrl }),
+        }).then(res => res.json()).then(data => {
+            if (data.success) alert('✅ Presença confirmada!');
+            else alert('❌ Rosto não reconhecido');
+        });
+    };
+
+    return (
+        <div className="p-6 max-w-md mx-auto text-center">
+            <h1 className="text-2xl font-semibold mb-4">Reconhecimento Facial</h1>
+            <video ref={videoRef} autoPlay width="320" height="240" className="mx-auto rounded border" />
+            <button
+                onClick={capturarFoto}
+                className="mt-4 bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark"
+            >
+                Capturar e Marcar Presença
+            </button>
+            {imageData && <img src={imageData} alt="Captura" className="mt-4 rounded" />}
+        </div>
+    );
+}

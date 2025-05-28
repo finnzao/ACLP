@@ -39,7 +39,6 @@ export default function JustificarSubmetidoPage() {
     console.log('Data:', data);
     console.log('Justificativa:', justificativa);
 
-    // Aqui você pode enviar para uma API ou salvar em banco
     router.back();
   }
 

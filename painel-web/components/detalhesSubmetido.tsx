@@ -43,8 +43,9 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
         </div>
 
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button className="bg-secondary text-white px-4 py-2 rounded hover:bg-green-600">
-            Marcar
+          <button onClick={() => router.push(`/dashboard/comparecimento/confirmar?processo=${dados.processo}`)}
+            className="bg-secondary text-white px-4 py-2 rounded hover:bg-green-600">
+            Confirmar Presença
           </button>
           <button
             onClick={() => onEditar(dados)}
@@ -53,7 +54,7 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
             Editar
           </button>
           <button
-            onClick={() => router.push(`/justificarSubmetido?processo=${dados.processo}`)}
+            onClick={() => router.push(`/dashboard/comparecimento/justificar?processo=${dados.processo}`)}
             className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
           >
             Justificar
