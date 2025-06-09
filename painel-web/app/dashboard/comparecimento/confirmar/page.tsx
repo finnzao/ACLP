@@ -1,20 +1,53 @@
-// app/marcarPresenca/page.tsx
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function MarcarPresencaPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [imageData, setImageData] = useState<string | null>(null);
     const searchParams = useSearchParams();
+    const router = useRouter();
     const processo = searchParams.get('processo');
+    const streamRef = useRef<MediaStream | null>(null);
 
     useEffect(() => {
+        // Ativa a câmera
         navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+            streamRef.current = stream;
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
             }
         });
+
+        // Função para parar a câmera
+        const stopCamera = () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach((track) => track.stop());
+                streamRef.current = null;
+            }
+        };
+
+        // Detecta mudança de visibilidade da aba
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                stopCamera();
+            }
+        };
+
+        // Detecta mudança de rota
+        const handleBeforeUnload = () => {
+            stopCamera();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        // Cleanup geral
+        return () => {
+            stopCamera();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
     }, []);
 
     const capturarFoto = () => {
