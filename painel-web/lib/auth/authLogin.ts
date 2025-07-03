@@ -4,7 +4,7 @@ export const loginFicticio = async (email: string, senha: string): Promise<{ suc
       return { success: false, message: 'Preencha todos os campos.' };
     }
   
-    if (email === 'emailteste@gmail.com' && senha === '123') {
+    if (email === 'email@gmail.com' && senha === '123') {
       document.cookie = `token=fake-token; path=/;`;
       return { success: true };
     }
