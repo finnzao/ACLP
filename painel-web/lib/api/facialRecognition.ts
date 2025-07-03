@@ -1,3 +1,4 @@
+// painel-web/lib/api/facialRecognition.ts
 const API_URL = process.env.NEXT_PUBLIC_FACIAL_API_URL || 'http://localhost:5000';
 
 export interface FacialResponse {
@@ -9,9 +10,54 @@ export interface FacialResponse {
   path?: string;
 }
 
+export interface ValidationResponse {
+  valid: boolean;
+  message: string;
+  details: {
+    faceCount?: number;
+    faceRatio?: number;
+    brightness?: number;
+    sharpness?: number;
+    centered?: boolean;
+    faceBox?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  };
+}
+
 export interface CadastroInfo {
   processo: string;
   cadastrado_em: string;
+}
+
+/**
+ * Validar frame em tempo real
+ */
+export async function validarFrame(imageBase64: string): Promise<ValidationResponse> {
+  try {
+    const response = await fetch(`${API_URL}/validar-frame`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: imageBase64
+      }),
+    });
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao validar frame:', error);
+    return {
+      valid: false,
+      message: 'Erro de conexão',
+      details: {}
+    };
+  }
 }
 
 /**
