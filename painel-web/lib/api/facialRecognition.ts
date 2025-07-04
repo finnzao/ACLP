@@ -1,4 +1,6 @@
 // painel-web/lib/api/facialRecognition.ts
+import { createCustomError, ErrorCodes } from '@/lib/utils/errorHandler';
+
 const API_URL = process.env.NEXT_PUBLIC_FACIAL_API_URL || 'http://localhost:5000';
 
 export interface FacialResponse {
@@ -107,14 +109,38 @@ export async function verificarRosto(processo: string, imageBase64: string): Pro
 
     const data = await response.json();
     
+    // Tratar especificamente o caso de não haver foto cadastrada
+    if (response.status === 404) {
+      throw createCustomError(
+        data.message || 'Não há foto cadastrada para este processo',
+        ErrorCodes.NO_REFERENCE_PHOTO,
+        { response: data, status: 404 }
+      );
+    }
+    
+    // Outros erros HTTP
     if (!response.ok) {
-      throw new Error(data.message || 'Erro na verificação');
+      throw createCustomError(
+        data.message || 'Erro na verificação',
+        ErrorCodes.VERIFICATION_ERROR,
+        { response: data, status: response.status }
+      );
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
+    // Re-lançar erros customizados
+    if (error.code) {
+      throw error;
+    }
+    
+    // Erro de rede ou outros erros
     console.error('Erro ao verificar rosto:', error);
-    throw error;
+    throw createCustomError(
+      'Erro de conexão com o servidor',
+      ErrorCodes.NETWORK_ERROR,
+      { originalError: error }
+    );
   }
 }
 

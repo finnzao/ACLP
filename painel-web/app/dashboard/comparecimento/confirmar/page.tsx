@@ -2,8 +2,10 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { verificarRosto, confirmarComparecimento, validarFrame } from '@/lib/api/facialRecognition';
-import { Camera, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { verificarRosto, confirmarComparecimento, validarFrame, salvarRostoReferencia } from '@/lib/api/facialRecognition';
+import { Camera, CheckCircle, XCircle, AlertCircle, Loader2, Save } from 'lucide-react';
+import ModalCadastroReferencia from '@/components/ModalCadastroReferencia';
+import { ErrorCodes, getErrorMessage, isCustomError } from '@/lib/utils/errorHandler';
 
 type EstadoVerificacao = 'inicial' | 'capturando' | 'verificando' | 'sucesso' | 'erro';
 type StatusValidacao = 'neutro' | 'valido' | 'invalido';
@@ -29,6 +31,8 @@ export default function ConfirmarPresencaPage() {
   const [statusValidacao, setStatusValidacao] = useState<StatusValidacao>('neutro');
   const [mensagemValidacao, setMensagemValidacao] = useState('');
   const [podeCapturar, setPodeCapturar] = useState(false);
+  const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
+  const [imagemCapturada, setImagemCapturada] = useState<string | null>(null);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -208,17 +212,64 @@ export default function ConfirmarPresencaPage() {
         }, 3000);
       }
     } catch (error: any) {
-      setEstado('erro');
-      setMensagem(error.message || 'Erro ao verificar identidade. Tente novamente.');
+      console.error('Erro na captura:', error);
       
-      // Voltar para captura após 3 segundos
-      setTimeout(() => {
-        setEstado('capturando');
-        // Reiniciar validação em tempo real
-        intervalRef.current = setInterval(validarFrameTempoReal, 500);
-      }, 3000);
+      // Verificar o tipo de erro usando o sistema de erros
+      if (isCustomError(error) && error.code === ErrorCodes.NO_REFERENCE_PHOTO) {
+        // Não há foto cadastrada - abrir modal para oferecer cadastro
+        setImagemCapturada(imageData);
+        setModalCadastroAberto(true);
+        
+        // Parar câmera enquanto o modal está aberto
+        pararCamera();
+      } else {
+        // Outros tipos de erro
+        setEstado('erro');
+        setMensagem(getErrorMessage(error));
+        
+        // Determinar tempo de retry baseado no tipo de erro
+        const retryDelay = error.code === ErrorCodes.NETWORK_ERROR ? 5000 : 3000;
+        
+        // Voltar para captura após delay
+        setTimeout(() => {
+          setEstado('capturando');
+          // Reiniciar validação em tempo real
+          intervalRef.current = setInterval(validarFrameTempoReal, 500);
+        }, retryDelay);
+      }
     }
   }, [processo, podeCapturar, pararCamera, router, validarFrameTempoReal]);
+
+  // Salvar como referência
+  const salvarComoReferencia = useCallback(async () => {
+    if (!imagemCapturada || !processo) return;
+
+    setEstado('verificando');
+    setMensagem('Salvando foto como referência...');
+
+    try {
+      const resultado = await salvarRostoReferencia(processo, imagemCapturada);
+
+      if (resultado.success) {
+        setEstado('sucesso');
+        setMensagem('Foto salva como referência! Seu comparecimento foi registrado.');
+        
+        // Parar câmera
+        pararCamera();
+        
+        // Redirecionar após 3 segundos
+        setTimeout(() => router.push('/dashboard/geral'), 3000);
+      } else {
+        setEstado('erro');
+        setMensagem(resultado.message || 'Erro ao salvar foto como referência');
+        setModalCadastroAberto(false);
+      }
+    } catch (error: any) {
+      setEstado('erro');
+      setMensagem(error.message || 'Erro ao salvar foto');
+      setModalCadastroAberto(false);
+    }
+  }, [imagemCapturada, processo, pararCamera, router]);
 
   // Captura automática com contagem regressiva
   const iniciarCapturaAutomatica = useCallback(() => {
@@ -467,6 +518,20 @@ export default function ConfirmarPresencaPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Cadastro de Referência */}
+      <ModalCadastroReferencia
+        isOpen={modalCadastroAberto}
+        onClose={() => {
+          setModalCadastroAberto(false);
+          setEstado('capturando');
+          setImagemCapturada(null);
+          iniciarCamera();
+        }}
+        onConfirm={salvarComoReferencia}
+        imagemPreview={imagemCapturada || undefined}
+        processo={processo || ''}
+      />
     </div>
   );
 }
