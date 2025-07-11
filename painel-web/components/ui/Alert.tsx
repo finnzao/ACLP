@@ -2,7 +2,8 @@ import React from 'react';
 
 interface AlertProps {
   type?: 'info' | 'warning' | 'error' | 'success';
-  message: string;
+  message: string | React.ReactNode;
+  className?: string;
 }
 
 const icons: Record<string, string> = {
@@ -19,11 +20,13 @@ const bgColors: Record<string, string> = {
   success: 'bg-secondary text-white',
 };
 
-export const Alert: React.FC<AlertProps> = ({ type = 'info', message }) => {
+export const Alert: React.FC<AlertProps> = ({ type = 'info', message, className = '' }) => {
   return (
-    <div className={`flex items-center gap-2 p-3 rounded-md ${bgColors[type]}`}>
+    <div className={`flex items-center gap-2 p-3 rounded-md ${bgColors[type]} ${className}`}>
       <span>{icons[type]}</span>
-      <span>{message}</span>
+      <div className="flex-1">
+        {typeof message === 'string' ? <span>{message}</span> : message}
+      </div>
     </div>
   );
 };

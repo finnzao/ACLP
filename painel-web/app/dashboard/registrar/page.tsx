@@ -1,9 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import CadastroFacial from '@/components/CadastroFacial';
 import { formatCPF, formatRG, formatProcesso, formatContato } from '@/lib/utils/formatting';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, User, FileText, Calendar } from 'lucide-react';
 
 interface FormData {
   nome: string;
@@ -33,7 +32,7 @@ export default function RegistrarPage() {
     periodicidade: 'mensal',
     dataComparecimentoInicial: ''
   });
-  const [fotoSalva, setFotoSalva] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -59,13 +58,39 @@ export default function RegistrarPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSalvando(true);
     
-    // Aqui você salvaria os dados no banco
-    console.log('Dados do formulário:', formData);
-    console.log('Foto facial salva:', fotoSalva);
-    
-    // Redirecionar para a página geral
-    router.push('/dashboard/geral');
+    try {
+      // Simular salvamento no backend
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Aqui você salvaria os dados no banco
+      console.log('Dados do formulário:', formData);
+      
+      // Ir para etapa de sucesso
+      setEtapa(3);
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar os dados. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const resetarFormulario = () => {
+    setFormData({
+      nome: '',
+      cpf: '',
+      rg: '',
+      contato: '',
+      processo: '',
+      vara: '',
+      comarca: '',
+      decisao: '',
+      periodicidade: 'mensal',
+      dataComparecimentoInicial: ''
+    });
+    setEtapa(1);
   };
 
   return (
@@ -91,7 +116,7 @@ export default function RegistrarPage() {
             Informações do Processo
           </span>
           <span className={etapa === 3 ? 'font-bold text-primary' : 'text-gray-500'}>
-            Cadastro Facial
+            Finalização
           </span>
         </div>
       </div>
@@ -100,7 +125,12 @@ export default function RegistrarPage() {
         {/* Etapa 1: Dados Pessoais */}
         {etapa === 1 && (
           <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Dados Pessoais</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold">Dados Pessoais</h2>
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -180,7 +210,12 @@ export default function RegistrarPage() {
         {/* Etapa 2: Informações do Processo */}
         {etapa === 2 && (
           <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Informações do Processo</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold">Informações do Processo</h2>
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -284,50 +319,69 @@ export default function RegistrarPage() {
                 Voltar
               </button>
               <button
-                type="button"
-                onClick={() => validarEtapa2() && setEtapa(3)}
-                disabled={!validarEtapa2()}
-                className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
+                type="submit"
+                disabled={!validarEtapa2() || salvando}
+                className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-2"
               >
-                Próxima Etapa
+                {salvando ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    Finalizar Cadastro
+                  </>
+                )}
               </button>
             </div>
           </div>
         )}
 
-        {/* Etapa 3: Cadastro Facial */}
+        {/* Etapa 3: Sucesso */}
         {etapa === 3 && (
-          <div className="space-y-6">
-            <CadastroFacial
-              processo={formData.processo}
-              onSuccess={() => setFotoSalva(true)}
-              onError={(error) => console.error('Erro no cadastro facial:', error)}
-            />
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-12 h-12 text-green-500" />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-green-700 mb-4">
+              ✅ Cadastro Realizado com Sucesso!
+            </h2>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <p className="text-green-800 font-medium">
+                A pessoa foi cadastrada no sistema com sucesso.
+              </p>
+              <p className="text-green-700 text-sm mt-2">
+                <strong>{formData.nome}</strong> - Processo: {formData.processo}
+              </p>
+              <p className="text-green-600 text-sm mt-1">
+                Próximo comparecimento: {new Date(formData.dataComparecimentoInicial).toLocaleDateString('pt-BR')}
+              </p>
+            </div>
 
-            {fotoSalva && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-                <span className="text-green-800 font-medium">
-                  Foto facial cadastrada com sucesso!
-                </span>
+            <div className="space-y-4">
+              <p className="text-gray-600">
+                A partir de agora, você pode gerenciar os comparecimentos desta pessoa através do painel geral.
+              </p>
+              
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={resetarFormulario}
+                  className="bg-secondary text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all"
+                >
+                  Cadastrar Outra Pessoa
+                </button>
+                
+                <button
+                  onClick={() => router.push('/dashboard/geral')}
+                  className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-all"
+                >
+                  Ir para o Painel Geral
+                </button>
               </div>
-            )}
-
-            <div className="flex justify-between">
-              <button
-                type="button"
-                onClick={() => setEtapa(2)}
-                className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition-all"
-              >
-                Voltar
-              </button>
-              <button
-                type="submit"
-                disabled={!fotoSalva}
-                className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all font-semibold"
-              >
-                Finalizar Cadastro
-              </button>
             </div>
           </div>
         )}
