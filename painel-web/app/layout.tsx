@@ -1,5 +1,7 @@
 import './globals.css';
 import { Metadata } from 'next';
+import { ToastProvider } from '@/components/Toast';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
   title: 'Sistema de Controle de Comparecimento',
@@ -16,7 +18,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-br">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </AuthProvider>
+      </body>
     </html>
   );
 }

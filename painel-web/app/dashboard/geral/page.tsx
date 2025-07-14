@@ -6,7 +6,8 @@ import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
 import DetalhesAcusadoModal from '@/components/detalhesSubmetido';
 import EditarAcusadoModal from '@/components/editarSubmetido';
-import { Search, Filter, Download, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import ExportButton from '@/components/ExportButton';
+import { Search, Filter, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function GeralPage() {
   const router = useRouter();
@@ -232,6 +233,15 @@ export default function GeralPage() {
     containerRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Informações para exportação
+  const exportFilterInfo = {
+    filtro: filtro || undefined,
+    status: filtroStatus !== 'todos' ? filtroStatus : undefined,
+    urgencia: filtroUrgencia !== 'todos' ? filtroUrgencia : undefined,
+    dataInicio: dataInicio || undefined,
+    dataFim: dataFim || undefined
+  };
+
   // Mostrar loading apenas durante carregamento inicial
   if (initialLoad || loading) {
     return (
@@ -255,10 +265,11 @@ export default function GeralPage() {
         </div>
         
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 bg-secondary text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-all">
-            <Download className="w-4 h-4" />
-            Exportar
-          </button>
+          <ExportButton
+            dados={dados}
+            dadosFiltrados={dadosFiltrados}
+            filterInfo={exportFilterInfo}
+          />
         </div>
       </div>
 
