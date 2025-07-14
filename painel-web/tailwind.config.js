@@ -1,36 +1,58 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    './app/**/*.{js,ts,jsx,tsx}',
-    './components/**/*.{js,ts,jsx,tsx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
       colors: {
-        primary: '#4A90E2',          // Azul claro sereno
-        'primary-light': '#8ABAF3',  // Azul suave para fundo
-        'primary-dark': '#2C3E50',   // Azul escuro para títulos
-        secondary: '#7ED6A7',        // Verde calmante para sucesso
-        warning: '#F6D365',          // Amarelo suave
-        danger: '#E57373',           // Vermelho para erro
-        background: '#E9F1FA',       // Azul claro de fundo
-        'background-deep': '#D6E6F2',// Fundo mais forte para cartões
-        'text-base': '#2F2F2F',      // Texto principal
-        'text-muted': '#6E7B8B',     // Texto secundário
-        'card-bg': '#F9FBFD',        // Cartões
-        border: '#D9E3EC',           // Bordas suaves
-        'accent-blue': '#5B8DEF',    // Destaque
-        'overlay-blue': '#4A90E2aa', // Sobreposições
+        primary: {
+          DEFAULT: '#4A90E2',
+          light: '#7BB3F0',
+          dark: '#2C5AA0'
+        },
+        secondary: {
+          DEFAULT: '#7ED6A7',
+          light: '#A8E6CA',
+          dark: '#5BC084'
+        },
+        warning: {
+          DEFAULT: '#F6D365',
+          light: '#F9E79F',
+          dark: '#F4D03F'
+        },
+        danger: {
+          DEFAULT: '#E57373',
+          light: '#EF9A9A',
+          dark: '#E53E3E'
+        },
+        success: {
+          DEFAULT: '#7ED6A7',
+          light: '#A8E6CA',
+          dark: '#5BC084'
+        },
+        
+        background: {
+          DEFAULT: '#F8FAFC',
+          deep: '#F1F5F9'
+        },
+        'primary-light': '#E3F2FD',
+        'accent-blue': '#64B5F6',
+        
+        'text-base': '#1A202C',
+        'text-muted': '#718096',
+        
+        border: '#E2E8F0',
+        'card-bg': '#FFFFFF',
+        
+        'overlay-blue': 'rgba(74, 144, 226, 0.9)'
       },
       fontFamily: {
-        sans: ['Inter', 'Roboto', 'sans-serif'],
-      },
-      borderRadius: {
-        DEFAULT: '8px',
-        xl: '16px',
-        '2xl': '24px',
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
     },
   },
   plugins: [],
-};
+}

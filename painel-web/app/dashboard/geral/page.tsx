@@ -6,7 +6,7 @@ import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
 import DetalhesAcusadoModal from '@/components/detalhesSubmetido';
 import EditarAcusadoModal from '@/components/editarSubmetido';
-import { Search, Filter, Download, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Search, Filter, Download, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function GeralPage() {
   const router = useRouter();
@@ -25,25 +25,36 @@ export default function GeralPage() {
   const [selecionado, setSelecionado] = useState<Comparecimento | null>(null);
   const [editando, setEditando] = useState<Comparecimento | null>(null);
   const [dados, setDados] = useState<Comparecimento[]>([]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [hasMoreData, setHasMoreData] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
+  
+  // Estados de paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Carregar dados iniciais
   useEffect(() => {
     if (!initialLoad) return;
     
-    const todosOsDados = usuarios.map((item) => ({
-      ...item,
-      periodicidade: item.periodicidade as Comparecimento['periodicidade'],
-      status: item.status as Comparecimento['status'],
-    }));
+    setLoading(true);
     
-    setDados(todosOsDados);
-    setInitialLoad(false);
-    setHasMoreData(false); // Como carregamos todos os dados de uma vez
+    // Simular carregamento do banco de dados
+    const loadData = async () => {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const todosOsDados = usuarios.map((item) => ({
+        ...item,
+        periodicidade: item.periodicidade as Comparecimento['periodicidade'],
+        status: item.status as Comparecimento['status'],
+      }));
+      
+      setDados(todosOsDados);
+      setInitialLoad(false);
+      setLoading(false);
+    };
+    
+    loadData();
   }, [initialLoad]);
 
   // Configurar busca inicial a partir da URL
@@ -76,6 +87,9 @@ export default function GeralPage() {
     
     // Atualizar URL sem recarregar a página
     window.history.replaceState({}, '', newUrl);
+    
+    // Reset pagination when filters change
+    setCurrentPage(1);
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
 
   // Utilitários
@@ -196,6 +210,7 @@ export default function GeralPage() {
     setFiltroUrgencia('todos');
     setDataInicio('');
     setDataFim('');
+    setCurrentPage(1);
     router.push('/dashboard/geral');
   };
 
@@ -206,8 +221,19 @@ export default function GeralPage() {
   const totalHoje = dadosFiltrados.filter(d => isToday(d.proximoComparecimento)).length;
   const totalAtrasados = dadosFiltrados.filter(d => isOverdue(d.proximoComparecimento)).length;
 
+  // Paginação
+  const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const dadosPaginados = dadosFiltrados.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    containerRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   // Mostrar loading apenas durante carregamento inicial
-  if (initialLoad) {
+  if (initialLoad || loading) {
     return (
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -221,7 +247,7 @@ export default function GeralPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6" ref={containerRef}>
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-3xl font-bold text-primary mb-2">Painel Geral de Comparecimentos</h2>
@@ -407,6 +433,12 @@ export default function GeralPage() {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-800">
               Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'pessoa' : 'pessoas'})
+              {totalFiltrados > 0 && (
+                <span className="text-sm text-gray-600 ml-2">
+                  • Página {currentPage} de {totalPages} 
+                  • Mostrando {startIndex + 1}-{Math.min(endIndex, totalFiltrados)} de {totalFiltrados}
+                </span>
+              )}
             </h3>
             {(filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim) && (
               <span className="text-sm text-gray-600">
@@ -432,7 +464,7 @@ export default function GeralPage() {
               </tr>
             </thead>
             <tbody>
-              {dadosFiltrados.map((item, index) => {
+              {dadosPaginados.map((item, index) => {
                 const hoje = isToday(item.proximoComparecimento);
                 const atrasado = isOverdue(item.proximoComparecimento);
                 const diasRestantes = getDaysUntil(item.proximoComparecimento);
@@ -511,6 +543,66 @@ export default function GeralPage() {
           </table>
         </div>
 
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, totalFiltrados)} de {totalFiltrados} resultados
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Anterior
+                </button>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-2 text-sm rounded-lg ${
+                          currentPage === pageNum
+                            ? 'bg-primary text-white'
+                            : 'bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Próxima
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mensagem quando não há resultados */}
         {dadosFiltrados.length === 0 && (
           <div className="p-8 text-center">
@@ -535,43 +627,6 @@ export default function GeralPage() {
           </div>
         )}
       </div>
-
-      {/* Botões de Ação Rápida */}
-      {(totalHoje > 0 || totalAtrasados > 0) && (
-        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h3 className="font-semibold text-yellow-800 mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            Ações Necessárias
-          </h3>
-          <div className="flex flex-wrap gap-3">
-            {totalHoje > 0 && (
-              <button 
-                onClick={() => router.push(createFilterLink({ urgencia: 'hoje' }))}
-                className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2"
-              >
-                <Clock className="w-4 h-4" />
-                Ver Comparecimentos de Hoje ({totalHoje})
-              </button>
-            )}
-            {totalAtrasados > 0 && (
-              <button 
-                onClick={() => router.push(createFilterLink({ urgencia: 'atrasados' }))}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
-              >
-                <AlertTriangle className="w-4 h-4" />
-                Ver Atrasados ({totalAtrasados})
-              </button>
-            )}
-            <button 
-              onClick={() => router.push('/dashboard/validacao-manual')}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
-            >
-              <CheckCircle className="w-4 h-4" />
-              Validação Manual
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Modais */}
       {selecionado && (

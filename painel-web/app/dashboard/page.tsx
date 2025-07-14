@@ -64,6 +64,7 @@ export default function DashboardPage() {
   const [proximosComparecimentos, setProximosComparecimentos] = useState<Comparecimento[]>([]);
   const [alertasUrgentes, setAlertasUrgentes] = useState<Comparecimento[]>([]);
   const [tendenciaData, setTendenciaData] = useState<TendenciaData[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Utilitários de data
   const dateUtils = {
@@ -89,10 +90,21 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    calcularEstatisticas();
-    obterProximosComparecimentos();
-    obterAlertasUrgentes();
-    gerarDadosTendencia();
+    const loadDashboardData = async () => {
+      setLoading(true);
+      
+      // Simular carregamento de dados
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      calcularEstatisticas();
+      obterProximosComparecimentos();
+      obterAlertasUrgentes();
+      gerarDadosTendencia();
+      
+      setLoading(false);
+    };
+
+    loadDashboardData();
   }, []);
 
   const calcularEstatisticas = () => {
@@ -193,6 +205,19 @@ export default function DashboardPage() {
     const searchParams = new URLSearchParams(params);
     return `/dashboard/geral?${searchParams.toString()}`;
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600">Carregando dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
@@ -440,12 +465,12 @@ export default function DashboardPage() {
             </Link>
             
             <Link 
-              href="/dashboard/validacao-manual"
+              href="/dashboard/geral"
               className="block w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors text-center"
             >
               <div className="flex items-center justify-center gap-2">
                 <UserCheck className="w-5 h-5" />
-                Validação Manual de Presença
+                Validação de Presença
               </div>
             </Link>
             

@@ -18,8 +18,8 @@ import usuarios from '@/db/usuarios_mock.json';
 interface RegistroComparecimento {
   processo: string;
   nome: string;
-  dataComparecimento: string;
-  horaComparecimento: string;
+  dataComparecimento?: string;
+  horaComparecimento?: string;
   observacoes: string;
   validadoPor: string;
   tipoValidacao: 'presencial' | 'documental' | 'justificado';
@@ -97,8 +97,8 @@ export default function ConfirmarPresencaPage() {
       const novoRegistro: RegistroComparecimento = {
         processo: pessoa.processo,
         nome: pessoa.nome,
-        dataComparecimento: formulario.dataComparecimento || dateUtils.getCurrentDate(),
-        horaComparecimento: formulario.horaComparecimento || dateUtils.getCurrentTime(),
+        dataComparecimento: formulario.tipoValidacao === 'justificado' ? undefined : formulario.dataComparecimento || dateUtils.getCurrentDate(),
+        horaComparecimento: formulario.tipoValidacao === 'justificado' ? undefined : formulario.horaComparecimento || dateUtils.getCurrentTime(),
         observacoes: formulario.observacoes || '',
         validadoPor: formulario.validadoPor || 'Servidor Atual',
         tipoValidacao: formulario.tipoValidacao || 'presencial'
@@ -108,7 +108,12 @@ export default function ConfirmarPresencaPage() {
       console.log('Comparecimento registrado:', novoRegistro);
 
       setEstado('sucesso');
-      setMensagem('Comparecimento confirmado com sucesso!');
+      
+      if (formulario.tipoValidacao === 'justificado') {
+        setMensagem('Justificativa de ausência registrada com sucesso!');
+      } else {
+        setMensagem('Comparecimento confirmado com sucesso!');
+      }
 
       // Redirecionar após 3 segundos
       setTimeout(() => {
@@ -171,8 +176,10 @@ export default function ConfirmarPresencaPage() {
             Voltar
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-primary-dark">Confirmar Presença</h1>
-            <p className="text-lg text-gray-600">Validação manual de comparecimento</p>
+            <h1 className="text-3xl font-bold text-primary-dark">
+              {formulario.tipoValidacao === 'justificado' ? 'Justificar Ausência' : 'Confirmar Presença'}
+            </h1>
+            <p className="text-lg text-gray-600">Registro de comparecimento</p>
           </div>
         </div>
 
@@ -220,40 +227,7 @@ export default function ConfirmarPresencaPage() {
                   Registrar Comparecimento
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Data do Comparecimento *
-                    </label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                      <input
-                        type="date"
-                        value={formulario.dataComparecimento}
-                        onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Horário do Comparecimento *
-                    </label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                      <input
-                        type="time"
-                        value={formulario.horaComparecimento}
-                        onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
+                {/* Tipo de Validação - Sempre visível */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tipo de Validação *
@@ -266,20 +240,62 @@ export default function ConfirmarPresencaPage() {
                   >
                     <option value="presencial">Presencial</option>
                     <option value="documental">Documental</option>
-                    <option value="justificado">Justificado</option>
+                    <option value="justificado">Justificado (Ausência)</option>
                   </select>
                 </div>
 
+                {/* Campos de Data e Hora - Ocultos quando justificado */}
+                {formulario.tipoValidacao !== 'justificado' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Data do Comparecimento *
+                      </label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="date"
+                          value={formulario.dataComparecimento}
+                          onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Horário do Comparecimento *
+                      </label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="time"
+                          value={formulario.horaComparecimento}
+                          onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Observações
+                    {formulario.tipoValidacao === 'justificado' ? 'Motivo da Ausência' : 'Observações'}
                   </label>
                   <textarea
                     value={formulario.observacoes}
                     onChange={(e) => handleInputChange('observacoes', e.target.value)}
                     rows={4}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                    placeholder="Adicione observações sobre o comparecimento (opcional)..."
+                    placeholder={
+                      formulario.tipoValidacao === 'justificado' 
+                        ? "Descreva o motivo da ausência..." 
+                        : "Adicione observações sobre o comparecimento (opcional)..."
+                    }
+                    required={formulario.tipoValidacao === 'justificado'}
                   />
                 </div>
 
@@ -309,10 +325,14 @@ export default function ConfirmarPresencaPage() {
                 
                 <button
                   onClick={confirmarComparecimento}
-                  className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-medium flex items-center gap-2 shadow-lg"
+                  className={`px-8 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg ${
+                    formulario.tipoValidacao === 'justificado'
+                      ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
                 >
                   <Save className="w-5 h-5" />
-                  Confirmar Presença
+                  {formulario.tipoValidacao === 'justificado' ? 'Registrar Justificativa' : 'Confirmar Presença'}
                 </button>
               </div>
             </div>
@@ -322,8 +342,15 @@ export default function ConfirmarPresencaPage() {
           {estado === 'confirmando' && (
             <div className="p-8 text-center">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6"></div>
-              <h2 className="text-2xl font-bold text-primary-dark mb-2">Confirmando Presença...</h2>
-              <p className="text-gray-600">Aguarde enquanto registramos o comparecimento</p>
+              <h2 className="text-2xl font-bold text-primary-dark mb-2">
+                {formulario.tipoValidacao === 'justificado' ? 'Registrando Justificativa...' : 'Confirmando Presença...'}
+              </h2>
+              <p className="text-gray-600">
+                {formulario.tipoValidacao === 'justificado' 
+                  ? 'Aguarde enquanto registramos a justificativa'
+                  : 'Aguarde enquanto registramos o comparecimento'
+                }
+              </p>
             </div>
           )}
 
@@ -333,16 +360,22 @@ export default function ConfirmarPresencaPage() {
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-12 h-12 text-green-500" />
               </div>
-              <h2 className="text-2xl font-bold text-green-700 mb-2">✅ Presença Confirmada!</h2>
+              <h2 className="text-2xl font-bold text-green-700 mb-2">
+                {formulario.tipoValidacao === 'justificado' ? '✅ Justificativa Registrada!' : '✅ Presença Confirmada!'}
+              </h2>
               <p className="text-gray-600 mb-6">{mensagem}</p>
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                 <p className="text-green-800">
-                  <strong>Comparecimento registrado para:</strong><br />
+                  <strong>
+                    {formulario.tipoValidacao === 'justificado' ? 'Justificativa registrada para:' : 'Comparecimento registrado para:'}
+                  </strong><br />
                   {pessoa?.nome} - Processo: {pessoa?.processo}
                 </p>
-                <p className="text-green-700 text-sm mt-2">
-                  Data/Hora: {dateUtils.formatToBR(formulario.dataComparecimento || '')} às {formulario.horaComparecimento}
-                </p>
+                {formulario.tipoValidacao !== 'justificado' && (
+                  <p className="text-green-700 text-sm mt-2">
+                    Data/Hora: {dateUtils.formatToBR(formulario.dataComparecimento || '')} às {formulario.horaComparecimento}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => router.push('/dashboard/geral')}
@@ -390,14 +423,29 @@ export default function ConfirmarPresencaPage() {
               Importante
             </h3>
             <ul className="space-y-2 text-blue-800">
-              <li className="flex items-start">
-                <span className="mr-2">📝</span>
-                <span>Certifique-se de que a pessoa realmente compareceu antes de confirmar</span>
-              </li>
-              <li className="flex items-start">
-                <span className="mr-2">🕐</span>
-                <span>Registre o horário exato do comparecimento</span>
-              </li>
+              {formulario.tipoValidacao === 'justificado' ? (
+                <>
+                  <li className="flex items-start">
+                    <span className="mr-2">📝</span>
+                    <span>Descreva detalhadamente o motivo da ausência</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">📋</span>
+                    <span>Esta justificativa será registrada no histórico da pessoa</span>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="flex items-start">
+                    <span className="mr-2">📝</span>
+                    <span>Certifique-se de que a pessoa realmente compareceu antes de confirmar</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">🕐</span>
+                    <span>Registre o horário exato do comparecimento</span>
+                  </li>
+                </>
+              )}
               <li className="flex items-start">
                 <span className="mr-2">📋</span>
                 <span>Adicione observações relevantes quando necessário</span>

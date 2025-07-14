@@ -58,10 +58,6 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
     router.push(`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(dados.processo)}`);
   };
 
-  const handleJustificar = () => {
-    router.push(`/dashboard/comparecimento/justificar?processo=${encodeURIComponent(dados.processo)}`);
-  };
-
   const isComparecimentoHoje = dateUtils.isToday(dados.proximoComparecimento);
   const isComparecimentoAtrasado = dateUtils.isOverdue(dados.proximoComparecimento);
   const diasRestantes = dateUtils.getDaysUntil(dados.proximoComparecimento);
@@ -219,7 +215,7 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
             }`}
           >
             <UserCheck className="w-5 h-5" />
-            Confirmar Presença
+            Validar Comparecimento
           </button>
 
           {/* Editar */}
@@ -229,15 +225,6 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
           >
             <Edit className="w-5 h-5" />
             Editar Dados
-          </button>
-
-          {/* Justificar */}
-          <button
-            onClick={handleJustificar}
-            className="flex items-center gap-2 bg-yellow-500 text-white px-6 py-3 rounded-lg hover:bg-yellow-600 font-medium transition-all"
-          >
-            <FileText className="w-5 h-5" />
-            Justificar Ausência
           </button>
 
           {/* Excluir */}
