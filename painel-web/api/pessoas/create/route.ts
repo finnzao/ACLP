@@ -1,11 +1,24 @@
-// painel-web/app/api/pessoas/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { User, ROLE_PERMISSIONS } from '@/types/user';
+import { User, ROLE_PERMISSIONS, UserPermissions } from '@/types/user';
 
 // Simular dados de usuários para validação
 const MOCK_USERS = {
-  '1': { id: '1', role: 'admin' as const, nome: 'João Silva', email: 'admin@tjba.com.br' },
-  '2': { id: '2', role: 'usuario' as const, nome: 'Maria Santos', email: 'usuario@tjba.com.br' }
+  '1': { 
+    id: '1', 
+    role: 'admin' as const, 
+    nome: 'João Silva', 
+    email: 'admin@tjba.com.br',
+    ativo: true,
+    criadoEm: new Date().toISOString()
+  },
+  '2': { 
+    id: '2', 
+    role: 'usuario' as const, 
+    nome: 'Maria Santos', 
+    email: 'usuario@tjba.com.br',
+    ativo: true,
+    criadoEm: new Date().toISOString()
+  }
 };
 
 function getUserFromRequest(request: NextRequest): User | null {
@@ -22,9 +35,14 @@ function getUserFromRequest(request: NextRequest): User | null {
   return user || null;
 }
 
-function hasPermission(user: User, resource: keyof typeof ROLE_PERMISSIONS['admin'], action: keyof typeof ROLE_PERMISSIONS['admin'][keyof typeof ROLE_PERMISSIONS['admin']]): boolean {
+function hasPermission(
+  user: User, 
+  resource: string, 
+  action: string
+): boolean {
   const userPermissions = ROLE_PERMISSIONS[user.role];
-  return userPermissions[resource][action] === true;
+  const resourcePermissions = (userPermissions as any)[resource];
+  return resourcePermissions && resourcePermissions[action] === true;
 }
 
 export async function POST(request: NextRequest) {
@@ -42,6 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Verificar permissão específica
+    // Linha 63: corrigida para usar string literal
     if (!hasPermission(user, 'pessoas', 'cadastrar')) {
       // Log da tentativa de acesso negado
       console.log(`[SECURITY] Tentativa de cadastro negada para usuário ${user.id} (${user.role}) - ${user.email}`);
@@ -186,6 +205,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Verificar permissão de listagem
+    // Linha 207: corrigida para usar string literal
     if (!hasPermission(user, 'pessoas', 'listar')) {
       return NextResponse.json(
         { 

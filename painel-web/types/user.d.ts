@@ -157,7 +157,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
-  hasPermission: (resource: keyof UserPermissions, action: keyof UserPermissions[keyof UserPermissions]) => boolean;
+  hasPermission: (resource: string, action: string) => boolean;
   isAdmin: () => boolean;
   isUsuario: () => boolean;
 }

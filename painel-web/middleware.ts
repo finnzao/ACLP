@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { UserPermissions } from '@/types/user';
 
 interface User {
   id: string;
@@ -94,7 +95,7 @@ function hasPermission(user: User, resource: string, action: string): boolean {
     usuario: {
       pessoas: ['listar', 'visualizar', 'exportar'],
       comparecimentos: ['listar', 'visualizar', 'registrar', 'exportar'],
-      sistema: [],
+      sistema: [] as string[],
       relatorios: ['visualizar', 'exportar'],
       biometria: ['verificar']
     }

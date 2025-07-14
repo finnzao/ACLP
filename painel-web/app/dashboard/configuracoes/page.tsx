@@ -8,6 +8,7 @@ import { NotificacaoItem } from '@/components/NotificacaoItem';
 import { formatEmail, isValidEmail } from '@/lib/utils/formatting';
 import { useAuth, usePermissions } from '@/contexts/AuthContext';
 import { PermissionGuard, AdminArea, PermissionIndicator } from '@/components/PermissionGuard';
+import { UserPermissions } from '@/types/user';
 import { 
   User, 
   Settings, 

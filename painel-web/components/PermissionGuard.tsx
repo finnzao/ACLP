@@ -2,22 +2,21 @@
 
 import { ReactNode } from 'react';
 import { usePermissions } from '@/contexts/AuthContext';
-import { UserPermissions } from '@/types/user';
 import { Shield, Lock, AlertTriangle } from 'lucide-react';
 
 interface PermissionGuardProps {
-  resource: keyof UserPermissions;
-  action: keyof UserPermissions[keyof UserPermissions];
+  resource: string;
+  action: string;
   children: ReactNode;
   fallback?: ReactNode;
   showMessage?: boolean;
-  requireAll?: boolean; // Para múltiplas permissões
+  requireAll?: boolean;
 }
 
 interface MultiPermissionGuardProps {
   permissions: Array<{
-    resource: keyof UserPermissions;
-    action: keyof UserPermissions[keyof UserPermissions];
+    resource: string;
+    action: string;
   }>;
   children: ReactNode;
   fallback?: ReactNode;
@@ -163,8 +162,8 @@ export function usePermissionWrapper() {
   const { hasPermission } = usePermissions();
   
   const wrapWithPermission = (
-    resource: keyof UserPermissions,
-    action: keyof UserPermissions[keyof UserPermissions]
+    resource: string,
+    action: string
   ) => {
     return (children: ReactNode) => (
       <PermissionGuard resource={resource} action={action} showMessage={false}>
@@ -174,8 +173,8 @@ export function usePermissionWrapper() {
   };
   
   const disableIfNoPermission = (
-    resource: keyof UserPermissions,
-    action: keyof UserPermissions[keyof UserPermissions]
+    resource: string,
+    action: string
   ) => {
     const hasAccess = hasPermission(resource, action);
     
@@ -214,8 +213,8 @@ export function PermissionIndicator({
   showWhenDenied = false,
   className = ""
 }: {
-  resource: keyof UserPermissions;
-  action: keyof UserPermissions[keyof UserPermissions];
+  resource: string;
+  action: string;
   showWhenDenied?: boolean;
   className?: string;
 }) {

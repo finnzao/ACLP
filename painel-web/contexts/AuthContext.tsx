@@ -83,7 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (token && savedUser) {
           const userData = JSON.parse(savedUser);
           setUser(userData);
-          setPermissions(ROLE_PERMISSIONS[userData.role]);
+          setPermissions(ROLE_PERMISSIONS[userData.role as UserRole]);
         }
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
@@ -163,12 +163,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const hasPermission = (
-    resource: keyof UserPermissions, 
-    action: keyof UserPermissions[keyof UserPermissions]
+    resource: string, 
+    action: string
   ): boolean => {
     if (!permissions || !user) return false;
     
-    const resourcePermissions = permissions[resource];
+    const resourcePermissions = (permissions as any)[resource];
     if (!resourcePermissions) return false;
     
     return resourcePermissions[action] === true;
@@ -190,7 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     updateUser,
-    hasPermission,
+    hasPermission: hasPermission as any,
     isAdmin,
     isUsuario,
   };
