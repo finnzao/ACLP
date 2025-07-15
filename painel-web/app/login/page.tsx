@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaUser, FaLock, FaChevronRight } from 'react-icons/fa';
 import { Crown, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
@@ -16,7 +16,15 @@ export default function LoginPage() {
   const [showDemoAccounts, setShowDemoAccounts] = useState(false);
   
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Redirecionar se já estiver logado
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      console.log('User is authenticated, redirecting to dashboard');
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +38,15 @@ export default function LoginPage() {
     setError('');
 
     try {
+      console.log('Submitting login form...');
       const success = await login(email, password);
       
       if (success) {
-        router.push('/dashboard');
+        console.log('Login successful, redirecting...');
+        // Aguardar um momento para o estado ser atualizado
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 100);
       } else {
         setError('E-mail ou senha inválidos.');
       }
@@ -54,7 +67,12 @@ export default function LoginPage() {
     try {
       const success = await login(demoEmail, demoPassword);
       if (success) {
-        router.push('/dashboard');
+        console.log('Demo login successful, redirecting...');
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 100);
+      } else {
+        setError('Erro ao fazer login com conta demo.');
       }
     } catch (error) {
       setError('Erro ao fazer login com conta demo.');
@@ -62,6 +80,18 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // Mostrar loading enquanto verifica autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-primary">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light font-sans px-4">

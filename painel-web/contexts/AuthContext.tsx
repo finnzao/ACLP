@@ -1,4 +1,3 @@
-// painel-web/contexts/AuthContext.tsx
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -80,16 +79,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const token = localStorage.getItem('auth-token');
         const savedUser = localStorage.getItem('auth-user');
         
+        console.log('Loading user - Token:', token, 'SavedUser:', savedUser);
+        
         if (token && savedUser) {
           const userData = JSON.parse(savedUser);
           setUser(userData);
           setPermissions(ROLE_PERMISSIONS[userData.role as UserRole]);
+          
+          // Garantir que o cookie também está definido
+          document.cookie = `auth-token=${token}; path=/; max-age=86400`;
+          
+          console.log('User loaded successfully:', userData);
         }
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         // Limpar dados corrompidos
         localStorage.removeItem('auth-token');
         localStorage.removeItem('auth-user');
+        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       } finally {
         setIsLoading(false);
       }
@@ -99,6 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
+    console.log('Attempting login with:', email, password);
     setIsLoading(true);
     
     try {
@@ -109,6 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const foundUser = MOCK_USERS.find(u => u.email === email);
       
       if (!foundUser) {
+        console.log('User not found for email:', email);
         return false;
       }
       
@@ -119,6 +128,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       };
       
       if (validPasswords[email as keyof typeof validPasswords] !== password) {
+        console.log('Invalid password for email:', email);
         return false;
       }
       
@@ -128,12 +138,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         ultimoLogin: new Date().toISOString()
       };
       
+      console.log('Login successful, setting user:', updatedUser);
+      
       // Salvar no estado e localStorage
       setUser(updatedUser);
       setPermissions(ROLE_PERMISSIONS[updatedUser.role]);
       
       localStorage.setItem('auth-token', 'fake-jwt-token');
+      // Também definir cookie para o middleware
+      document.cookie = 'auth-token=fake-jwt-token; path=/; max-age=86400';
       localStorage.setItem('auth-user', JSON.stringify(updatedUser));
+      
+      console.log('User data saved to localStorage');
       
       return true;
     } catch (error) {
@@ -145,10 +161,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
+    console.log('Logging out user');
     setUser(null);
     setPermissions(null);
     localStorage.removeItem('auth-token');
     localStorage.removeItem('auth-user');
+    
+    // Remover cookies
+    document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     
     // Redirecionar para login
     window.location.href = '/login';
