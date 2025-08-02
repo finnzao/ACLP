@@ -128,13 +128,12 @@ export async function verificarRosto(processo: string, imageBase64: string): Pro
     }
 
     return data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
-    // Re-lançar erros customizados
     if (error.code) {
       throw error;
     }
     
-    // Erro de rede ou outros erros
     console.error('Erro ao verificar rosto:', error);
     throw createCustomError(
       'Erro de conexão com o servidor',

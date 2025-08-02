@@ -200,7 +200,7 @@ export interface UserAction {
   userId: string;
   action: string;
   resource: string;
-  details?: any;
+  details?: string;
   ip?: string;
   userAgent?: string;
   timestamp: string;

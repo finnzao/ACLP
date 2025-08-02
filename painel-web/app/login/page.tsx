@@ -6,6 +6,7 @@ import { Crown, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { isValidEmail } from '@/lib/utils/formatting';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -33,7 +34,11 @@ export default function LoginPage() {
       setError('Preencha todos os campos.');
       return;
     }
-    
+    if (!isValidEmail(email)) {
+      setError('E-mail ou senha inválidos.');
+      return;
+    }
+  
     setLoading(true);
     setError('');
 
@@ -71,14 +76,13 @@ export default function LoginPage() {
         setTimeout(() => {
           router.push('/dashboard');
         }, 100);
+        
       } else {
         setError('Erro ao fazer login com conta demo.');
       }
     } catch (error) {
       setError('Erro ao fazer login com conta demo.');
-    } finally {
-      setLoading(false);
-    }
+    } 
   };
 
   // Mostrar loading enquanto verifica autenticação
@@ -133,7 +137,7 @@ export default function LoginPage() {
             <div className="relative">
               <FaUser className="absolute top-3 left-3 text-primary-light" />
               <input
-                type="email"
+                type="text"
                 placeholder="E-mail do usuário"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

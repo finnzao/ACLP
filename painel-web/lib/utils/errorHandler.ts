@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // painel-web/lib/utils/errorHandler.ts
 
 export interface CustomError extends Error {

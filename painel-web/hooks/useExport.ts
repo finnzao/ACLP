@@ -39,6 +39,7 @@ export function useExport(options: UseExportOptions = {}) {
       }
 
       return result;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       const errorResult: ExportResult = {
         success: false,

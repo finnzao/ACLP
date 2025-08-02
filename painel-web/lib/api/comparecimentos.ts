@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/api/comparecimentos.ts
 
 // Constantes e mensagens

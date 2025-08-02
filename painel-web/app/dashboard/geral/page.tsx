@@ -180,8 +180,9 @@ export default function GeralPage() {
       const valB = b[colunaOrdenacao];
 
       if (colunaOrdenacao.includes('Comparecimento') || colunaOrdenacao === 'decisao') {
-        const dateA = new Date(valA);
-        const dateB = new Date(valB);
+        const dateA = valA ? new Date(valA as string | number | Date) : undefined;
+        const dateB = valB ? new Date(valB as string | number | Date) : undefined;
+        if (!dateA || !dateB) return 0;
         return ordem === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
       }
 
@@ -377,7 +378,7 @@ export default function GeralPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Urgência</label>
             <select
               value={filtroUrgencia}
-              onChange={(e) => setFiltroUrgencia(e.target.value as any)}
+              onChange={(e) => setFiltroUrgencia(e.target.value as 'todos' | 'hoje' | 'atrasados' | 'proximos')}
               className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="todos">Todos</option>

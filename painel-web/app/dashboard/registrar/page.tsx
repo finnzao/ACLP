@@ -365,7 +365,7 @@ export default function ProtectedRegistrarPage() {
 }
 
 // Wrapper para auditoria de tentativas de acesso
-export function withPermissionAudit<T extends {}>(
+export function withPermissionAudit<T extends object>(
   Component: React.ComponentType<T>,
   resource: string,
   action: string

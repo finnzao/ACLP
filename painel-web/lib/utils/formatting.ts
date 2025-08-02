@@ -140,19 +140,19 @@ export function formatNumber(value: string, maxLength?: number): string {
 // Validação de período personalizado
 export function validateCustomPeriod(days: string | number): { valid: boolean; error?: string } {
   const numDays = typeof days === 'string' ? parseInt(days) : days;
-  
+
   if (isNaN(numDays)) {
     return { valid: false, error: 'Período deve ser um número válido' };
   }
-  
+
   if (numDays < 1) {
     return { valid: false, error: 'Período deve ser maior que zero' };
   }
-  
+
   if (numDays > 365) {
     return { valid: false, error: 'Período não pode ser maior que 365 dias' };
   }
-  
+
   return { valid: true };
 }
 
@@ -167,23 +167,23 @@ export function formatFullAddress(endereco: {
   cep?: string;
 }): string {
   const parts: string[] = [];
-  
+
   if (endereco.logradouro) {
     let address = endereco.logradouro;
     if (endereco.numero) address += `, ${endereco.numero}`;
     if (endereco.complemento) address += `, ${endereco.complemento}`;
     parts.push(address);
   }
-  
+
   if (endereco.bairro) parts.push(endereco.bairro);
   if (endereco.cidade && endereco.estado) {
     parts.push(`${endereco.cidade} - ${endereco.estado}`);
   } else if (endereco.cidade) {
     parts.push(endereco.cidade);
   }
-  
+
   if (endereco.cep) parts.push(`CEP: ${endereco.cep}`);
-  
+
   return parts.join(', ');
 }
 
@@ -194,26 +194,26 @@ export function sanitizeInput(input: string, options: {
   maxLength?: number;
 } = {}): string {
   let sanitized = input.trim();
-  
+
   if (!options.allowNumbers) {
     sanitized = sanitized.replace(/\d/g, '');
   }
-  
+
   if (!options.allowSpecialChars) {
     sanitized = sanitized.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
   }
-  
+
   if (options.maxLength) {
     sanitized = sanitized.slice(0, options.maxLength);
   }
-  
+
   return sanitized;
 }
 
 // Formatação para exibição em tabelas
 export function formatForDisplay(value: any, type: 'cpf' | 'phone' | 'date' | 'text' = 'text'): string {
   if (!value) return '-';
-  
+
   switch (type) {
     case 'cpf':
       return formatCPF(value);
@@ -224,4 +224,6 @@ export function formatForDisplay(value: any, type: 'cpf' | 'phone' | 'date' | 't
     default:
       return String(value);
   }
+
+
 }

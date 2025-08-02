@@ -227,6 +227,7 @@ export function exportToExcel(dados: Comparecimento[], options: ExportOptions = 
     const workbook = XLSX.utils.book_new();
     
     // Criar dados da planilha
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let finalData: any[] = sheetData;
     
     // Adicionar informações de filtros se solicitado

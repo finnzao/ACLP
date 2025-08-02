@@ -1,4 +1,3 @@
-import { Comparecimento } from './index';
 
 export interface ExportOptions {
   filename?: string;

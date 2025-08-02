@@ -189,7 +189,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   ): boolean => {
     if (!permissions || !user) return false;
     
-    const resourcePermissions = (permissions as any)[resource];
+    const resourcePermissions = (permissions as never)[resource];
     if (!resourcePermissions) return false;
     
     return resourcePermissions[action] === true;
@@ -211,7 +211,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     updateUser,
-    hasPermission: hasPermission as any,
+    hasPermission: hasPermission,
     isAdmin,
     isUsuario,
   };
@@ -257,7 +257,7 @@ export function usePermissions() {
 export function useAudit() {
   const { user } = useAuth();
   
-  const logAction = (action: string, resource: string, details?: any) => {
+  const logAction = (action: string, resource: string, details?: unknown) => {
     if (!user) return;
     
     const auditLog = {

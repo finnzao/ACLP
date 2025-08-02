@@ -191,8 +191,7 @@ export const debounce = <T extends (...args: any[]) => void>(
     };
 };
 
-// Exportar tudo como default também para facilitar imports
-export default {
+const utils = {
     dateUtils,
     textUtils,
     validationUtils,
@@ -200,3 +199,5 @@ export default {
     numberUtils,
     debounce
 };
+
+export default utils;
