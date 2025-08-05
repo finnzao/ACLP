@@ -1,4 +1,3 @@
-// painel-web/types/comparecimento.d.ts
 import type { Periodicidade, StatusComparecimento } from './index';
 
 export interface Endereco {
@@ -85,6 +84,26 @@ export interface NotificacaoPrazo {
   dataEnvio?: string;
   emailDestino: string;
   tipoNotificacao: 'aviso' | 'urgente' | 'vencido';
+}
+
+// Interface para atualização de endereço durante comparecimento
+export interface AtualizacaoEndereco {
+  houveAlteracao: boolean;
+  endereco?: Endereco;
+  motivoAlteracao?: string;
+}
+
+// Interface ampliada para registro de comparecimento
+export interface RegistroComparecimentoCompleto {
+  processo: string;
+  nome: string;
+  dataComparecimento?: string;
+  horaComparecimento?: string;
+  observacoes: string;
+  validadoPor: string;
+  tipoValidacao: 'presencial' | 'documental' | 'justificado';
+  // Novos campos para endereço
+  atualizacaoEndereco?: AtualizacaoEndereco;
 }
 
 // Interface para relatórios

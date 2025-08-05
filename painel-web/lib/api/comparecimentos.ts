@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/api/comparecimentos.ts
 
+import { RegistroComparecimentoCompleto, AtualizacaoEndereco } from '@/types/comparecimento';
+
 // Constantes e mensagens
 const API_ENDPOINTS = {
     BASE: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
@@ -11,13 +13,15 @@ const API_ENDPOINTS = {
       SAVE: 'Dados salvos com sucesso!',
       UPDATE: 'Dados atualizados com sucesso!',
       DELETE: 'Registro excluído com sucesso!',
-      VALIDATION: 'Comparecimento validado com sucesso!'
+      VALIDATION: 'Comparecimento validado com sucesso!',
+      ADDRESS_UPDATED: 'Endereço atualizado com sucesso!'
     },
     ERROR: {
       GENERIC: 'Ocorreu um erro inesperado',
       NETWORK: 'Erro de conexão com o servidor',
       VALIDATION: 'Dados inválidos fornecidos',
-      NOT_FOUND: 'Registro não encontrado'
+      NOT_FOUND: 'Registro não encontrado',
+      ADDRESS_VALIDATION: 'Erro na validação do endereço'
     },
     CONFIRMATION: {
       DELETE: 'Tem certeza que deseja excluir este registro?',
@@ -31,16 +35,6 @@ const API_ENDPOINTS = {
     data?: any;
   }
   
-  export interface RegistroComparecimento {
-    processo: string;
-    nome: string;
-    dataComparecimento: string;
-    horaComparecimento: string;
-    observacoes: string;
-    validadoPor: string;
-    tipoValidacao: 'presencial' | 'documental' | 'justificado';
-  }
-  
   export interface JustificativaAusencia {
     processo: string;
     dataOcorrencia: string;
@@ -50,9 +44,49 @@ const API_ENDPOINTS = {
   }
   
   /**
-   * Registrar comparecimento manual
+   * Registrar comparecimento com possível atualização de endereço
    */
-  export async function registrarComparecimento(dados: RegistroComparecimento): Promise<ComparecimentoResponse> {
+  export async function registrarComparecimentoCompleto(dados: RegistroComparecimentoCompleto): Promise<ComparecimentoResponse> {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/comparecimentos/registrar-completo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dados),
+      });
+  
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || MESSAGES.ERROR.GENERIC);
+      }
+  
+      let message = data.message || MESSAGES.SUCCESS.VALIDATION;
+      
+      // Adicionar informação sobre atualização de endereço na mensagem
+      if (dados.atualizacaoEndereco?.houveAlteracao) {
+        message += ` ${MESSAGES.SUCCESS.ADDRESS_UPDATED}`;
+      }
+  
+      return {
+        success: true,
+        message,
+        data: data.data
+      };
+    } catch (error: any) {
+      console.error('Erro ao registrar comparecimento completo:', error);
+      return {
+        success: false,
+        message: error.message || MESSAGES.ERROR.NETWORK
+      };
+    }
+  }
+
+  /**
+   * Registrar comparecimento manual (função original mantida para compatibilidade)
+   */
+  export async function registrarComparecimento(dados: Omit<RegistroComparecimentoCompleto, 'atualizacaoEndereco'>): Promise<ComparecimentoResponse> {
     try {
       const response = await fetch(`${API_ENDPOINTS.BASE}/comparecimentos/registrar`, {
         method: 'POST',
@@ -78,6 +112,115 @@ const API_ENDPOINTS = {
       return {
         success: false,
         message: error.message || MESSAGES.ERROR.NETWORK
+      };
+    }
+  }
+
+  /**
+   * Atualizar endereço de uma pessoa
+   */
+  export async function atualizarEnderecoPessoa(
+    processo: string, 
+    atualizacao: AtualizacaoEndereco
+  ): Promise<ComparecimentoResponse> {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/pessoas/${encodeURIComponent(processo)}/endereco`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(atualizacao),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || MESSAGES.ERROR.GENERIC);
+      }
+
+      return {
+        success: true,
+        message: data.message || MESSAGES.SUCCESS.ADDRESS_UPDATED,
+        data: data.data
+      };
+    } catch (error: any) {
+      console.error('Erro ao atualizar endereço:', error);
+      return {
+        success: false,
+        message: error.message || MESSAGES.ERROR.ADDRESS_VALIDATION
+      };
+    }
+  }
+
+  /**
+   * Buscar endereço atual de uma pessoa
+   */
+  export async function buscarEnderecoPessoa(processo: string): Promise<ComparecimentoResponse> {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/pessoas/${encodeURIComponent(processo)}/endereco`);
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || MESSAGES.ERROR.GENERIC);
+      }
+
+      return {
+        success: true,
+        message: 'Endereço recuperado com sucesso',
+        data: data.data
+      };
+    } catch (error: any) {
+      console.error('Erro ao buscar endereço:', error);
+      return {
+        success: false,
+        message: error.message || MESSAGES.ERROR.NETWORK
+      };
+    }
+  }
+
+  /**
+   * Validar endereço via CEP
+   */
+  export async function validarEnderecoPorCEP(cep: string): Promise<ComparecimentoResponse> {
+    try {
+      const cleanCep = cep.replace(/\D/g, '');
+      
+      if (cleanCep.length !== 8) {
+        throw new Error('CEP deve ter 8 dígitos');
+      }
+
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      
+      if (!response.ok) {
+        throw new Error('Erro na consulta do CEP');
+      }
+      
+      const data = await response.json();
+      
+      if (data.erro) {
+        throw new Error('CEP não encontrado');
+      }
+      
+      const endereco = {
+        cep: cep,
+        logradouro: data.logradouro || '',
+        bairro: data.bairro || '',
+        cidade: data.localidade || '',
+        estado: data.uf || ''
+      };
+      
+      return {
+        success: true,
+        message: 'CEP validado com sucesso',
+        data: endereco
+      };
+      
+    } catch (error: any) {
+      console.error('Erro ao validar CEP:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao consultar CEP'
       };
     }
   }
@@ -148,6 +291,33 @@ const API_ENDPOINTS = {
       };
     } catch (error: any) {
       console.error('Erro ao buscar histórico:', error);
+      return {
+        success: false,
+        message: error.message || MESSAGES.ERROR.NETWORK
+      };
+    }
+  }
+
+  /**
+   * Buscar histórico de alterações de endereço
+   */
+  export async function buscarHistoricoAlteracaoEndereco(processo: string): Promise<ComparecimentoResponse> {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/pessoas/${encodeURIComponent(processo)}/endereco/historico`);
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || MESSAGES.ERROR.GENERIC);
+      }
+
+      return {
+        success: true,
+        message: 'Histórico de endereços recuperado com sucesso',
+        data: data.data
+      };
+    } catch (error: any) {
+      console.error('Erro ao buscar histórico de endereços:', error);
       return {
         success: false,
         message: error.message || MESSAGES.ERROR.NETWORK

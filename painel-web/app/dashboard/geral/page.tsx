@@ -25,7 +25,6 @@ export default function GeralPage() {
   // Estados de controle
   const [selecionado, setSelecionado] = useState<Comparecimento | null>(null);
   const [editando, setEditando] = useState<Comparecimento | null>(null);
-  const [dados, setDados] = useState<Comparecimento[]>([]);
   const [todosOsDados, setTodosOsDados] = useState<Comparecimento[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -95,32 +94,35 @@ export default function GeralPage() {
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
 
   // Utilitários
-  function limparMascaraProcesso(processo: string) {
+  const limparMascaraProcesso = useCallback((processo: string) => {
     return processo.replace(/\D/g, '');
-  }
+  }, []);
 
-  function normalizarTexto(texto: string) {
+  const normalizarTexto = useCallback((texto: string) => {
     return texto
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
-  }
+  }, []);
 
-  function getDaysUntil(date: string): number {
+  const getDaysUntil = useCallback((date: string): number => {
     const today = new Date();
     const targetDate = new Date(date);
     const diffTime = targetDate.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }
+  }, []);
 
-  function isToday(date: string): boolean {
+  const isToday = useCallback((date: string): boolean => {
     return date === new Date().toISOString().split('T')[0];
-  }
+  }, []);
 
-  function isOverdue(date: string): boolean {
-    return getDaysUntil(date) < 0;
-  }
+  const isOverdue = useCallback((date: string): boolean => {
+    const today = new Date();
+    const targetDate = new Date(date);
+    const diffTime = targetDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) < 0;
+  }, []);
 
   // Filtros
   const filtrarDados = useCallback((data: Comparecimento[]): Comparecimento[] => {
@@ -163,7 +165,7 @@ export default function GeralPage() {
 
       return matchTexto && matchStatus && matchUrgencia && dentroPeriodo;
     });
-  }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
+  }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim, normalizarTexto, limparMascaraProcesso, isToday, isOverdue, getDaysUntil]);
 
 
   const ordenarDados = useCallback((data: Comparecimento[]): Comparecimento[] => {
@@ -363,7 +365,7 @@ export default function GeralPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value as any)}
+              onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'em conformidade' | 'inadimplente')}
               className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
             >
               <option value="todos">Todos</option>
