@@ -1,4 +1,3 @@
-// app/api/verify-face/route.ts
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {

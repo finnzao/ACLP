@@ -1,4 +1,3 @@
-// painel-web/lib/utils/formatting.ts
 
 // Formatação de documentos
 export function formatCPF(value: string): string {
@@ -21,20 +20,24 @@ export function formatProcesso(value: string): string {
   return digits.replace(/^(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})(\d{4})$/, '$1-$2.$3.$4.$5.$6');
 }
 
-export function formatContato(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length < 10) return digits;
-
-  const isCelular = digits.length === 11;
-  return isCelular
-    ? digits.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')
-    : digits.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+/**
+ * Formata número de telefone com máscara (##) #####-####
+ */
+export function formatContato(telefone: string): string {
+  const clean = telefone.replace(/\D/g, '');
+  if (clean.length <= 2) return clean;
+  if (clean.length <= 7) return clean.replace(/^(\d{2})(\d+)/, '($1) $2');
+  return clean.replace(/^(\d{2})(\d{5})(\d+)/, '($1) $2-$3');
 }
 
-// Formatação de endereço
-export function formatCEP(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  return digits.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+
+/**
+ * Formata CEP com máscara #####-###
+ */
+export function formatCEP(cep: string): string {
+  const clean = cep.replace(/\D/g, '');
+  if (clean.length <= 5) return clean;
+  return clean.replace(/^(\d{5})(\d{0,3}).*/, '$1-$2');
 }
 
 // Remover formatação
@@ -210,7 +213,26 @@ export function sanitizeInput(input: string, options: {
   return sanitized;
 }
 
+
+
+/**
+ * Trunca texto para o tamanho máximo especificado, adicionando reticências
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (!text || text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
+
+/**
+ * Formata data em formato ISO para o formato brasileiro (DD/MM/YYYY)
+ */
+export function formatDateToBR(date: string | Date): string {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleDateString('pt-BR');
+}
 // Formatação para exibição em tabelas
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function formatForDisplay(value: any, type: 'cpf' | 'phone' | 'date' | 'text' = 'text'): string {
   if (!value) return '-';
 

@@ -46,6 +46,7 @@ export default function ConfirmarPresencaPage() {
   const [pessoa, setPessoa] = useState<Comparecimento | null>(null);
   const [estado, setEstado] = useState<'inicial' | 'confirmando' | 'sucesso' | 'erro'>('inicial');
   const [mensagem, setMensagem] = useState('');
+  const [mostrarAlerta, setMostrarAlerta] = useState(false);
   const [formulario, setFormulario] = useState<Partial<RegistroComparecimentoCompleto>>({
     dataComparecimento: dateUtils.getCurrentDate(),
     horaComparecimento: dateUtils.getCurrentTime(),
@@ -59,6 +60,9 @@ export default function ConfirmarPresencaPage() {
   const [houveAlteracaoEndereco, setHouveAlteracaoEndereco] = useState<boolean | null>(null);
   const [novoEndereco, setNovoEndereco] = useState<Endereco>({});
   const [motivoAlteracaoEndereco, setMotivoAlteracaoEndereco] = useState('');
+  
+  // Novo estado para verificar se a pergunta sobre endereço foi respondida
+  const [enderecoRespondido, setEnderecoRespondido] = useState(false);
 
   useEffect(() => {
     if (!processo) return;
@@ -89,9 +93,47 @@ export default function ConfirmarPresencaPage() {
     }
   }, [processo]);
 
+  // Atualizar estado de endereçoRespondido quando houveAlteracaoEndereco mudar
+  useEffect(() => {
+    if (houveAlteracaoEndereco !== null) {
+      setEnderecoRespondido(true);
+    } else {
+      setEnderecoRespondido(false);
+    }
+  }, [houveAlteracaoEndereco]);
+
   const confirmarComparecimento = async () => {
     if (!pessoa) return;
+    
+    // Verificar se a pergunta sobre endereço foi respondida
+    if (!enderecoRespondido) {
+      // Exibir mensagem indicando o campo obrigatório
+      const enderecoElement = document.getElementById('secao-endereco');
+      if (enderecoElement) {
+        enderecoElement.scrollIntoView({ behavior: 'smooth' });
+        
+        // Destacar visualmente a seção de endereço
+        enderecoElement.classList.add('animate-pulse');
+        setTimeout(() => {
+          enderecoElement.classList.remove('animate-pulse');
+        }, 2000);
+      }
+      
+      // Atualizar estado para mostrar alerta visual
+      setMensagem('É necessário responder sobre a atualização de endereço.');
+      setMostrarAlerta(true);
+      
+      // Esconder o alerta após 5 segundos
+      setTimeout(() => {
+        setMostrarAlerta(false);
+      }, 5000);
+      
+      return;
+    }
 
+    // Limpar mensagens de erro anteriores
+    setMensagem('');
+    setMostrarAlerta(false);
     setEstado('confirmando');
 
     try {
@@ -162,6 +204,7 @@ export default function ConfirmarPresencaPage() {
 
   const handleRespostaAlteracaoEndereco = (houve: boolean) => {
     setHouveAlteracaoEndereco(houve);
+    setEnderecoRespondido(true);
     if (!houve) {
       // Se não houve alteração, limpar dados
       setNovoEndereco({});
@@ -172,6 +215,7 @@ export default function ConfirmarPresencaPage() {
   const voltarParaPerguntas = () => {
     setMostrarAtualizacaoEndereco(false);
     setHouveAlteracaoEndereco(null);
+    setEnderecoRespondido(false);
     setNovoEndereco({});
     setMotivoAlteracaoEndereco('');
   };
@@ -264,11 +308,17 @@ export default function ConfirmarPresencaPage() {
 
               {/* Seção de Atualização de Endereço */}
               {!mostrarAtualizacaoEndereco && (
-                <div className="mb-8">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div className="mb-8" id="secao-endereco">
+                  <div className={`bg-blue-50 border ${!enderecoRespondido && mensagem ? 'border-red-300 shadow-md' : 'border-blue-200'} rounded-lg p-6 transition-all`}>
                     <div className="flex items-center gap-3 mb-4">
                       <MapPin className="w-6 h-6 text-blue-600" />
                       <h3 className="text-lg font-semibold text-blue-900">Atualização de Endereço</h3>
+                      {!enderecoRespondido && mensagem && (
+                        <span className="bg-red-100 text-red-700 text-sm py-1 px-3 rounded-full ml-2 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          Resposta obrigatória
+                        </span>
+                      )}
                     </div>
                     
                     <p className="text-blue-800 mb-4">
@@ -277,16 +327,18 @@ export default function ConfirmarPresencaPage() {
                     
                     <div className="flex gap-4">
                       <button
-                        onClick={handleMostrarAtualizacaoEndereco}
-                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all font-medium"
+                        onClick={() => handleRespostaAlteracaoEndereco(true)}
+                        className="bg-yellow-500 text-white px-8 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium flex items-center gap-2"
                       >
-                        Verificar/Atualizar Endereço
+                        <MapPin className="w-5 h-5" />
+                        Sim, houve mudança
                       </button>
                       <button
-                        onClick={() => setHouveAlteracaoEndereco(false)}
-                        className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition-all font-medium"
+                        onClick={() => handleRespostaAlteracaoEndereco(false)}
+                        className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium flex items-center gap-2"
                       >
-                        Pular (Sem Alteração)
+                        <CheckCircle className="w-5 h-5" />
+                        Não, mantém o mesmo
                       </button>
                     </div>
                   </div>
@@ -404,115 +456,124 @@ export default function ConfirmarPresencaPage() {
                 </div>
               )}
 
-              {/* Formulário de Confirmação - só aparece após tratar a questão do endereço */}
-              {(houveAlteracaoEndereco !== null || !mostrarAtualizacaoEndereco) && (
-                <div className="space-y-6">
-                  <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Registrar Comparecimento
-                  </h3>
+              {/* Formulário de Confirmação */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Registrar Comparecimento
+                </h3>
 
-                  {/* Tipo de Validação */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Validação *
-                    </label>
-                    <select
-                      value={formulario.tipoValidacao}
-                      onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      required
-                    >
-                      <option value="presencial">Presencial</option>
-                      <option value="documental">Balcão Virtual</option>
-                    </select>
-                  </div>
+                {/* Tipo de Validação */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Validação *
+                  </label>
+                  <select
+                    value={formulario.tipoValidacao}
+                    onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    required
+                  >
+                    <option value="presencial">Presencial</option>
+                    <option value="documental">Balcão Virtual</option>
+                  </select>
+                </div>
 
-                  {/* Campos de Data e Hora */}
-                  {formulario.tipoValidacao !== 'justificado' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Data do Comparecimento *
-                        </label>
-                        <div className="relative">
-                          <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                          <input
-                            type="date"
-                            value={formulario.dataComparecimento}
-                            onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Horário do Comparecimento *
-                        </label>
-                        <div className="relative">
-                          <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                          <input
-                            type="time"
-                            value={formulario.horaComparecimento}
-                            onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                            required
-                          />
-                        </div>
+                {/* Campos de Data e Hora */}
+                {formulario.tipoValidacao !== 'justificado' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Data do Comparecimento *
+                      </label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="date"
+                          value={formulario.dataComparecimento}
+                          onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
                       </div>
                     </div>
-                  )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Observações
-                    </label>
-                    <textarea
-                      value={formulario.observacoes}
-                      onChange={(e) => handleInputChange('observacoes', e.target.value)}
-                      rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                      placeholder="Adicione observações sobre o comparecimento (opcional)..."
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Horário do Comparecimento *
+                      </label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="time"
+                          value={formulario.horaComparecimento}
+                          onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
+                      </div>
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Validado por
-                    </label>
-                    <input
-                      type="text"
-                      value={formulario.validadoPor}
-                      onChange={(e) => handleInputChange('validadoPor', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50"
-                      placeholder="Nome do servidor responsável"
-                      required
-                    />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Observações
+                  </label>
+                  <textarea
+                    value={formulario.observacoes}
+                    onChange={(e) => handleInputChange('observacoes', e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                    placeholder="Adicione observações sobre o comparecimento (opcional)..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Validado por
+                  </label>
+                  <input
+                    type="text"
+                    value={formulario.validadoPor}
+                    onChange={(e) => handleInputChange('validadoPor', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50"
+                    placeholder="Nome do servidor responsável"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Indicador de campos obrigatórios */}
+              {/* Removido o alerta permanente, substituído pelo alerta dinâmico acima */}
+
+              {/* Mensagem de alerta para campos obrigatórios */}
+              {mostrarAlerta && !enderecoRespondido && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 mt-4 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <p className="text-red-700 font-medium">Por favor, responda a pergunta sobre atualização de endereço.</p>
                   </div>
                 </div>
               )}
 
               {/* Botões de Ação */}
-              {(houveAlteracaoEndereco !== null || !mostrarAtualizacaoEndereco) && (
-                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
-                  <button
-                    onClick={() => router.back()}
-                    className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
-                  >
-                    Cancelar
-                  </button>
-                  
-                  <button
-                    onClick={confirmarComparecimento}
-                    className="px-8 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg bg-green-500 text-white hover:bg-green-600"
-                  >
-                    <Save className="w-5 h-5" />
-                    Confirmar Presença
-                  </button>
-                </div>
-              )}
+              <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => router.back()}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
+                >
+                  Cancelar
+                </button>
+                
+                <button
+                  onClick={confirmarComparecimento}
+                  className="px-8 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg bg-green-500 text-white hover:bg-green-600"
+                >
+                  <Save className="w-5 h-5" />
+                  Confirmar Presença
+                </button>
+              </div>
             </div>
           )}
 

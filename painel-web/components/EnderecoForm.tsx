@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, Search, AlertCircle } from 'lucide-react';
+import { MapPin, Search, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Endereco } from '@/types/comparecimento';
-import { formatCEP } from '@/lib/utils/formatting';
 import { useAddressValidation } from '@/hooks/useAddressValidation';
 
 interface EnderecoFormProps {
@@ -23,7 +22,8 @@ export default function EnderecoForm({
 }: EnderecoFormProps) {
   const [localEndereco, setLocalEndereco] = useState<Endereco>(endereco);
   const [cepError, setCepError] = useState('');
-  const { validateCEP, isLoading, lastResult } = useAddressValidation();
+  const [cepSuccess, setCepSuccess] = useState(false);
+  const { validateCEP, formatCEP, isLoading } = useAddressValidation();
 
   // Atualizar estado local quando props mudarem
   useEffect(() => {
@@ -34,32 +34,70 @@ export default function EnderecoForm({
     const updatedEndereco = { ...localEndereco, [field]: value };
     setLocalEndereco(updatedEndereco);
     onEnderecoChange(updatedEndereco);
+    
+    // Se estiver editando campos manualmente, resetar o status de sucesso do CEP
+    if (field !== 'cep' && field !== 'numero' && field !== 'complemento') {
+      setCepSuccess(false);
+    }
   };
 
   const handleCepChange = async (value: string) => {
+    // Limpar status
+    setCepSuccess(false);
+    setCepError('');
+    
+    // Formatar CEP
     const formatted = formatCEP(value);
     handleInputChange('cep', formatted);
-    setCepError('');
 
     // Validar CEP se tiver 8 dígitos
     const cleanCep = value.replace(/\D/g, '');
     if (cleanCep.length === 8) {
-      const result = await validateCEP(cleanCep);
-      
-      if (result.success && result.data) {
-        const enderecoAtualizado = {
-          ...localEndereco,
-          cep: formatted,
-          logradouro: result.data.logradouro,
-          bairro: result.data.bairro,
-          cidade: result.data.cidade,
-          estado: result.data.estado
-        };
-        setLocalEndereco(enderecoAtualizado);
-        onEnderecoChange(enderecoAtualizado);
-      } else {
-        setCepError(result.error || 'CEP não encontrado');
+      try {
+        const result = await validateCEP(cleanCep);
+        
+        if (result.success && result.data) {
+          // Preencher os campos com os dados retornados
+          const enderecoAtualizado = {
+            ...localEndereco,
+            cep: formatted,
+            logradouro: result.data.logradouro || '',
+            bairro: result.data.bairro || '',
+            cidade: result.data.cidade || '',
+            estado: result.data.estado || ''
+          };
+          
+          // Manter número e complemento se já existirem
+          if (localEndereco.numero) {
+            enderecoAtualizado.numero = localEndereco.numero;
+          }
+          if (localEndereco.complemento) {
+            enderecoAtualizado.complemento = localEndereco.complemento;
+          }
+          
+          setLocalEndereco(enderecoAtualizado);
+          onEnderecoChange(enderecoAtualizado);
+          setCepSuccess(true);
+          
+          // Exibir mensagem de sucesso temporária
+          setTimeout(() => {
+            setCepSuccess(false);
+          }, 3000);
+        } else {
+          setCepError(result.error || 'CEP não encontrado');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+        setCepError('Erro ao consultar o CEP. Tente novamente.');
       }
+    }
+  };
+
+  const handleCepBlur = () => {
+    // Quando o campo perder o foco, verificar se tem 8 dígitos
+    const cleanCep = localEndereco.cep?.replace(/\D/g, '') || '';
+    if (cleanCep.length > 0 && cleanCep.length < 8) {
+      setCepError('CEP incompleto. Digite 8 dígitos.');
     }
   };
 
@@ -83,24 +121,38 @@ export default function EnderecoForm({
               type="text"
               value={localEndereco.cep || ''}
               onChange={(e) => handleCepChange(e.target.value)}
+              onBlur={handleCepBlur}
               disabled={disabled}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed
+                ${cepError ? 'border-red-300' : cepSuccess ? 'border-green-300' : 'border-gray-300'}`}
               placeholder="00000-000"
               maxLength={9}
             />
-            {isLoading && (
-              <div className="absolute right-3 top-3">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-              </div>
-            )}
-            {lastResult?.success && (
-              <Search className="absolute right-3 top-3 w-5 h-5 text-green-500" />
-            )}
+            <div className="absolute right-3 top-3">
+              {isLoading && (
+                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+              )}
+              {!isLoading && cepSuccess && (
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              )}
+              {!isLoading && !cepSuccess && !cepError && (
+                <Search className="w-5 h-5 text-gray-400" />
+              )}
+              {!isLoading && cepError && (
+                <AlertCircle className="w-5 h-5 text-red-500" />
+              )}
+            </div>
           </div>
           {cepError && (
             <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
               <AlertCircle className="w-4 h-4" />
               {cepError}
+            </p>
+          )}
+          {cepSuccess && (
+            <p className="text-green-500 text-sm mt-1 flex items-center gap-1">
+              <CheckCircle className="w-4 h-4" />
+              Endereço encontrado!
             </p>
           )}
         </div>
@@ -115,7 +167,7 @@ export default function EnderecoForm({
             onChange={(e) => handleInputChange('estado', e.target.value.toUpperCase())}
             disabled={disabled}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="BA"
+            placeholder="UF"
             maxLength={2}
           />
         </div>

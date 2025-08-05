@@ -1,4 +1,3 @@
-// painel-web/api/comparecimentos/registrar-completo/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { RegistroComparecimentoCompleto, Endereco } from '@/types/comparecimento';
 

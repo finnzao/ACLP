@@ -1,4 +1,3 @@
-// painel-web/app/dashboard/registrar/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
