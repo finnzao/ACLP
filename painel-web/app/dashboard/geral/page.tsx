@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
@@ -12,7 +12,7 @@ import { Search, Filter, AlertTriangle, CheckCircle, Clock, ChevronLeft, Chevron
 export default function GeralPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Estados principais
   const [filtro, setFiltro] = useState('');
   const [colunaOrdenacao, setColunaOrdenacao] = useState<keyof Comparecimento>('nome');
@@ -21,14 +21,15 @@ export default function GeralPage() {
   const [dataFim, setDataFim] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'em conformidade' | 'inadimplente'>('todos');
   const [filtroUrgencia, setFiltroUrgencia] = useState<'todos' | 'hoje' | 'atrasados' | 'proximos'>('todos');
-  
+
   // Estados de controle
   const [selecionado, setSelecionado] = useState<Comparecimento | null>(null);
   const [editando, setEditando] = useState<Comparecimento | null>(null);
   const [dados, setDados] = useState<Comparecimento[]>([]);
+  const [todosOsDados, setTodosOsDados] = useState<Comparecimento[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
-  
+
   // Estados de paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
@@ -37,24 +38,24 @@ export default function GeralPage() {
   // Carregar dados iniciais
   useEffect(() => {
     if (!initialLoad) return;
-    
+
     setLoading(true);
-    
+
     // Simular carregamento do banco de dados
     const loadData = async () => {
       await new Promise(resolve => setTimeout(resolve, 800));
-      
+
       const todosOsDados = usuarios.map((item) => ({
         ...item,
         periodicidade: item.periodicidade as Comparecimento['periodicidade'],
         status: item.status as Comparecimento['status'],
       }));
-      
-      setDados(todosOsDados);
+
+      setTodosOsDados(todosOsDados);
       setInitialLoad(false);
       setLoading(false);
     };
-    
+
     loadData();
   }, [initialLoad]);
 
@@ -76,7 +77,7 @@ export default function GeralPage() {
   // Atualizar URL quando filtros mudarem
   useEffect(() => {
     const params = new URLSearchParams();
-    
+
     if (filtro) params.set('busca', filtro);
     if (filtroStatus !== 'todos') params.set('status', filtroStatus);
     if (filtroUrgencia !== 'todos') params.set('urgencia', filtroUrgencia);
@@ -85,10 +86,10 @@ export default function GeralPage() {
 
     const queryString = params.toString();
     const newUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
-    
+
     // Atualizar URL sem recarregar a página
     window.history.replaceState({}, '', newUrl);
-    
+
     // Reset pagination when filters change
     setCurrentPage(1);
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
@@ -122,12 +123,11 @@ export default function GeralPage() {
   }
 
   // Filtros
-  function filtrarDados(data: Comparecimento[]): Comparecimento[] {
+  const filtrarDados = useCallback((data: Comparecimento[]): Comparecimento[] => {
     return data.filter((item) => {
-      // Filtro de texto
       const termo = filtro.trim();
       let matchTexto = true;
-      
+
       if (termo.length > 0) {
         const primeiraLetra = termo[0];
         const buscandoProcesso = /\d/.test(primeiraLetra);
@@ -142,10 +142,8 @@ export default function GeralPage() {
         matchTexto = buscandoProcesso ? matchProcesso : matchNome;
       }
 
-      // Filtro de status
       const matchStatus = filtroStatus === 'todos' || item.status === filtroStatus;
 
-      // Filtro de urgência
       let matchUrgencia = true;
       if (filtroUrgencia !== 'todos') {
         const hoje = isToday(item.proximoComparecimento);
@@ -153,28 +151,22 @@ export default function GeralPage() {
         const proximo = getDaysUntil(item.proximoComparecimento) <= 7 && !hoje && !atrasado;
 
         switch (filtroUrgencia) {
-          case 'hoje':
-            matchUrgencia = hoje;
-            break;
-          case 'atrasados':
-            matchUrgencia = atrasado;
-            break;
-          case 'proximos':
-            matchUrgencia = proximo;
-            break;
+          case 'hoje': matchUrgencia = hoje; break;
+          case 'atrasados': matchUrgencia = atrasado; break;
+          case 'proximos': matchUrgencia = proximo; break;
         }
       }
 
-      // Filtro de período
-      const dentroPeriodo = (!dataInicio || !dataFim) ? true :
-        new Date(item.proximoComparecimento) >= new Date(dataInicio) &&
-        new Date(item.proximoComparecimento) <= new Date(dataFim);
+      const dentroPeriodo = (!dataInicio || !dataFim) ||
+        (new Date(item.proximoComparecimento) >= new Date(dataInicio) &&
+          new Date(item.proximoComparecimento) <= new Date(dataFim));
 
       return matchTexto && matchStatus && matchUrgencia && dentroPeriodo;
     });
-  }
+  }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
 
-  function ordenarDados(data: Comparecimento[]): Comparecimento[] {
+
+  const ordenarDados = useCallback((data: Comparecimento[]): Comparecimento[] => {
     return [...data].sort((a, b) => {
       const valA = a[colunaOrdenacao];
       const valB = b[colunaOrdenacao];
@@ -190,7 +182,9 @@ export default function GeralPage() {
         ? String(valA).localeCompare(String(valB))
         : String(valB).localeCompare(String(valA));
     });
-  }
+  }, [colunaOrdenacao, ordem]);
+
+
 
   // Função para criar links de filtro rápido
   const createFilterLink = (params: Record<string, string>) => {
@@ -216,7 +210,9 @@ export default function GeralPage() {
     router.push('/dashboard/geral');
   };
 
-  const dadosFiltrados = ordenarDados(filtrarDados(dados));
+  const dadosFiltrados = useMemo(() => {
+    return ordenarDados(filtrarDados(todosOsDados));
+  }, [todosOsDados, filtrarDados, ordenarDados]);
   const totalFiltrados = dadosFiltrados.length;
   const totalEmConformidade = dadosFiltrados.filter(d => d.status === 'em conformidade').length;
   const totalInadimplentes = dadosFiltrados.filter(d => d.status === 'inadimplente').length;
@@ -227,7 +223,10 @@ export default function GeralPage() {
   const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const dadosPaginados = dadosFiltrados.slice(startIndex, endIndex);
+  const dadosPaginados = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return dadosFiltrados.slice(startIndex, startIndex + itemsPerPage);
+  }, [dadosFiltrados, currentPage, itemsPerPage]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -264,10 +263,10 @@ export default function GeralPage() {
           <h2 className="text-3xl font-bold text-primary mb-2">Painel Geral de Comparecimentos</h2>
           <p className="text-text-muted">Gerencie todos os comparecimentos em um só lugar</p>
         </div>
-        
+
         <div className="flex gap-2">
           <ExportButton
-            dados={dados}
+            dados={todosOsDados}
             dadosFiltrados={dadosFiltrados}
             filterInfo={exportFilterInfo}
           />
@@ -302,28 +301,28 @@ export default function GeralPage() {
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <div className="flex flex-wrap gap-2 mb-4">
           <span className="text-sm font-medium text-gray-700">Filtros Rápidos:</span>
-          <button 
+          <button
             onClick={() => router.push(createFilterLink({ urgencia: 'hoje' }))}
             className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm hover:bg-yellow-200 transition-colors"
           >
             <Clock className="w-3 h-3 inline mr-1" />
             Comparecimentos Hoje ({totalHoje})
           </button>
-          <button 
+          <button
             onClick={() => router.push(createFilterLink({ urgencia: 'atrasados' }))}
             className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 transition-colors"
           >
             <AlertTriangle className="w-3 h-3 inline mr-1" />
             Em Atraso ({totalAtrasados})
           </button>
-          <button 
+          <button
             onClick={() => router.push(createFilterLink({ status: 'em conformidade' }))}
             className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm hover:bg-green-200 transition-colors"
           >
             <CheckCircle className="w-3 h-3 inline mr-1" />
             Em Conformidade ({totalEmConformidade})
           </button>
-          <button 
+          <button
             onClick={() => router.push(createFilterLink({ status: 'inadimplente' }))}
             className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 transition-colors"
           >
@@ -331,7 +330,7 @@ export default function GeralPage() {
             Inadimplentes ({totalInadimplentes})
           </button>
           {(filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim) && (
-            <button 
+            <button
               onClick={limparFiltros}
               className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors"
             >
@@ -447,7 +446,7 @@ export default function GeralPage() {
               Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'pessoa' : 'pessoas'})
               {totalFiltrados > 0 && (
                 <span className="text-sm text-gray-600 ml-2">
-                  • Página {currentPage} de {totalPages} 
+                  • Página {currentPage} de {totalPages}
                   • Mostrando {startIndex + 1}-{Math.min(endIndex, totalFiltrados)} de {totalFiltrados}
                 </span>
               )}
@@ -480,13 +479,12 @@ export default function GeralPage() {
                 const hoje = isToday(item.proximoComparecimento);
                 const atrasado = isOverdue(item.proximoComparecimento);
                 const diasRestantes = getDaysUntil(item.proximoComparecimento);
-                
+
                 return (
-                  <tr 
-                    key={index} 
-                    className={`border-b border-border hover:bg-gray-50 transition-colors ${
-                      atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''
-                    }`}
+                  <tr
+                    key={index}
+                    className={`border-b border-border hover:bg-gray-50 transition-colors ${atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''
+                      }`}
                   >
                     <td className="p-3">
                       <div>
@@ -499,9 +497,8 @@ export default function GeralPage() {
                       <p className="text-xs text-text-muted">{item.vara}</p>
                     </td>
                     <td className="p-3 text-center">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                      }`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                        }`}>
                         {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
                       </span>
                     </td>
@@ -509,15 +506,14 @@ export default function GeralPage() {
                       {new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR')}
                     </td>
                     <td className="p-3 text-center">
-                      <div className={`text-sm font-medium ${
-                        atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'
-                      }`}>
+                      <div className={`text-sm font-medium ${atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'
+                        }`}>
                         {new Date(item.proximoComparecimento).toLocaleDateString('pt-BR')}
                       </div>
                       <div className="text-xs text-text-muted">
-                        {atrasado ? `${Math.abs(diasRestantes)} dias atraso` : 
-                         hoje ? 'Hoje' : 
-                         diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
+                        {atrasado ? `${Math.abs(diasRestantes)} dias atraso` :
+                          hoje ? 'Hoje' :
+                            diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
                       </div>
                     </td>
                     <td className="p-3 text-center">
@@ -562,7 +558,7 @@ export default function GeralPage() {
               <div className="text-sm text-gray-600">
                 Mostrando {startIndex + 1} a {Math.min(endIndex, totalFiltrados)} de {totalFiltrados} resultados
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -590,11 +586,10 @@ export default function GeralPage() {
                       <button
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-2 text-sm rounded-lg ${
-                          currentPage === pageNum
-                            ? 'bg-primary text-white'
-                            : 'bg-white border border-gray-300 hover:bg-gray-50'
-                        }`}
+                        className={`px-3 py-2 text-sm rounded-lg ${currentPage === pageNum
+                          ? 'bg-primary text-white'
+                          : 'bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -623,14 +618,14 @@ export default function GeralPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
             <p className="text-gray-500 mb-4">
-              {filtroUrgencia === 'hoje' && totalHoje === 0 ? 
+              {filtroUrgencia === 'hoje' && totalHoje === 0 ?
                 'Não há comparecimentos agendados para hoje.' :
                 filtroUrgencia === 'atrasados' && totalAtrasados === 0 ?
-                'Não há comparecimentos em atraso.' :
-                'Tente ajustar os filtros ou termos de busca'
+                  'Não há comparecimentos em atraso.' :
+                  'Tente ajustar os filtros ou termos de busca'
               }
             </p>
-            <button 
+            <button
               onClick={limparFiltros}
               className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
             >
@@ -661,7 +656,7 @@ export default function GeralPage() {
             setEditando(null);
           }}
           onSave={(novo: Comparecimento) => {
-            setDados((prev) =>
+            setTodosOsDados((prev) =>
               prev.map((item) => (item.processo === novo.processo ? novo : item))
             );
             setEditando(null);

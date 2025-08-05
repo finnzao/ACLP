@@ -19,15 +19,24 @@ function OriginalRegistrarPage() {
     comarca: '',
     decisao: '',
     periodicidade: 'mensal',
-    dataComparecimentoInicial: ''
+    dataComparecimentoInicial: '',
+    diasPeriodicidade: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [diasError, setDiasError] = useState('');
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validar diasPeriodicidade se periodicidade custom for selecionada
+    if (formData.periodicidade === 'custom') {
+      if (!formData.diasPeriodicidade || !/^(?!0)\d+$/.test(formData.diasPeriodicidade)) {
+        setDiasError('Digite apenas números inteiros positivos, sem zero à esquerda.');
+        return;
+      }
+    }
     setLoading(true);
 
     try {
@@ -44,9 +53,24 @@ function OriginalRegistrarPage() {
     }
   };
 
+  // Função para filtrar apenas números inteiros positivos, sem zero à esquerda
+  const filterPositiveInt = (value: string) => {
+    // Remove tudo que não for dígito
+    let filtered = value.replace(/\D/g, '');
+    // Remove zeros à esquerda
+    filtered = filtered.replace(/^0+/, '');
+    return filtered;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'diasPeriodicidade') {
+      const filtered = filterPositiveInt(value);
+      setFormData(prev => ({ ...prev, [name]: filtered }));
+      setDiasError('');
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   if (success) {
@@ -196,7 +220,34 @@ function OriginalRegistrarPage() {
               >
                 <option value="mensal">Mensal</option>
                 <option value="bimensal">Bimensal</option>
+                <option value="custom">Escolher</option>
               </select>
+              {formData.periodicidade === 'custom' && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de dias *</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="diasPeriodicidade"
+                    min="1"
+                    step="1"
+                    value={formData.diasPeriodicidade}
+                    onChange={handleChange}
+                    onInput={e => {
+                      const target = e.target as HTMLInputElement;
+                      const filtered = filterPositiveInt(target.value);
+                      if (target.value !== filtered) {
+                        target.value = filtered;
+                      }
+                    }}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Ex: 15"
+                    autoComplete="off"
+                  />
+                  {diasError && <span className="text-red-500 text-xs">{diasError}</span>}
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2">

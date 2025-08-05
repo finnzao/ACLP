@@ -189,7 +189,7 @@ export default function ConfirmarPresencaPage() {
           {estado === 'inicial' && pessoa && (
             <div className="p-8">
               {/* Informações da Pessoa */}
-              <div className="bg-gradient-to-r from-primary-light to-primary p-6 rounded-xl mb-8 text-white">
+              <div className="bg-primary p-6 rounded-xl mb-8 text-white">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                     <User className="w-8 h-8" />
@@ -239,8 +239,7 @@ export default function ConfirmarPresencaPage() {
                     required
                   >
                     <option value="presencial">Presencial</option>
-                    <option value="documental">Documental</option>
-                    <option value="justificado">Justificado (Ausência)</option>
+                    <option value="documental">Balcão Virtual</option>
                   </select>
                 </div>
 
