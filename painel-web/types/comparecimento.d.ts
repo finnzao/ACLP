@@ -1,19 +1,24 @@
 import type { Periodicidade, StatusComparecimento } from './index';
 
 export interface Endereco {
-  cep?: string;
-  logradouro?: string;
+  cep: string; // Obrigatório
+  logradouro: string; // Obrigatório
   numero?: string;
   complemento?: string;
-  bairro?: string;
-  cidade?: string;
-  estado?: string;
+  bairro: string; // Obrigatório
+  cidade: string; // Obrigatório
+  estado: string; // Obrigatório
 }
 
-export interface Comparecimento {
+// Tipo utilitário para garantir que pelo menos um documento seja fornecido
+type AtLeastOneDocument = 
+  | { cpf: string; rg?: string }  // CPF obrigatório, RG opcional
+  | { cpf?: string; rg: string }  // RG obrigatório, CPF opcional
+  | { cpf: string; rg: string };  // Ambos fornecidos
+
+// Interface base sem CPF/RG
+interface ComparecimentoBase {
   nome: string;
-  cpf: string;
-  rg: string;
   contato: string;
   processo: string;
   vara: string;
@@ -25,32 +30,64 @@ export interface Comparecimento {
   primeiroComparecimento: string;
   ultimoComparecimento: string;
   proximoComparecimento: string;
-  // Novos campos opcionais
-  endereco?: Endereco;
-  periodoEmDias?: number; // Para periodicidade personalizada
+  endereco: Endereco;
   observacoes?: string;
   dataCadastro?: string;
   ultimaAtualizacao?: string;
 }
 
-export interface NovoComparecimento {
+// Interface principal que garante pelo menos um documento
+export interface Comparecimento extends ComparecimentoBase, AtLeastOneDocument {}
+
+// Interface para novo comparecimento
+interface NovoComparecimentoBase {
   nome: string;
-  cpf?: string; // Opcional, mas pelo menos um documento deve existir
-  rg?: string; // Opcional, mas pelo menos um documento deve existir
   contato: string;
   processo: string;
   vara: string;
   comarca: string;
   decisao: string;
-  periodicidade: Periodicidade | 'personalizada';
-  diasPersonalizados?: number; // Para quando periodicidade = 'personalizada'
+  periodicidade: Periodicidade;
   dataComparecimentoInicial: string;
-  endereco?: Endereco;
+  endereco: Endereco;
   observacoes?: string;
 }
 
-export interface ComparecimentoFormData extends NovoComparecimento {
-  periodoEmDias: number;
+export interface NovoComparecimento extends NovoComparecimentoBase, AtLeastOneDocument {}
+
+// Interface mais flexível para formulários (antes da validação)
+export interface ComparecimentoFormData {
+  nome: string;
+  cpf?: string; // Ambos opcionais no formulário
+  rg?: string;  // Mas validação garantirá que pelo menos um existe
+  contato: string;
+  processo: string;
+  vara: string;
+  comarca: string;
+  decisao: string;
+  periodicidade: Periodicidade;
+  dataComparecimentoInicial: string;
+  endereco: Endereco;
+  observacoes?: string;
+}
+
+// Type Guards para verificação em runtime
+export function hasRequiredDocuments(data: ComparecimentoFormData): data is NovoComparecimento {
+  return !!(data.cpf?.trim() || data.rg?.trim());
+}
+
+export function validateDocuments(cpf?: string, rg?: string): { isValid: boolean; error?: string } {
+  const hasCpf = cpf?.trim();
+  const hasRg = rg?.trim();
+  
+  if (!hasCpf && !hasRg) {
+    return {
+      isValid: false,
+      error: 'Pelo menos CPF ou RG deve ser informado'
+    };
+  }
+  
+  return { isValid: true };
 }
 
 // Interface para validação de formulário

@@ -8,12 +8,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Rodrigues",
     "decisao": "2025-02-17",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-02-20",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-20",
     "ultimoComparecimento": "2025-03-22",
-    "proximoComparecimento": "2025-04-21"
+    "proximoComparecimento": "2025-04-21",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Maria Fernanda Nunes",
@@ -24,12 +32,20 @@
     "vara": "7ª Vara Criminal",
     "comarca": "Martins da Serra",
     "decisao": "2025-04-03",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-13",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-13",
     "ultimoComparecimento": "2025-05-13",
-    "proximoComparecimento": "2025-05-28"
+    "proximoComparecimento": "2025-05-28",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Levi Cardoso",
@@ -40,12 +56,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Moura",
     "decisao": "2024-11-22",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-11-30",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-11-30",
     "ultimoComparecimento": "2024-12-30",
-    "proximoComparecimento": "2025-01-29"
+    "proximoComparecimento": "2025-01-29",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sofia Martins",
@@ -56,12 +80,20 @@
     "vara": "1ª Vara Criminal",
     "comarca": "Peixoto do Oeste",
     "decisao": "2024-07-11",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-07-21",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-07-21",
     "ultimoComparecimento": "2024-08-20",
-    "proximoComparecimento": "2024-09-19"
+    "proximoComparecimento": "2024-09-19",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dra. Nina Souza",
@@ -72,12 +104,20 @@
     "vara": "2ª Vara Criminal",
     "comarca": "Melo da Prata",
     "decisao": "2024-06-25",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-07-01",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-07-01",
     "ultimoComparecimento": "2024-07-31",
-    "proximoComparecimento": "2024-08-30"
+    "proximoComparecimento": "2024-08-30",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Danilo Lima",
@@ -88,12 +128,20 @@
     "vara": "2ª Vara Criminal",
     "comarca": "Ferreira",
     "decisao": "2024-08-07",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-08-08",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-08",
     "ultimoComparecimento": "2024-09-07",
-    "proximoComparecimento": "2024-09-28"
+    "proximoComparecimento": "2024-09-28",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dra. Bruna Correia",
@@ -104,12 +152,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Castro",
     "decisao": "2025-02-20",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-02-25",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-25",
     "ultimoComparecimento": "2025-03-27",
-    "proximoComparecimento": "2025-04-26"
+    "proximoComparecimento": "2025-04-26",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Bryan Lopes",
@@ -120,12 +176,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Ramos das Flores",
     "decisao": "2025-02-10",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-02-11",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-11",
     "ultimoComparecimento": "2025-03-13",
-    "proximoComparecimento": "2025-03-29"
+    "proximoComparecimento": "2025-03-29",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Luiz Miguel Souza",
@@ -136,12 +200,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Monteiro",
     "decisao": "2025-03-11",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-03-13",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-03-13",
     "ultimoComparecimento": "2025-04-12",
-    "proximoComparecimento": "2025-05-05"
+    "proximoComparecimento": "2025-05-05",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Bernardo da Mata",
@@ -152,12 +224,20 @@
     "vara": "7ª Vara Criminal",
     "comarca": "da Conceição",
     "decisao": "2025-04-05",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-12",
     "status": "em conformidade",
     "primeiroComparecimento": "2025-04-12",
     "ultimoComparecimento": "2025-06-11",
-    "proximoComparecimento": "2025-08-10"
+    "proximoComparecimento": "2025-08-10",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Ana Sophia Araújo",
@@ -168,12 +248,20 @@
     "vara": "1ª Vara Criminal",
     "comarca": "Costa",
     "decisao": "2025-03-28",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-01",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-01",
     "ultimoComparecimento": "2025-05-01",
-    "proximoComparecimento": "2025-05-31"
+    "proximoComparecimento": "2025-05-31",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Evelyn Nunes",
@@ -184,12 +272,20 @@
     "vara": "9ª Vara Criminal",
     "comarca": "Ramos",
     "decisao": "2024-08-14",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-08-22",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-22",
     "ultimoComparecimento": "2024-09-21",
-    "proximoComparecimento": "2024-10-14"
+    "proximoComparecimento": "2024-10-14",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Vitor Teixeira",
@@ -200,12 +296,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "da Cruz",
     "decisao": "2024-07-31",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-08-06",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-06",
     "ultimoComparecimento": "2024-09-05",
-    "proximoComparecimento": "2024-10-05"
+    "proximoComparecimento": "2024-10-05",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Maria Eduarda Fernandes",
@@ -216,12 +320,20 @@
     "vara": "4ª Vara Criminal",
     "comarca": "Lopes do Oeste",
     "decisao": "2024-12-04",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-12-08",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-12-08",
     "ultimoComparecimento": "2025-01-07",
-    "proximoComparecimento": "2025-02-06"
+    "proximoComparecimento": "2025-02-06",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dr. Pedro Lucas da Rocha",
@@ -232,12 +344,20 @@
     "vara": "9ª Vara Criminal",
     "comarca": "Caldeira",
     "decisao": "2025-04-21",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-04-27",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-27",
     "ultimoComparecimento": "2025-05-27",
-    "proximoComparecimento": "2025-06-19"
+    "proximoComparecimento": "2025-06-19",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Beatriz Porto",
@@ -248,12 +368,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Alves do Amparo",
     "decisao": "2024-10-18",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-10-23",
     "status": "em conformidade",
     "primeiroComparecimento": "2024-10-23",
     "ultimoComparecimento": "2024-12-22",
-    "proximoComparecimento": "2025-02-20"
+    "proximoComparecimento": "2025-02-20",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Catarina Teixeira",
@@ -264,12 +392,20 @@
     "vara": "10ª Vara Criminal",
     "comarca": "Dias",
     "decisao": "2024-05-27",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-05-31",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-05-31",
     "ultimoComparecimento": "2024-06-30",
-    "proximoComparecimento": "2024-07-30"
+    "proximoComparecimento": "2024-07-30",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Srta. Helena Porto",
@@ -280,12 +416,20 @@
     "vara": "4ª Vara Criminal",
     "comarca": "Mendes",
     "decisao": "2025-04-03",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-11",
     "status": "em conformidade",
     "primeiroComparecimento": "2025-04-11",
     "ultimoComparecimento": "2025-06-10",
-    "proximoComparecimento": "2025-08-09"
+    "proximoComparecimento": "2025-08-09",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sr. Benjamin Fogaça",
@@ -296,12 +440,20 @@
     "vara": "3ª Vara Criminal",
     "comarca": "da Mota",
     "decisao": "2025-03-01",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-03-10",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-03-10",
     "ultimoComparecimento": "2025-04-09",
-    "proximoComparecimento": "2025-04-27"
+    "proximoComparecimento": "2025-04-27",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Agatha Correia",
@@ -312,12 +464,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Lima",
     "decisao": "2024-05-27",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-05-29",
     "status": "em conformidade",
     "primeiroComparecimento": "2024-05-29",
     "ultimoComparecimento": "2024-07-28",
-    "proximoComparecimento": "2024-09-26"
+    "proximoComparecimento": "2024-09-26",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Isadora Nunes",
@@ -328,12 +488,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Rodrigues",
     "decisao": "2025-02-17",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-02-20",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-20",
     "ultimoComparecimento": "2025-03-22",
-    "proximoComparecimento": "2025-04-21"
+    "proximoComparecimento": "2025-04-21",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Maria Fernanda Nunes",
@@ -344,12 +512,20 @@
     "vara": "7ª Vara Criminal",
     "comarca": "Martins da Serra",
     "decisao": "2025-04-03",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-13",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-13",
     "ultimoComparecimento": "2025-05-13",
-    "proximoComparecimento": "2025-05-28"
+    "proximoComparecimento": "2025-05-28",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Levi Cardoso",
@@ -360,12 +536,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Moura",
     "decisao": "2024-11-22",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-11-30",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-11-30",
     "ultimoComparecimento": "2024-12-30",
-    "proximoComparecimento": "2025-01-29"
+    "proximoComparecimento": "2025-01-29",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sofia Martins",
@@ -376,12 +560,20 @@
     "vara": "1ª Vara Criminal",
     "comarca": "Peixoto do Oeste",
     "decisao": "2024-07-11",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-07-21",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-07-21",
     "ultimoComparecimento": "2024-08-20",
-    "proximoComparecimento": "2024-09-19"
+    "proximoComparecimento": "2024-09-19",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dra. Nina Souza",
@@ -392,12 +584,20 @@
     "vara": "2ª Vara Criminal",
     "comarca": "Melo da Prata",
     "decisao": "2024-06-25",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-07-01",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-07-01",
     "ultimoComparecimento": "2024-07-31",
-    "proximoComparecimento": "2024-08-30"
+    "proximoComparecimento": "2024-08-30",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Danilo Lima",
@@ -408,12 +608,20 @@
     "vara": "2ª Vara Criminal",
     "comarca": "Ferreira",
     "decisao": "2024-08-07",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-08-08",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-08",
     "ultimoComparecimento": "2024-09-07",
-    "proximoComparecimento": "2024-09-28"
+    "proximoComparecimento": "2024-09-28",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dra. Bruna Correia",
@@ -424,12 +632,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Castro",
     "decisao": "2025-02-20",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-02-25",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-25",
     "ultimoComparecimento": "2025-03-27",
-    "proximoComparecimento": "2025-04-26"
+    "proximoComparecimento": "2025-04-26",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Bryan Lopes",
@@ -440,12 +656,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Ramos das Flores",
     "decisao": "2025-02-10",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-02-11",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-11",
     "ultimoComparecimento": "2025-03-13",
-    "proximoComparecimento": "2025-03-29"
+    "proximoComparecimento": "2025-03-29",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Luiz Miguel Souza",
@@ -456,12 +680,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Monteiro",
     "decisao": "2025-03-11",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-03-13",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-03-13",
     "ultimoComparecimento": "2025-04-12",
-    "proximoComparecimento": "2025-05-05"
+    "proximoComparecimento": "2025-05-05",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Bernardo da Mata",
@@ -472,12 +704,20 @@
     "vara": "7ª Vara Criminal",
     "comarca": "da Conceição",
     "decisao": "2025-04-05",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-12",
     "status": "em conformidade",
     "primeiroComparecimento": "2025-04-12",
     "ultimoComparecimento": "2025-06-11",
-    "proximoComparecimento": "2025-08-10"
+    "proximoComparecimento": "2025-08-10",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Ana Sophia Araújo",
@@ -488,12 +728,20 @@
     "vara": "1ª Vara Criminal",
     "comarca": "Costa",
     "decisao": "2025-03-28",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-01",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-01",
     "ultimoComparecimento": "2025-05-01",
-    "proximoComparecimento": "2025-05-31"
+    "proximoComparecimento": "2025-05-31",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Evelyn Nunes",
@@ -504,12 +752,20 @@
     "vara": "9ª Vara Criminal",
     "comarca": "Ramos",
     "decisao": "2024-08-14",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-08-22",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-22",
     "ultimoComparecimento": "2024-09-21",
-    "proximoComparecimento": "2024-10-14"
+    "proximoComparecimento": "2024-10-14",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Vitor Teixeira",
@@ -520,12 +776,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "da Cruz",
     "decisao": "2024-07-31",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-08-06",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-06",
     "ultimoComparecimento": "2024-09-05",
-    "proximoComparecimento": "2024-10-05"
+    "proximoComparecimento": "2024-10-05",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Maria Eduarda Fernandes",
@@ -536,12 +800,20 @@
     "vara": "4ª Vara Criminal",
     "comarca": "Lopes do Oeste",
     "decisao": "2024-12-04",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-12-08",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-12-08",
     "ultimoComparecimento": "2025-01-07",
-    "proximoComparecimento": "2025-02-06"
+    "proximoComparecimento": "2025-02-06",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dr. Pedro Lucas da Rocha",
@@ -552,12 +824,20 @@
     "vara": "9ª Vara Criminal",
     "comarca": "Caldeira",
     "decisao": "2025-04-21",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-04-27",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-27",
     "ultimoComparecimento": "2025-05-27",
-    "proximoComparecimento": "2025-06-19"
+    "proximoComparecimento": "2025-06-19",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Beatriz Porto",
@@ -568,12 +848,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Alves do Amparo",
     "decisao": "2024-10-18",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-10-23",
     "status": "em conformidade",
     "primeiroComparecimento": "2024-10-23",
     "ultimoComparecimento": "2024-12-22",
-    "proximoComparecimento": "2025-02-20"
+    "proximoComparecimento": "2025-02-20",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Catarina Teixeira",
@@ -584,12 +872,20 @@
     "vara": "10ª Vara Criminal",
     "comarca": "Dias",
     "decisao": "2024-05-27",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-05-31",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-05-31",
     "ultimoComparecimento": "2024-06-30",
-    "proximoComparecimento": "2024-07-30"
+    "proximoComparecimento": "2024-07-30",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Srta. Helena Porto",
@@ -600,12 +896,20 @@
     "vara": "4ª Vara Criminal",
     "comarca": "Mendes",
     "decisao": "2025-04-03",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-11",
     "status": "em conformidade",
     "primeiroComparecimento": "2025-04-11",
     "ultimoComparecimento": "2025-06-10",
-    "proximoComparecimento": "2025-08-09"
+    "proximoComparecimento": "2025-08-09",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sr. Benjamin Fogaça",
@@ -616,12 +920,20 @@
     "vara": "3ª Vara Criminal",
     "comarca": "da Mota",
     "decisao": "2025-03-01",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-03-10",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-03-10",
     "ultimoComparecimento": "2025-04-09",
-    "proximoComparecimento": "2025-04-27"
+    "proximoComparecimento": "2025-04-27",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Agatha Correia",
@@ -632,12 +944,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Lima",
     "decisao": "2024-05-27",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-05-29",
     "status": "em conformidade",
     "primeiroComparecimento": "2024-05-29",
     "ultimoComparecimento": "2024-07-28",
-    "proximoComparecimento": "2024-09-26"
+    "proximoComparecimento": "2024-09-26",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Isadora Nunes",
@@ -648,12 +968,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Rodrigues",
     "decisao": "2025-02-17",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-02-20",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-20",
     "ultimoComparecimento": "2025-03-22",
-    "proximoComparecimento": "2025-04-21"
+    "proximoComparecimento": "2025-04-21",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Maria Fernanda Nunes",
@@ -664,12 +992,20 @@
     "vara": "7ª Vara Criminal",
     "comarca": "Martins da Serra",
     "decisao": "2025-04-03",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-13",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-13",
     "ultimoComparecimento": "2025-05-13",
-    "proximoComparecimento": "2025-05-28"
+    "proximoComparecimento": "2025-05-28",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Levi Cardoso",
@@ -680,12 +1016,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Moura",
     "decisao": "2024-11-22",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-11-30",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-11-30",
     "ultimoComparecimento": "2024-12-30",
-    "proximoComparecimento": "2025-01-29"
+    "proximoComparecimento": "2025-01-29",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sofia Martins",
@@ -696,12 +1040,20 @@
     "vara": "1ª Vara Criminal",
     "comarca": "Peixoto do Oeste",
     "decisao": "2024-07-11",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-07-21",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-07-21",
     "ultimoComparecimento": "2024-08-20",
-    "proximoComparecimento": "2024-09-19"
+    "proximoComparecimento": "2024-09-19",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dra. Nina Souza",
@@ -712,12 +1064,20 @@
     "vara": "2ª Vara Criminal",
     "comarca": "Melo da Prata",
     "decisao": "2024-06-25",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-07-01",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-07-01",
     "ultimoComparecimento": "2024-07-31",
-    "proximoComparecimento": "2024-08-30"
+    "proximoComparecimento": "2024-08-30",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Danilo Lima",
@@ -728,12 +1088,20 @@
     "vara": "2ª Vara Criminal",
     "comarca": "Ferreira",
     "decisao": "2024-08-07",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-08-08",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-08",
     "ultimoComparecimento": "2024-09-07",
-    "proximoComparecimento": "2024-09-28"
+    "proximoComparecimento": "2024-09-28",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dra. Bruna Correia",
@@ -744,12 +1112,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Castro",
     "decisao": "2025-02-20",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-02-25",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-25",
     "ultimoComparecimento": "2025-03-27",
-    "proximoComparecimento": "2025-04-26"
+    "proximoComparecimento": "2025-04-26",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Bryan Lopes",
@@ -760,12 +1136,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Ramos das Flores",
     "decisao": "2025-02-10",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-02-11",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-02-11",
     "ultimoComparecimento": "2025-03-13",
-    "proximoComparecimento": "2025-03-29"
+    "proximoComparecimento": "2025-03-29",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Luiz Miguel Souza",
@@ -776,12 +1160,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Monteiro",
     "decisao": "2025-03-11",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-03-13",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-03-13",
     "ultimoComparecimento": "2025-04-12",
-    "proximoComparecimento": "2025-05-05"
+    "proximoComparecimento": "2025-05-05",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Bernardo da Mata",
@@ -792,12 +1184,20 @@
     "vara": "7ª Vara Criminal",
     "comarca": "da Conceição",
     "decisao": "2025-04-05",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-12",
     "status": "em conformidade",
     "primeiroComparecimento": "2025-04-12",
     "ultimoComparecimento": "2025-06-11",
-    "proximoComparecimento": "2025-08-10"
+    "proximoComparecimento": "2025-08-10",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Ana Sophia Araújo",
@@ -808,12 +1208,20 @@
     "vara": "1ª Vara Criminal",
     "comarca": "Costa",
     "decisao": "2025-03-28",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-01",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-01",
     "ultimoComparecimento": "2025-05-01",
-    "proximoComparecimento": "2025-05-31"
+    "proximoComparecimento": "2025-05-31",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Evelyn Nunes",
@@ -824,12 +1232,20 @@
     "vara": "9ª Vara Criminal",
     "comarca": "Ramos",
     "decisao": "2024-08-14",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-08-22",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-22",
     "ultimoComparecimento": "2024-09-21",
-    "proximoComparecimento": "2024-10-14"
+    "proximoComparecimento": "2024-10-14",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Vitor Teixeira",
@@ -840,12 +1256,20 @@
     "vara": "8ª Vara Criminal",
     "comarca": "da Cruz",
     "decisao": "2024-07-31",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-08-06",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-08-06",
     "ultimoComparecimento": "2024-09-05",
-    "proximoComparecimento": "2024-10-05"
+    "proximoComparecimento": "2024-10-05",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Maria Eduarda Fernandes",
@@ -856,12 +1280,20 @@
     "vara": "4ª Vara Criminal",
     "comarca": "Lopes do Oeste",
     "decisao": "2024-12-04",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-12-08",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-12-08",
     "ultimoComparecimento": "2025-01-07",
-    "proximoComparecimento": "2025-02-06"
+    "proximoComparecimento": "2025-02-06",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Dr. Pedro Lucas da Rocha",
@@ -872,12 +1304,20 @@
     "vara": "9ª Vara Criminal",
     "comarca": "Caldeira",
     "decisao": "2025-04-21",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-04-27",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-04-27",
     "ultimoComparecimento": "2025-05-27",
-    "proximoComparecimento": "2025-06-19"
+    "proximoComparecimento": "2025-06-19",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Beatriz Porto",
@@ -888,12 +1328,20 @@
     "vara": "6ª Vara Criminal",
     "comarca": "Alves do Amparo",
     "decisao": "2024-10-18",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-10-23",
     "status": "em conformidade",
     "primeiroComparecimento": "2024-10-23",
     "ultimoComparecimento": "2024-12-22",
-    "proximoComparecimento": "2025-02-20"
+    "proximoComparecimento": "2025-02-20",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Catarina Teixeira",
@@ -904,12 +1352,20 @@
     "vara": "10ª Vara Criminal",
     "comarca": "Dias",
     "decisao": "2024-05-27",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2024-05-31",
     "status": "inadimplente",
     "primeiroComparecimento": "2024-05-31",
     "ultimoComparecimento": "2024-06-30",
-    "proximoComparecimento": "2024-07-30"
+    "proximoComparecimento": "2024-07-30",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Srta. Helena Porto",
@@ -920,12 +1376,20 @@
     "vara": "4ª Vara Criminal",
     "comarca": "Mendes",
     "decisao": "2025-04-03",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2025-04-11",
     "status": "em conformidade",
     "primeiroComparecimento": "2025-04-11",
     "ultimoComparecimento": "2025-06-10",
-    "proximoComparecimento": "2025-08-09"
+    "proximoComparecimento": "2025-08-09",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sr. Benjamin Fogaça",
@@ -936,12 +1400,20 @@
     "vara": "3ª Vara Criminal",
     "comarca": "da Mota",
     "decisao": "2025-03-01",
-    "periodicidade": "mensal",
+    "periodicidade": 30,
     "dataComparecimentoInicial": "2025-03-10",
     "status": "inadimplente",
     "primeiroComparecimento": "2025-03-10",
     "ultimoComparecimento": "2025-04-09",
-    "proximoComparecimento": "2025-04-27"
+    "proximoComparecimento": "2025-04-27",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   },
   {
     "nome": "Sra. Agatha Correia",
@@ -952,11 +1424,19 @@
     "vara": "8ª Vara Criminal",
     "comarca": "Lima",
     "decisao": "2024-05-27",
-    "periodicidade": "bimensal",
+    "periodicidade": 60,
     "dataComparecimentoInicial": "2024-05-29",
     "status": "em conformidade",
     "primeiroComparecimento": "2024-05-29",
     "ultimoComparecimento": "2024-07-28",
-    "proximoComparecimento": "2024-09-26"
+    "proximoComparecimento": "2024-09-26",
+    "endereco": {
+      "cep": "44001-000",
+      "logradouro": "Praça Castro Alves",
+      "numero": "789",
+      "bairro": "Centro",
+      "cidade": "Feira de Santana",
+      "estado": "BA"
+    }
   }
 ]

@@ -11,6 +11,7 @@ interface EnderecoFormProps {
   disabled?: boolean;
   showTitle?: boolean;
   className?: string;
+  required?: boolean; // Novo prop para indicar se é obrigatório
 }
 
 export default function EnderecoForm({
@@ -18,11 +19,13 @@ export default function EnderecoForm({
   onEnderecoChange,
   disabled = false,
   showTitle = true,
-  className = ''
+  className = '',
+  required = false
 }: EnderecoFormProps) {
   const [localEndereco, setLocalEndereco] = useState<Endereco>(endereco);
   const [cepError, setCepError] = useState('');
   const [cepSuccess, setCepSuccess] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { validateCEP, formatCEP, isLoading } = useAddressValidation();
 
   // Atualizar estado local quando props mudarem
@@ -30,10 +33,44 @@ export default function EnderecoForm({
     setLocalEndereco(endereco);
   }, [endereco]);
 
+  // Validar campos obrigatórios se required for true
+  useEffect(() => {
+    if (required) {
+      const errors: Record<string, string> = {};
+      
+      if (!localEndereco.cep?.trim()) {
+        errors.cep = 'CEP é obrigatório';
+      }
+      if (!localEndereco.logradouro?.trim()) {
+        errors.logradouro = 'Logradouro é obrigatório';
+      }
+      if (!localEndereco.bairro?.trim()) {
+        errors.bairro = 'Bairro é obrigatório';
+      }
+      if (!localEndereco.cidade?.trim()) {
+        errors.cidade = 'Cidade é obrigatória';
+      }
+      if (!localEndereco.estado?.trim()) {
+        errors.estado = 'Estado é obrigatório';
+      }
+      
+      setValidationErrors(errors);
+    }
+  }, [localEndereco, required]);
+
   const handleInputChange = (field: keyof Endereco, value: string) => {
     const updatedEndereco = { ...localEndereco, [field]: value };
     setLocalEndereco(updatedEndereco);
     onEnderecoChange(updatedEndereco);
+    
+    // Limpar erro do campo quando preenchido
+    if (required && value.trim()) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
     
     // Se estiver editando campos manualmente, resetar o status de sucesso do CEP
     if (field !== 'cep' && field !== 'numero' && field !== 'complemento') {
@@ -106,7 +143,17 @@ export default function EnderecoForm({
       {showTitle && (
         <div className="flex items-center gap-2 mb-4">
           <MapPin className="w-5 h-5 text-primary" />
-          <h4 className="text-lg font-medium text-gray-800">Endereço</h4>
+          <h4 className="text-lg font-medium text-gray-800">
+            Endereço {required && <span className="text-red-500">*</span>}
+          </h4>
+        </div>
+      )}
+
+      {required && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <p className="text-sm text-blue-800">
+            <strong>Informação:</strong> Todos os campos de endereço são obrigatórios para o cadastro inicial.
+          </p>
         </div>
       )}
 
@@ -114,7 +161,7 @@ export default function EnderecoForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            CEP
+            CEP {required && <span className="text-red-500">*</span>}
           </label>
           <div className="relative">
             <input
@@ -124,7 +171,7 @@ export default function EnderecoForm({
               onBlur={handleCepBlur}
               disabled={disabled}
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed
-                ${cepError ? 'border-red-300' : cepSuccess ? 'border-green-300' : 'border-gray-300'}`}
+                ${cepError || validationErrors.cep ? 'border-red-300' : cepSuccess ? 'border-green-300' : 'border-gray-300'}`}
               placeholder="00000-000"
               maxLength={9}
             />
@@ -135,18 +182,18 @@ export default function EnderecoForm({
               {!isLoading && cepSuccess && (
                 <CheckCircle className="w-5 h-5 text-green-500" />
               )}
-              {!isLoading && !cepSuccess && !cepError && (
+              {!isLoading && !cepSuccess && !cepError && !validationErrors.cep && (
                 <Search className="w-5 h-5 text-gray-400" />
               )}
-              {!isLoading && cepError && (
+              {!isLoading && (cepError || validationErrors.cep) && (
                 <AlertCircle className="w-5 h-5 text-red-500" />
               )}
             </div>
           </div>
-          {cepError && (
+          {(cepError || validationErrors.cep) && (
             <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
               <AlertCircle className="w-4 h-4" />
-              {cepError}
+              {cepError || validationErrors.cep}
             </p>
           )}
           {cepSuccess && (
@@ -159,17 +206,24 @@ export default function EnderecoForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Estado
+            Estado {required && <span className="text-red-500">*</span>}
           </label>
           <input
             type="text"
             value={localEndereco.estado || ''}
             onChange={(e) => handleInputChange('estado', e.target.value.toUpperCase())}
             disabled={disabled}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed
+              ${validationErrors.estado ? 'border-red-300' : 'border-gray-300'}`}
             placeholder="UF"
             maxLength={2}
           />
+          {validationErrors.estado && (
+            <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {validationErrors.estado}
+            </p>
+          )}
         </div>
       </div>
 
@@ -177,16 +231,23 @@ export default function EnderecoForm({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Logradouro
+            Logradouro {required && <span className="text-red-500">*</span>}
           </label>
           <input
             type="text"
             value={localEndereco.logradouro || ''}
             onChange={(e) => handleInputChange('logradouro', e.target.value)}
             disabled={disabled}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed
+              ${validationErrors.logradouro ? 'border-red-300' : 'border-gray-300'}`}
             placeholder="Rua, Avenida, etc."
           />
+          {validationErrors.logradouro && (
+            <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {validationErrors.logradouro}
+            </p>
+          )}
         </div>
 
         <div>
@@ -222,40 +283,74 @@ export default function EnderecoForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Bairro
+            Bairro {required && <span className="text-red-500">*</span>}
           </label>
           <input
             type="text"
             value={localEndereco.bairro || ''}
             onChange={(e) => handleInputChange('bairro', e.target.value)}
             disabled={disabled}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed
+              ${validationErrors.bairro ? 'border-red-300' : 'border-gray-300'}`}
             placeholder="Centro, Barra, etc."
           />
+          {validationErrors.bairro && (
+            <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {validationErrors.bairro}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Cidade */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Cidade
+          Cidade {required && <span className="text-red-500">*</span>}
         </label>
         <input
           type="text"
           value={localEndereco.cidade || ''}
           onChange={(e) => handleInputChange('cidade', e.target.value)}
           disabled={disabled}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed
+            ${validationErrors.cidade ? 'border-red-300' : 'border-gray-300'}`}
           placeholder="Salvador, Feira de Santana, etc."
         />
+        {validationErrors.cidade && (
+          <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {validationErrors.cidade}
+          </p>
+        )}
       </div>
 
       {/* Informação de ajuda */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-sm text-blue-800">
           <strong>Dica:</strong> Digite o CEP para preenchimento automático dos campos de endereço.
+          {required && " Todos os campos marcados com * são obrigatórios."}
         </p>
       </div>
+
+      {/* Indicador de validação geral */}
+      {required && Object.keys(validationErrors).length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-red-800 mb-1">
+                Preencha todos os campos obrigatórios:
+              </p>
+              <ul className="text-sm text-red-700 list-disc list-inside">
+                {Object.entries(validationErrors).map(([field, error]) => (
+                  <li key={field}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

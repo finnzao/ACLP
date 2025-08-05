@@ -4,11 +4,16 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions, useAudit } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
-import { Lock, Shield, AlertTriangle, ArrowLeft, UserPlus, CheckCircle } from 'lucide-react';
+import { Lock, AlertTriangle, ArrowLeft, UserPlus, CheckCircle } from 'lucide-react';
+import EnderecoForm from '@/components/EnderecoForm';
+import DocumentForm from '@/components/DocumentForm';
+import { Endereco, Periodicidade, ComparecimentoFormData } from '@/types/comparecimento';
+import { PERIODICIDADES_PADROES, PERIODOS_SUGERIDOS, formatarPeriodicidade } from '@/lib/utils/periodicidade';
+import { validateComparecimentoForm, sanitizeComparecimentoData } from '@/lib/utils/validation';
 
-// Componente original de cadastro simplificado
+// Componente original de cadastro atualizado
 function OriginalRegistrarPage() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ComparecimentoFormData>({
     nome: '',
     cpf: '',
     rg: '',
@@ -17,58 +22,106 @@ function OriginalRegistrarPage() {
     vara: '',
     comarca: '',
     decisao: '',
-    periodicidade: 'mensal',
+    periodicidade: PERIODICIDADES_PADROES.MENSAL as Periodicidade,
     dataComparecimentoInicial: '',
-    diasPeriodicidade: ''
+    endereco: {
+      cep: '',
+      logradouro: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: ''
+    }
   });
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [diasError, setDiasError] = useState('');
+  const [periodicidadeCustomizada, setPeriodicidadeCustomizada] = useState(false);
+  const [diasCustomizados, setDiasCustomizados] = useState('');
+  const [validationState, setValidationState] = useState({
+    errors: {} as Record<string, string>,
+    warnings: {} as Record<string, string>,
+    isValid: false
+  });
+
   const router = useRouter();
+
+  // Validar formulário sempre que dados mudarem
+  useEffect(() => {
+    const validation = validateComparecimentoForm(formData);
+    setValidationState({
+      errors: validation.errors,
+      warnings: validation.warnings || {},
+      isValid: validation.isValid
+    });
+  }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Validar diasPeriodicidade se periodicidade custom for selecionada
-    if (formData.periodicidade === 'custom') {
-      if (!formData.diasPeriodicidade || !/^(?!0)\d+$/.test(formData.diasPeriodicidade)) {
-        setDiasError('Digite apenas números inteiros positivos, sem zero à esquerda.');
-        return;
-      }
+    
+    // Validação final
+    const validation = validateComparecimentoForm(formData);
+    if (!validation.isValid) {
+      alert(`Corrija os erros no formulário:\n${Object.values(validation.errors).join('\n')}`);
+      return;
     }
+
     setLoading(true);
 
     try {
+      // Sanitizar dados
+      const cleanData = sanitizeComparecimentoData(formData);
+      
       // Simular salvamento
+      console.log('Dados para salvar:', cleanData);
       await new Promise(resolve => setTimeout(resolve, 2000));
+      
       setSuccess(true);
       setTimeout(() => {
         router.push('/dashboard/geral');
       }, 2000);
     } catch (error) {
       console.error('Erro ao cadastrar:', error);
+      alert('Erro ao cadastrar pessoa. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Função para filtrar apenas números inteiros positivos, sem zero à esquerda
-  const filterPositiveInt = (value: string) => {
-    // Remove tudo que não for dígito
-    let filtered = value.replace(/\D/g, '');
-    // Remove zeros à esquerda
-    filtered = filtered.replace(/^0+/, '');
-    return filtered;
+  const handleInputChange = (field: keyof ComparecimentoFormData, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (name === 'diasPeriodicidade') {
-      const filtered = filterPositiveInt(value);
-      setFormData(prev => ({ ...prev, [name]: filtered }));
-      setDiasError('');
+  const handleEnderecoChange = (endereco: Endereco) => {
+    setFormData(prev => ({ ...prev, endereco }));
+  };
+
+  const handleDocumentChange = (field: 'cpf' | 'rg', value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePeriodicidadeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    
+    if (value === 'custom') {
+      setPeriodicidadeCustomizada(true);
+      setDiasCustomizados('');
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setPeriodicidadeCustomizada(false);
+      handleInputChange('periodicidade', parseInt(value) as Periodicidade);
+    }
+  };
+
+  const handleDiasCustomizadosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDiasCustomizados(value);
+    
+    if (value) {
+      const dias = parseInt(value);
+      if (!isNaN(dias)) {
+        handleInputChange('periodicidade', dias);
+      }
     }
   };
 
@@ -105,163 +158,261 @@ function OriginalRegistrarPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Dados Pessoais */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Dados Pessoais</h3>
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
               <input
                 type="text"
-                name="nome"
                 value={formData.nome}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                onChange={(e) => handleInputChange('nome', e.target.value)}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                  validationState.errors.nome ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="Digite o nome completo"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
-              <input
-                type="text"
-                name="cpf"
-                value={formData.cpf}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="000.000.000-00"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">RG</label>
-              <input
-                type="text"
-                name="rg"
-                value={formData.rg}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="00.000.000-0"
-              />
+              {validationState.errors.nome && (
+                <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  {validationState.errors.nome}
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Contato *</label>
               <input
                 type="text"
-                name="contato"
                 value={formData.contato}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                onChange={(e) => handleInputChange('contato', e.target.value)}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                  validationState.errors.contato ? 'border-red-300' : 'border-gray-300'
+                }`}
                 placeholder="(00) 00000-0000"
               />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Número do Processo *</label>
-              <input
-                type="text"
-                name="processo"
-                value={formData.processo}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="0000000-00.0000.0.00.0000"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Vara *</label>
-              <input
-                type="text"
-                name="vara"
-                value={formData.vara}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Ex: 1ª Vara Criminal"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Comarca *</label>
-              <input
-                type="text"
-                name="comarca"
-                value={formData.comarca}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Ex: Salvador"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Data da Decisão *</label>
-              <input
-                type="date"
-                name="decisao"
-                value={formData.decisao}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Periodicidade *</label>
-              <select
-                name="periodicidade"
-                value={formData.periodicidade}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="mensal">Mensal</option>
-                <option value="bimensal">Bimensal</option>
-                <option value="custom">Escolher</option>
-              </select>
-              {formData.periodicidade === 'custom' && (
-                <div className="mt-3">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade de dias *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="diasPeriodicidade"
-                    min="1"
-                    step="1"
-                    value={formData.diasPeriodicidade}
-                    onChange={handleChange}
-                    onInput={e => {
-                      const target = e.target as HTMLInputElement;
-                      const filtered = filterPositiveInt(target.value);
-                      if (target.value !== filtered) {
-                        target.value = filtered;
-                      }
-                    }}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="Ex: 15"
-                    autoComplete="off"
-                  />
-                  {diasError && <span className="text-red-500 text-xs">{diasError}</span>}
-                </div>
+              {validationState.errors.contato && (
+                <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  {validationState.errors.contato}
+                </p>
               )}
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Data do Primeiro Comparecimento *</label>
-              <input
-                type="date"
-                name="dataComparecimentoInicial"
-                value={formData.dataComparecimentoInicial}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
+              {validationState.warnings.contato && (
+                <p className="text-yellow-600 text-sm mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  {validationState.warnings.contato}
+                </p>
+              )}
             </div>
           </div>
 
+          {/* Documentos */}
+          <DocumentForm
+            cpf={formData.cpf}
+            rg={formData.rg}
+            onDocumentChange={handleDocumentChange}
+          />
+          {validationState.errors.documentos && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-800 text-sm flex items-center gap-1">
+                <AlertTriangle className="w-4 h-4" />
+                {validationState.errors.documentos}
+              </p>
+            </div>
+          )}
+
+          {/* Endereço */}
+          <EnderecoForm
+            endereco={formData.endereco}
+            onEnderecoChange={handleEnderecoChange}
+            required={true}
+          />
+
+          {/* Dados Processuais */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Dados Processuais</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número do Processo *</label>
+                <input
+                  type="text"
+                  value={formData.processo}
+                  onChange={(e) => handleInputChange('processo', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    validationState.errors.processo ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="0000000-00.0000.0.00.0000"
+                />
+                {validationState.errors.processo && (
+                  <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4" />
+                    {validationState.errors.processo}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vara *</label>
+                <input
+                  type="text"
+                  value={formData.vara}
+                  onChange={(e) => handleInputChange('vara', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    validationState.errors.vara ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Ex: 1ª Vara Criminal"
+                />
+                {validationState.errors.vara && (
+                  <p className="text-red-500 text-sm mt-1">{validationState.errors.vara}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comarca *</label>
+                <input
+                  type="text"
+                  value={formData.comarca}
+                  onChange={(e) => handleInputChange('comarca', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    validationState.errors.comarca ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Ex: Salvador"
+                />
+                {validationState.errors.comarca && (
+                  <p className="text-red-500 text-sm mt-1">{validationState.errors.comarca}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Data da Decisão *</label>
+                <input
+                  type="date"
+                  value={formData.decisao}
+                  onChange={(e) => handleInputChange('decisao', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    validationState.errors.decisao ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                />
+                {validationState.errors.decisao && (
+                  <p className="text-red-500 text-sm mt-1">{validationState.errors.decisao}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Data do Primeiro Comparecimento *</label>
+                <input
+                  type="date"
+                  value={formData.dataComparecimentoInicial}
+                  onChange={(e) => handleInputChange('dataComparecimentoInicial', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    validationState.errors.dataComparecimentoInicial ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                />
+                {validationState.errors.dataComparecimentoInicial && (
+                  <p className="text-red-500 text-sm mt-1">{validationState.errors.dataComparecimentoInicial}</p>
+                )}
+                {validationState.warnings.dataComparecimentoInicial && (
+                  <p className="text-yellow-600 text-sm mt-1">{validationState.warnings.dataComparecimentoInicial}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Periodicidade */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Periodicidade de Comparecimento</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Periodicidade *</label>
+              <select
+                onChange={handlePeriodicidadeChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                {Object.entries(PERIODICIDADES_PADROES).map(([nome, dias]) => (
+                  <option key={nome} value={dias}>
+                    {formatarPeriodicidade(dias)}
+                  </option>
+                ))}
+                <option value="custom">Personalizada</option>
+              </select>
+            </div>
+
+            {periodicidadeCustomizada && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantidade de dias *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={diasCustomizados}
+                    onChange={handleDiasCustomizadosChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Ex: 45"
+                  />
+                </div>
+
+                {/* Sugestões */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Sugestões:</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {PERIODOS_SUGERIDOS.map((periodo) => (
+                      <button
+                        key={periodo.dias}
+                        type="button"
+                        onClick={() => setDiasCustomizados(periodo.dias.toString())}
+                        className="text-sm px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-left"
+                      >
+                        {periodo.descricao.split('(')[0].trim()}
+                        <br />
+                        <span className="text-xs text-gray-500">({periodo.dias} dias)</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Validação de periodicidade */}
+                {diasCustomizados && validationState.errors.periodicidade && (
+                  <div className="bg-red-50 border border-red-200 rounded p-3">
+                    <p className="text-sm text-red-800">{validationState.errors.periodicidade}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Prévia da periodicidade */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Periodicidade selecionada:</strong> {formatarPeriodicidade(formData.periodicidade)}
+              </p>
+            </div>
+          </div>
+
+          {/* Indicador de validação geral */}
+          {Object.keys(validationState.errors).length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-red-800 mb-2">
+                    Corrija os erros para continuar:
+                  </p>
+                  <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                    {Object.entries(validationState.errors).map(([field, error]) => (
+                      <li key={field}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Botões de Ação */}
           <div className="flex justify-between items-center pt-6 border-t border-gray-200">
             <button
               type="button"
@@ -274,7 +425,7 @@ function OriginalRegistrarPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !validationState.isValid}
               className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -302,101 +453,30 @@ export default function ProtectedRegistrarPage() {
   const { logAction } = useAudit();
 
   useEffect(() => {
-    // Log da tentativa de acesso
     logAction('page_access', 'registrar_pessoa', { 
       hasPermission: canCreatePeople(),
       userType: isAdmin() ? 'admin' : 'usuario' 
     });
   }, [canCreatePeople, isAdmin, logAction]);
 
-  // Componente de acesso negado personalizado
   const AccessDeniedContent = () => (
     <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-6">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-red-100">
-          {/* Ícone de bloqueio */}
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="w-10 h-10 text-red-600" />
           </div>
-
-          {/* Título e mensagem */}
-          <h1 className="text-2xl font-bold text-red-800 mb-3">
-            Acesso Negado
-          </h1>
-          
-          <div className="space-y-3 mb-6">
-            <p className="text-red-700 font-medium">
-              Você não tem permissão para cadastrar novas pessoas.
-            </p>
-            
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-red-800 mb-1">
-                    Funcionalidade Restrita
-                  </p>
-                  <p className="text-sm text-red-700">
-                    O cadastro de novas pessoas é uma funcionalidade exclusiva para 
-                    administradores do sistema. Esta restrição existe para garantir 
-                    a integridade e segurança dos dados.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-left">
-                  <p className="text-sm font-medium text-blue-800 mb-1">
-                    Suas Permissões Atuais
-                  </p>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Visualizar lista de pessoas</li>
-                    <li>• Registrar comparecimentos</li>
-                    <li>• Exportar relatórios</li>
-                    <li>• Verificar reconhecimento facial</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Ações disponíveis */}
-          <div className="space-y-3">
-            <button
-              onClick={() => router.push('/dashboard/geral')}
-              className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark transition-colors font-medium flex items-center justify-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Voltar ao Painel Geral
-            </button>
-
-            <button
-              onClick={() => router.push('/dashboard/comparecimento/confirmar')}
-              className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
-            >
-              Registrar Comparecimento
-            </button>
-
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-500 mb-2">
-                Precisa cadastrar uma nova pessoa?
-              </p>
-              <p className="text-sm text-gray-700">
-                Entre em contato com um <strong>administrador</strong> do sistema 
-                para solicitar o cadastro ou elevação de suas permissões.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Informações de contato (opcional) */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            <strong>Suporte:</strong> suporte@tjba.jus.br
+          <h1 className="text-2xl font-bold text-red-800 mb-3">Acesso Negado</h1>
+          <p className="text-red-700 font-medium mb-6">
+            Você não tem permissão para cadastrar novas pessoas.
           </p>
+          <button
+            onClick={() => router.push('/dashboard/geral')}
+            className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark transition-colors font-medium flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar ao Painel Geral
+          </button>
         </div>
       </div>
     </div>
@@ -412,26 +492,4 @@ export default function ProtectedRegistrarPage() {
       <OriginalRegistrarPage />
     </PermissionGuard>
   );
-}
-
-// Wrapper para auditoria de tentativas de acesso
-export function withPermissionAudit<T extends object>(
-  Component: React.ComponentType<T>,
-  resource: string,
-  action: string
-) {
-  return function PermissionAuditWrapper(props: T) {
-    const { logAction } = useAudit();
-    const { hasPermission } = usePermissions();
-
-    useEffect(() => {
-      logAction('permission_check', resource, {
-        action,
-        granted: hasPermission(resource, action),
-        timestamp: new Date().toISOString()
-      });
-    }, [logAction, hasPermission]);
-
-    return <Component {...props} />;
-  };
 }

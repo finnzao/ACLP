@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { User, ROLE_PERMISSIONS, UserPermissions } from '@/types/user';
+import { validateComparecimentoForm, validateDocuments } from '@/lib/utils/validation';
+import { ComparecimentoFormData } from '@/types/comparecimento';
 
 // Simular dados de usuários para validação
 const MOCK_USERS = {
@@ -60,7 +62,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Verificar permissão específica
-    // Linha 63: corrigida para usar string literal
     if (!hasPermission(user, 'pessoas', 'cadastrar')) {
       // Log da tentativa de acesso negado
       console.log(`[SECURITY] Tentativa de cadastro negada para usuário ${user.id} (${user.role}) - ${user.email}`);
@@ -80,34 +81,36 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Validar dados de entrada
-    const body = await request.json();
+    const body: ComparecimentoFormData = await request.json();
     
-    const requiredFields = ['nome', 'processo', 'vara', 'comarca', 'decisao', 'dataComparecimentoInicial'];
-    const missingFields = requiredFields.filter(field => !body[field]);
+    // Validação completa do formulário
+    const validation = validateComparecimentoForm(body);
     
-    if (missingFields.length > 0) {
+    if (!validation.isValid) {
       return NextResponse.json(
         { 
           error: 'Validation Error', 
-          message: 'Campos obrigatórios não preenchidos.',
-          missingFields 
+          message: 'Dados inválidos fornecidos.',
+          errors: validation.errors,
+          warnings: validation.warnings
         },
         { status: 400 }
       );
     }
 
-    // Validar que pelo menos CPF ou RG estão preenchidos
-    if (!body.cpf && !body.rg) {
+    // 4. Validação específica de documentos (redundante, mas importante)
+    const docValidation = validateDocuments(body.cpf, body.rg);
+    if (!docValidation.isValid) {
       return NextResponse.json(
         { 
           error: 'Validation Error', 
-          message: 'Pelo menos CPF ou RG deve ser informado.' 
+          message: docValidation.error
         },
         { status: 400 }
       );
     }
 
-    // 4. Validações de negócio
+    // 5. Validações de negócio específicas
     const processo = body.processo.replace(/\D/g, '');
     if (processo.length !== 20) {
       return NextResponse.json(
@@ -119,8 +122,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se processo já existe (simulação)
-    // Em produção, consultar banco de dados
+    // 6. Verificar se processo já existe (simulação)
     const processoExistente = false; // Simular consulta
     if (processoExistente) {
       return NextResponse.json(
@@ -132,24 +134,71 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Processar dados
+    // 7. Validar se há conflito de documentos
+    if (body.cpf?.trim()) {
+      // Simular verificação de CPF duplicado
+      const cpfExistente = false; // Em produção, consultar banco
+      if (cpfExistente) {
+        return NextResponse.json(
+          { 
+            error: 'Conflict', 
+            message: 'CPF já cadastrado no sistema.' 
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    if (body.rg?.trim()) {
+      // Simular verificação de RG duplicado
+      const rgExistente = false; // Em produção, consultar banco
+      if (rgExistente) {
+        return NextResponse.json(
+          { 
+            error: 'Conflict', 
+            message: 'RG já cadastrado no sistema.' 
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // 8. Processar dados para salvamento
     const novaPessoa = {
       id: `pessoa_${Date.now()}`,
       ...body,
+      // Garantir que apenas documentos preenchidos sejam salvos
+      cpf: body.cpf?.trim() || undefined,
+      rg: body.rg?.trim() || undefined,
       status: 'em conformidade',
+      primeiroComparecimento: body.dataComparecimentoInicial,
+      ultimoComparecimento: body.dataComparecimentoInicial,
+      proximoComparecimento: calcularProximoComparecimento(
+        body.dataComparecimentoInicial, 
+        body.periodicidade
+      ),
       criadoPor: user.id,
       criadoEm: new Date().toISOString(),
       ultimaAtualizacao: new Date().toISOString()
     };
 
-    // 6. Salvar no banco de dados (simulação)
+    // 9. Salvar no banco de dados (simulação)
     console.log(`[INFO] Nova pessoa cadastrada por ${user.nome} (${user.email}):`, {
       processo: novaPessoa.processo,
       nome: novaPessoa.nome,
+      documentos: {
+        cpf: novaPessoa.cpf ? 'Informado' : 'Não informado',
+        rg: novaPessoa.rg ? 'Informado' : 'Não informado'
+      },
+      endereco: {
+        cidade: novaPessoa.endereco.cidade,
+        estado: novaPessoa.endereco.estado
+      },
+      periodicidade: `${novaPessoa.periodicidade} dias`,
       criadoEm: novaPessoa.criadoEm
     });
 
-    // 7. Log de auditoria
+    // 10. Log de auditoria detalhado
     const auditLog = {
       userId: user.id,
       userName: user.nome,
@@ -158,7 +207,13 @@ export async function POST(request: NextRequest) {
       resourceId: novaPessoa.id,
       details: {
         processo: novaPessoa.processo,
-        nome: novaPessoa.nome
+        nome: novaPessoa.nome,
+        documentos: {
+          cpf: !!novaPessoa.cpf,
+          rg: !!novaPessoa.rg
+        },
+        endereco: novaPessoa.endereco,
+        periodicidade: novaPessoa.periodicidade
       },
       timestamp: new Date().toISOString(),
       ip: request.headers.get('x-forwarded-for') || 'unknown',
@@ -168,7 +223,7 @@ export async function POST(request: NextRequest) {
     // Em produção, salvar no sistema de auditoria
     console.log('[AUDIT]', auditLog);
 
-    // 8. Retornar sucesso
+    // 11. Retornar sucesso
     return NextResponse.json({
       success: true,
       message: 'Pessoa cadastrada com sucesso!',
@@ -176,6 +231,11 @@ export async function POST(request: NextRequest) {
         id: novaPessoa.id,
         processo: novaPessoa.processo,
         nome: novaPessoa.nome,
+        documentos: {
+          cpf: !!novaPessoa.cpf,
+          rg: !!novaPessoa.rg
+        },
+        proximoComparecimento: novaPessoa.proximoComparecimento,
         criadoEm: novaPessoa.criadoEm
       }
     }, { status: 201 });
@@ -193,6 +253,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Função auxiliar para calcular próximo comparecimento
+function calcularProximoComparecimento(dataInicial: string, periodicidade: number): string {
+  const data = new Date(dataInicial);
+  data.setDate(data.getDate() + periodicidade);
+  return data.toISOString().split('T')[0];
+}
+
 // Endpoint para listar pessoas (todos podem acessar)
 export async function GET(request: NextRequest) {
   try {
@@ -205,7 +272,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Verificar permissão de listagem
-    // Linha 207: corrigida para usar string literal
     if (!hasPermission(user, 'pessoas', 'listar')) {
       return NextResponse.json(
         { 
@@ -223,7 +289,11 @@ export async function GET(request: NextRequest) {
         nome: 'João Silva',
         processo: '1234567-89.2024.1.01.0001',
         status: 'em conformidade',
-        proximoComparecimento: '2024-07-20'
+        proximoComparecimento: '2024-07-20',
+        documentos: {
+          cpf: true,
+          rg: false
+        }
       }
     ];
 
