@@ -7,7 +7,7 @@ import type { Comparecimento } from '@/types';
 import DetalhesAcusadoModal from '@/components/detalhesSubmetido';
 import EditarAcusadoModal from '@/components/editarSubmetido';
 import ExportButton from '@/components/ExportButton';
-import { Search, Filter, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 export default function GeralPage() {
   const router = useRouter();
@@ -299,49 +299,6 @@ export default function GeralPage() {
         </div>
       </div>
 
-      {/* Filtros Rápidos */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="text-sm font-medium text-gray-700">Filtros Rápidos:</span>
-          <button
-            onClick={() => router.push(createFilterLink({ urgencia: 'hoje' }))}
-            className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm hover:bg-yellow-200 transition-colors"
-          >
-            <Clock className="w-3 h-3 inline mr-1" />
-            Comparecimentos Hoje ({totalHoje})
-          </button>
-          <button
-            onClick={() => router.push(createFilterLink({ urgencia: 'atrasados' }))}
-            className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 transition-colors"
-          >
-            <AlertTriangle className="w-3 h-3 inline mr-1" />
-            Em Atraso ({totalAtrasados})
-          </button>
-          <button
-            onClick={() => router.push(createFilterLink({ status: 'em conformidade' }))}
-            className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm hover:bg-green-200 transition-colors"
-          >
-            <CheckCircle className="w-3 h-3 inline mr-1" />
-            Em Conformidade ({totalEmConformidade})
-          </button>
-          <button
-            onClick={() => router.push(createFilterLink({ status: 'inadimplente' }))}
-            className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 transition-colors"
-          >
-            <AlertTriangle className="w-3 h-3 inline mr-1" />
-            Inadimplentes ({totalInadimplentes})
-          </button>
-          {(filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim) && (
-            <button
-              onClick={limparFiltros}
-              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200 transition-colors"
-            >
-              Limpar Filtros
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Filtros Principais */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <div className="flex flex-wrap gap-4 items-end">
@@ -437,6 +394,20 @@ export default function GeralPage() {
               onChange={(e) => setDataFim(e.target.value)}
             />
           </div>
+
+          {/* Botão Limpar Filtros */}
+          {(filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim) && (
+            <div className="flex items-end">
+              <button
+                onClick={limparFiltros}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                Limpar Filtros
+              </button>
+            </div>
+          )}
+
         </div>
       </div>
 

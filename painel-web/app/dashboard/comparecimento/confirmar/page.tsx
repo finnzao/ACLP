@@ -1,22 +1,24 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  User, 
+import {
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  User,
   Calendar,
   Clock,
   FileText,
   Save,
   ArrowLeft,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 import { Comparecimento, Endereco, RegistroComparecimentoCompleto, AtualizacaoEndereco } from '@/types/comparecimento';
 import usuarios from '@/db/usuarios_mock.json';
 import EnderecoForm from '@/components/EnderecoForm';
+import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
 
 // Utilitários de data
 const dateUtils = {
@@ -60,9 +62,12 @@ export default function ConfirmarPresencaPage() {
   const [houveAlteracaoEndereco, setHouveAlteracaoEndereco] = useState<boolean | null>(null);
   const [novoEndereco, setNovoEndereco] = useState<Endereco>({});
   const [motivoAlteracaoEndereco, setMotivoAlteracaoEndereco] = useState('');
-  
+
   // Novo estado para verificar se a pergunta sobre endereço foi respondida
   const [enderecoRespondido, setEnderecoRespondido] = useState(false);
+
+  // Novo estado para o próximo comparecimento
+  const [proximoComparecimento, setProximoComparecimento] = useState<string | null>(null);
 
   useEffect(() => {
     if (!processo) return;
@@ -102,32 +107,43 @@ export default function ConfirmarPresencaPage() {
     }
   }, [houveAlteracaoEndereco]);
 
+  // Calcular próximo comparecimento quando confirmar com sucesso
+  useEffect(() => {
+    if (estado === 'sucesso' && pessoa) {
+      const proximaData = calcularProximoComparecimento(
+        formulario.dataComparecimento || dateUtils.getCurrentDate(),
+        pessoa.periodicidade
+      );
+      setProximoComparecimento(dateUtils.formatToBR(proximaData));
+    }
+  }, [estado, pessoa, formulario.dataComparecimento]);
+
   const confirmarComparecimento = async () => {
     if (!pessoa) return;
-    
+
     // Verificar se a pergunta sobre endereço foi respondida
     if (!enderecoRespondido) {
       // Exibir mensagem indicando o campo obrigatório
       const enderecoElement = document.getElementById('secao-endereco');
       if (enderecoElement) {
         enderecoElement.scrollIntoView({ behavior: 'smooth' });
-        
+
         // Destacar visualmente a seção de endereço
         enderecoElement.classList.add('animate-pulse');
         setTimeout(() => {
           enderecoElement.classList.remove('animate-pulse');
         }, 2000);
       }
-      
+
       // Atualizar estado para mostrar alerta visual
       setMensagem('É necessário responder sobre a atualização de endereço.');
       setMostrarAlerta(true);
-      
+
       // Esconder o alerta após 5 segundos
       setTimeout(() => {
         setMostrarAlerta(false);
       }, 5000);
-      
+
       return;
     }
 
@@ -142,7 +158,7 @@ export default function ConfirmarPresencaPage() {
 
       // Preparar dados de atualização de endereço
       let atualizacaoEndereco: AtualizacaoEndereco | undefined;
-      
+
       if (houveAlteracaoEndereco === true) {
         atualizacaoEndereco = {
           houveAlteracao: true,
@@ -170,18 +186,13 @@ export default function ConfirmarPresencaPage() {
       console.log('Comparecimento registrado:', novoRegistro);
 
       setEstado('sucesso');
-      
+
       if (formulario.tipoValidacao === 'justificado') {
         setMensagem('Justificativa de ausência registrada com sucesso!');
       } else {
         const msgEndereco = houveAlteracaoEndereco === true ? ' Endereço atualizado.' : '';
         setMensagem(`Comparecimento confirmado com sucesso!${msgEndereco}`);
       }
-
-      // Redirecionar após 3 segundos
-      setTimeout(() => {
-        router.push('/dashboard/geral');
-      }, 3000);
 
     } catch (error) {
       setEstado('erro');
@@ -285,7 +296,7 @@ export default function ConfirmarPresencaPage() {
                     <p className="text-primary-light">Processo: {pessoa.processo}</p>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="font-semibold mb-1">CPF</p>
@@ -293,9 +304,8 @@ export default function ConfirmarPresencaPage() {
                   </div>
                   <div>
                     <p className="font-semibold mb-1">Status Atual</p>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      pessoa.status === 'em conformidade' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${pessoa.status === 'em conformidade' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      }`}>
                       {STATUS_LABELS[pessoa.status]}
                     </span>
                   </div>
@@ -320,11 +330,11 @@ export default function ConfirmarPresencaPage() {
                         </span>
                       )}
                     </div>
-                    
+
                     <p className="text-blue-800 mb-4">
                       Houve alguma mudança no endereço do custodiado desde o último comparecimento?
                     </p>
-                    
+
                     <div className="flex gap-4">
                       <button
                         onClick={() => handleRespostaAlteracaoEndereco(true)}
@@ -361,11 +371,11 @@ export default function ConfirmarPresencaPage() {
                         <RefreshCw className="w-5 h-5" />
                       </button>
                     </div>
-                    
+
                     <p className="text-blue-800 mb-6">
                       O custodiado mudou de endereço desde o último comparecimento?
                     </p>
-                    
+
                     <div className="flex gap-4">
                       <button
                         onClick={() => handleRespostaAlteracaoEndereco(true)}
@@ -544,9 +554,6 @@ export default function ConfirmarPresencaPage() {
                 </div>
               </div>
 
-              {/* Indicador de campos obrigatórios */}
-              {/* Removido o alerta permanente, substituído pelo alerta dinâmico acima */}
-
               {/* Mensagem de alerta para campos obrigatórios */}
               {mostrarAlerta && !enderecoRespondido && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 mt-4 animate-pulse">
@@ -565,7 +572,7 @@ export default function ConfirmarPresencaPage() {
                 >
                   Cancelar
                 </button>
-                
+
                 <button
                   onClick={confirmarComparecimento}
                   className="px-8 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg bg-green-500 text-white hover:bg-green-600"
@@ -594,6 +601,7 @@ export default function ConfirmarPresencaPage() {
               </div>
               <h2 className="text-2xl font-bold text-green-700 mb-2">✅ Presença Confirmada!</h2>
               <p className="text-gray-600 mb-6">{mensagem}</p>
+
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                 <p className="text-green-800">
                   <strong>Comparecimento registrado para:</strong><br />
@@ -610,12 +618,36 @@ export default function ConfirmarPresencaPage() {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => router.push('/dashboard/geral')}
-                className="bg-primary text-white px-8 py-3 rounded-lg hover:bg-primary-dark transition-all font-medium"
-              >
-                Voltar ao Dashboard
-              </button>
+
+              {/* Nova seção para mostrar o próximo comparecimento */}
+              {proximoComparecimento && pessoa && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                    📅 Próximo Comparecimento
+                  </h3>
+                  <p className="text-blue-700 text-lg font-medium">
+                    {proximoComparecimento}
+                  </p>
+                  <p className="text-blue-600 text-sm mt-1">
+                    Periodicidade: {formatarPeriodicidade(pessoa.periodicidade)}
+                  </p>
+                  <p className="text-blue-500 text-xs mt-2">
+                    ⚠️ É importante que a pessoa compareça na data indicada para manter-se em conformidade
+                  </p>
+                </div>
+              )}
+
+              {/* Botões de ação */}
+              <div className="flex gap-4 justify-center">
+
+
+                <button
+                  onClick={() => router.push('/dashboard/geral')}
+                  className="bg-primary text-white px-8 py-3 rounded-lg hover:bg-primary-dark transition-all font-medium"
+                >
+                  Voltar ao Dashboard
+                </button>
+              </div>
             </div>
           )}
 

@@ -1,17 +1,17 @@
 import type { Periodicidade, StatusComparecimento } from './index';
 
 export interface Endereco {
-  cep: string; // Obrigatório
-  logradouro: string; // Obrigatório
+  cep: string;
+  logradouro: string;
   numero?: string;
   complemento?: string;
-  bairro: string; // Obrigatório
-  cidade: string; // Obrigatório
-  estado: string; // Obrigatório
+  bairro: string;
+  cidade: string;
+  estado: string;
 }
 
 // Tipo utilitário para garantir que pelo menos um documento seja fornecido
-type AtLeastOneDocument = 
+type AtLeastOneDocument =
   | { cpf: string; rg?: string }  // CPF obrigatório, RG opcional
   | { cpf?: string; rg: string }  // RG obrigatório, CPF opcional
   | { cpf: string; rg: string };  // Ambos fornecidos
@@ -37,7 +37,10 @@ interface ComparecimentoBase {
 }
 
 // Interface principal que garante pelo menos um documento
-export interface Comparecimento extends ComparecimentoBase, AtLeastOneDocument {}
+export interface Comparecimento extends ComparecimentoBase, AtLeastOneDocument {
+  cpf?: ReactNode;
+  rg?: ReactNode;
+}
 
 // Interface para novo comparecimento
 interface NovoComparecimentoBase {
@@ -53,7 +56,7 @@ interface NovoComparecimentoBase {
   observacoes?: string;
 }
 
-export interface NovoComparecimento extends NovoComparecimentoBase, AtLeastOneDocument {}
+export interface NovoComparecimento extends NovoComparecimentoBase, AtLeastOneDocument { }
 
 // Interface mais flexível para formulários (antes da validação)
 export interface ComparecimentoFormData {
@@ -79,14 +82,14 @@ export function hasRequiredDocuments(data: ComparecimentoFormData): data is Novo
 export function validateDocuments(cpf?: string, rg?: string): { isValid: boolean; error?: string } {
   const hasCpf = cpf?.trim();
   const hasRg = rg?.trim();
-  
+
   if (!hasCpf && !hasRg) {
     return {
       isValid: false,
       error: 'Pelo menos CPF ou RG deve ser informado'
     };
   }
-  
+
   return { isValid: true };
 }
 
