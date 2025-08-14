@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Ajustes para mobile */
+@media (max-width: 768px) {
+
+  body {
+    overflow-x: auto;
+  }
+
+  /* Ajusta padding do conteúdo principal */
+  main {
+    padding-bottom: 5rem !important; /* Espaço para o menu inferior */
+  }
+
+  /* Melhora touch targets */
+  button, 
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Ajusta tabelas em mobile */
+  table {
+    font-size: 0.875rem;
+  }
+
+  /* Esconde elementos desnecessários em mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Animação suave para transições */
+.animate-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Melhora visual dos botões em mobile */
+@media (max-width: 768px) {
+  .btn-mobile {
+    @apply w-full py-4 text-base font-medium;
+  }
+}

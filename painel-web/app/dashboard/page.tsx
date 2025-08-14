@@ -1,30 +1,32 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  Tooltip, 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
   CartesianGrid,
   LineChart,
   Line
 } from 'recharts';
-import { 
-  Users, 
-  CheckCircle, 
-  AlertTriangle, 
+import {
+  Users,
+  CheckCircle,
+  AlertTriangle,
   Calendar,
   TrendingUp,
   UserCheck,
   Clock,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Search,
+  ChevronRight
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -92,15 +94,15 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadDashboardData = async () => {
       setLoading(true);
-      
+
       // Simular carregamento de dados
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       calcularEstatisticas();
       obterProximosComparecimentos();
       obterAlertasUrgentes();
       gerarDadosTendencia();
-      
+
       setLoading(false);
     };
 
@@ -122,7 +124,7 @@ export default function DashboardPage() {
     const total = dados.length;
     const emConformidade = dados.filter(d => d.status === 'em conformidade').length;
     const inadimplentes = dados.filter(d => d.status === 'inadimplente').length;
-    const proximosPrazos = dados.filter(d => 
+    const proximosPrazos = dados.filter(d =>
       d.proximoComparecimento >= hoje && d.proximoComparecimento <= proximaSemanaTxt
     ).length;
     const comparecimentosHoje = dados.filter(d => dateUtils.isToday(d.proximoComparecimento)).length;
@@ -208,7 +210,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
@@ -220,303 +222,400 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-primary-dark">Dashboard</h1>
-          <p className="text-text-muted mt-1">Visão geral do sistema de comparecimentos</p>
+    <>
+      {/* Interface Mobile */}
+      <div className="md:hidden p-4 space-y-4">
+        {/* Header Mobile */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-primary-dark">SCC Mobile</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Sistema de Controle de Comparecimentos
+          </p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-text-muted">Última atualização</p>
-          <p className="font-semibold">{new Date().toLocaleString('pt-BR')}</p>
+
+        {/* Cards de Ação Rápida */}
+        <div className="grid grid-cols-2 gap-4">
+          <Link
+            href="/dashboard/buscar"
+            className="bg-primary text-white p-6 rounded-xl text-center hover:bg-primary-dark transition-all"
+          >
+            <Search className="w-8 h-8 mx-auto mb-2" />
+            <span className="text-sm font-medium">Buscar</span>
+          </Link>
+
+          <Link
+            href="/dashboard/geral"
+            className="bg-green-500 text-white p-6 rounded-xl text-center hover:bg-green-600 transition-all"
+          >
+            <Users className="w-8 h-8 mx-auto mb-2" />
+            <span className="text-sm font-medium">Lista Geral</span>
+          </Link>
         </div>
+
+        {/* Estatísticas Resumidas */}
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">Resumo de Hoje</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Comparecimentos Hoje</span>
+              <span className="font-bold text-primary">{stats.comparecimentosHoje}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Em Atraso</span>
+              <span className="font-bold text-red-500">{stats.atrasados}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Próximos 7 dias</span>
+              <span className="font-bold text-yellow-600">{stats.proximosPrazos}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de Comparecimentos de Hoje */}
+        {proximosComparecimentos.filter(item => dateUtils.isToday(item.proximoComparecimento)).length > 0 && (
+          <div className="bg-white rounded-xl shadow p-4">
+            <h3 className="font-semibold text-gray-800 mb-3">Comparecimentos de Hoje</h3>
+            <div className="space-y-3">
+              {proximosComparecimentos
+                .filter(item => dateUtils.isToday(item.proximoComparecimento))
+                .map((item, index) => (
+                  <Link
+                    key={index}
+                    href={`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(item.processo)}`}
+                    className="block bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-800">{item.nome}</p>
+                        <p className="text-xs text-gray-600">Processo: {item.processo}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </Link>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Alertas Mobile */}
+        {alertasUrgentes.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <h4 className="font-semibold text-red-800 text-sm mb-2 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Atenção Urgente
+            </h4>
+            <p className="text-xs text-red-700">
+              {alertasUrgentes.length} pessoa(s) com comparecimento em atraso
+            </p>
+            <Link
+              href={createFilterLink({ urgencia: 'atrasados' })}
+              className="mt-2 block w-full bg-red-600 text-white py-2 rounded text-center text-sm"
+            >
+              Ver Todos
+            </Link>
+          </div>
+        )}
       </div>
 
-      {/* Alertas Urgentes */}
-      {alertasUrgentes.length > 0 && (
-        <Alert 
-          type="error" 
-          message={
-            <div className="flex items-center justify-between w-full">
-              <span>{alertasUrgentes.length} pessoa(s) com comparecimento em atraso necessitam atenção urgente!</span>
-              <Link 
-                href={createFilterLink({ urgencia: 'atrasados' })}
-                className="ml-4 bg-white text-red-600 px-3 py-1 rounded font-medium hover:bg-red-50 transition-colors"
-              >
-                Ver Atrasados
-              </Link>
-            </div>
-          } 
-        />
-      )}
+      {/* Interface Desktop */}
+      <div className="hidden md:block max-w-7xl mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-primary-dark">Dashboard</h1>
+            <p className="text-text-muted mt-1">Visão geral do sistema de comparecimentos</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-text-muted">Última atualização</p>
+            <p className="font-semibold">{new Date().toLocaleString('pt-BR')}</p>
+          </div>
+        </div>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link href="/dashboard/geral">
-          <Card className="p-6 border-l-4 border-l-primary hover:shadow-lg transition-all cursor-pointer group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-text-muted text-sm font-medium">Total de Custodiados</p>
-                <p className="text-3xl font-bold text-primary-dark">{stats.total}</p>
+        {/* Alertas Urgentes */}
+        {alertasUrgentes.length > 0 && (
+          <Alert
+            type="error"
+            message={
+              <div className="flex items-center justify-between w-full">
+                <span>{alertasUrgentes.length} pessoa(s) com comparecimento em atraso necessitam atenção urgente!</span>
+                <Link
+                  href={createFilterLink({ urgencia: 'atrasados' })}
+                  className="ml-4 bg-white text-red-600 px-3 py-1 rounded font-medium hover:bg-red-50 transition-colors"
+                >
+                  Ver Atrasados
+                </Link>
               </div>
-              <div className="flex items-center">
-                <Users className="w-12 h-12 text-primary opacity-80" />
-                <ArrowRight className="w-4 h-4 text-primary ml-2 group-hover:translate-x-1 transition-transform" />
+            }
+          />
+        )}
+
+        {/* Cards de Estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link href="/dashboard/geral">
+            <Card className="p-6 border-l-4 border-l-primary hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Total de Custodiados</p>
+                  <p className="text-3xl font-bold text-primary-dark">{stats.total}</p>
+                </div>
+                <div className="flex items-center">
+                  <Users className="w-12 h-12 text-primary opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-primary ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
               </div>
-            </div>
+            </Card>
+          </Link>
+
+          <Link href={createFilterLink({ status: 'em conformidade' })}>
+            <Card className="p-6 border-l-4 border-l-secondary hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Em Conformidade</p>
+                  <p className="text-3xl font-bold text-secondary">{stats.emConformidade}</p>
+                  <p className="text-sm text-secondary font-medium">{stats.percentualConformidade}% do total</p>
+                </div>
+                <div className="flex items-center">
+                  <CheckCircle className="w-12 h-12 text-secondary opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-secondary ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          <Link href={createFilterLink({ status: 'inadimplente' })}>
+            <Card className="p-6 border-l-4 border-l-danger hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Inadimplentes</p>
+                  <p className="text-3xl font-bold text-danger">{stats.inadimplentes}</p>
+                  <p className="text-sm text-danger font-medium">{Math.round((stats.inadimplentes / stats.total) * 100)}% do total</p>
+                </div>
+                <div className="flex items-center">
+                  <AlertTriangle className="w-12 h-12 text-danger opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-danger ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          <Link href={createFilterLink({ urgencia: 'hoje' })}>
+            <Card className="p-6 border-l-4 border-l-warning hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Comparecimentos Hoje</p>
+                  <p className="text-3xl font-bold text-warning">{stats.comparecimentosHoje}</p>
+                  <p className="text-sm text-text-muted">Próximos 7 dias: {stats.proximosPrazos}</p>
+                </div>
+                <div className="flex items-center">
+                  <Calendar className="w-12 h-12 text-warning opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-warning ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Gráfico de Pizza - Distribuição */}
+          <Card className="p-6">
+            <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Distribuição de Status
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </Card>
-        </Link>
 
-        <Link href={createFilterLink({ status: 'em conformidade' })}>
-          <Card className="p-6 border-l-4 border-l-secondary hover:shadow-lg transition-all cursor-pointer group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-text-muted text-sm font-medium">Em Conformidade</p>
-                <p className="text-3xl font-bold text-secondary">{stats.emConformidade}</p>
-                <p className="text-sm text-secondary font-medium">{stats.percentualConformidade}% do total</p>
-              </div>
-              <div className="flex items-center">
-                <CheckCircle className="w-12 h-12 text-secondary opacity-80" />
-                <ArrowRight className="w-4 h-4 text-secondary ml-2 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
+          {/* Gráfico de Barras - Comparecimentos por Dia */}
+          <Card className="p-6">
+            <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
+              <UserCheck className="w-5 h-5" />
+              Comparecimentos por Dia (Esta Semana)
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={dataComparecimentos}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="comparecimentos" fill="#4A90E2" />
+              </BarChart>
+            </ResponsiveContainer>
           </Card>
-        </Link>
+        </div>
 
-        <Link href={createFilterLink({ status: 'inadimplente' })}>
-          <Card className="p-6 border-l-4 border-l-danger hover:shadow-lg transition-all cursor-pointer group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-text-muted text-sm font-medium">Inadimplentes</p>
-                <p className="text-3xl font-bold text-danger">{stats.inadimplentes}</p>
-                <p className="text-sm text-danger font-medium">{Math.round((stats.inadimplentes / stats.total) * 100)}% do total</p>
-              </div>
-              <div className="flex items-center">
-                <AlertTriangle className="w-12 h-12 text-danger opacity-80" />
-                <ArrowRight className="w-4 h-4 text-danger ml-2 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </Card>
-        </Link>
-
-        <Link href={createFilterLink({ urgencia: 'hoje' })}>
-          <Card className="p-6 border-l-4 border-l-warning hover:shadow-lg transition-all cursor-pointer group">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-text-muted text-sm font-medium">Comparecimentos Hoje</p>
-                <p className="text-3xl font-bold text-warning">{stats.comparecimentosHoje}</p>
-                <p className="text-sm text-text-muted">Próximos 7 dias: {stats.proximosPrazos}</p>
-              </div>
-              <div className="flex items-center">
-                <Calendar className="w-12 h-12 text-warning opacity-80" />
-                <ArrowRight className="w-4 h-4 text-warning ml-2 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Pizza - Distribuição */}
+        {/* Tendência de Conformidade */}
         <Card className="p-6">
           <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            Distribuição de Status
+            Tendência de Conformidade (Últimos 6 Meses)
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* Gráfico de Barras - Comparecimentos por Dia */}
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
-            <UserCheck className="w-5 h-5" />
-            Comparecimentos por Dia (Esta Semana)
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={dataComparecimentos}>
+            <LineChart data={tendenciaData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis dataKey="mes" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="comparecimentos" fill="#4A90E2" />
-            </BarChart>
+              <Line
+                type="monotone"
+                dataKey="conformidade"
+                stroke="#7ED6A7"
+                strokeWidth={3}
+                name="Conformidade (%)"
+              />
+              <Line
+                type="monotone"
+                dataKey="inadimplencia"
+                stroke="#E57373"
+                strokeWidth={3}
+                name="Inadimplência (%)"
+              />
+            </LineChart>
           </ResponsiveContainer>
         </Card>
-      </div>
 
-      {/* Tendência de Conformidade */}
-      <Card className="p-6">
-        <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5" />
-          Tendência de Conformidade (Últimos 6 Meses)
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={tendenciaData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="mes" />
-            <YAxis />
-            <Tooltip />
-            <Line 
-              type="monotone" 
-              dataKey="conformidade" 
-              stroke="#7ED6A7" 
-              strokeWidth={3}
-              name="Conformidade (%)"
-            />
-            <Line 
-              type="monotone" 
-              dataKey="inadimplencia" 
-              stroke="#E57373" 
-              strokeWidth={3}
-              name="Inadimplência (%)"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-
-      {/* Seção de Ações e Próximos Comparecimentos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Próximos Comparecimentos */}
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            Próximos Comparecimentos (7 dias)
-          </h3>
-          <div className="space-y-3">
-            {proximosComparecimentos.length > 0 ? (
-              proximosComparecimentos.map((item, index) => {
-                const diasRestantes = dateUtils.getDaysUntil(item.proximoComparecimento);
-                const isHoje = dateUtils.isToday(item.proximoComparecimento);
-                return (
-                  <Link 
-                    key={index}
-                    href={createFilterLink({ busca: item.processo })}
-                    className="block"
-                  >
-                    <div className="flex items-center justify-between p-3 bg-background rounded-lg border border-border hover:shadow-md transition-all cursor-pointer group">
-                      <div className="flex-1">
-                        <p className="font-medium text-text-base group-hover:text-primary transition-colors">{item.nome}</p>
-                        <p className="text-sm text-text-muted">Processo: {item.processo}</p>
-                        <p className="text-sm text-text-muted">Data: {dateUtils.formatToBR(item.proximoComparecimento)}</p>
+        {/* Seção de Ações e Próximos Comparecimentos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Próximos Comparecimentos */}
+          <Card className="p-6">
+            <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              Próximos Comparecimentos (7 dias)
+            </h3>
+            <div className="space-y-3">
+              {proximosComparecimentos.length > 0 ? (
+                proximosComparecimentos.map((item, index) => {
+                  const diasRestantes = dateUtils.getDaysUntil(item.proximoComparecimento);
+                  const isHoje = dateUtils.isToday(item.proximoComparecimento);
+                  return (
+                    <Link
+                      key={index}
+                      href={createFilterLink({ busca: item.processo })}
+                      className="block"
+                    >
+                      <div className="flex items-center justify-between p-3 bg-background rounded-lg border border-border hover:shadow-md transition-all cursor-pointer group">
+                        <div className="flex-1">
+                          <p className="font-medium text-text-base group-hover:text-primary transition-colors">{item.nome}</p>
+                          <p className="text-sm text-text-muted">Processo: {item.processo}</p>
+                          <p className="text-sm text-text-muted">Data: {dateUtils.formatToBR(item.proximoComparecimento)}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            isHoje ? 'bg-danger text-white' :
+                            diasRestantes === 1 ? 'bg-warning text-text-base' :
+                            'bg-secondary text-white'
+                          }`}>
+                            {isHoje ? 'Hoje' :
+                             diasRestantes === 1 ? 'Amanhã' :
+                             `${diasRestantes} dias`}
+                          </span>
+                          <ArrowRight className="w-4 h-4 text-primary mt-1 group-hover:translate-x-1 transition-transform" />
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          isHoje ? 'bg-danger text-white' :
-                          diasRestantes === 1 ? 'bg-warning text-text-base' :
-                          'bg-secondary text-white'
-                        }`}>
-                          {isHoje ? 'Hoje' : 
-                           diasRestantes === 1 ? 'Amanhã' : 
-                           `${diasRestantes} dias`}
-                        </span>
-                        <ArrowRight className="w-4 h-4 text-primary mt-1 group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })
-            ) : (
-              <p className="text-text-muted text-center py-4">Nenhum comparecimento nos próximos 7 dias</p>
-            )}
-          </div>
-          <Link 
-            href={createFilterLink({ urgencia: 'proximos' })}
-            className="block w-full mt-4 bg-primary text-white py-2 rounded-lg hover:bg-primary-dark transition-colors text-center"
-          >
-            Ver Todos os Próximos Comparecimentos
-          </Link>
-        </Card>
+                    </Link>
+                  );
+                })
+              ) : (
+                <p className="text-text-muted text-center py-4">Nenhum comparecimento nos próximos 7 dias</p>
+              )}
+            </div>
+            <Link
+              href={createFilterLink({ urgencia: 'proximos' })}
+              className="block w-full mt-4 bg-primary text-white py-2 rounded-lg hover:bg-primary-dark transition-colors text-center"
+            >
+              Ver Todos os Próximos Comparecimentos
+            </Link>
+          </Card>
 
-        {/* Ações Rápidas */}
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            Ações Rápidas
-          </h3>
-          <div className="space-y-3">
-            <Link 
-              href="/dashboard/registrar"
-              className="block w-full bg-secondary text-white py-3 rounded-lg hover:bg-green-600 transition-colors text-center"
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Users className="w-5 h-5" />
-                Cadastrar Nova Pessoa
-              </div>
-            </Link>
-            
-            <Link 
-              href="/dashboard/geral"
-              className="block w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors text-center"
-            >
-              <div className="flex items-center justify-center gap-2">
-                <UserCheck className="w-5 h-5" />
-                Validação de Presença
-              </div>
-            </Link>
-            
-            <Link 
-              href={createFilterLink({ urgencia: 'hoje' })}
-              className="block w-full bg-warning text-text-base py-3 rounded-lg hover:opacity-90 transition-colors text-center"
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Clock className="w-5 h-5" />
-                Comparecimentos de Hoje ({stats.comparecimentosHoje})
-              </div>
-            </Link>
-            
-            <Link 
-              href="/dashboard/configuracoes"
-              className="block w-full bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors text-center"
-            >
-              Configurações do Sistema
-            </Link>
-          </div>
-
-          {/* Alertas de Inadimplência */}
-          {alertasUrgentes.length > 0 && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Atenção Urgente Necessária
-              </h4>
-              <div className="space-y-2">
-                {alertasUrgentes.map((item, index) => (
-                  <div key={index} className="text-sm">
-                    <p className="font-medium text-red-700">{item.nome}</p>
-                    <p className="text-red-600">Comparecimento em atraso: {dateUtils.formatToBR(item.proximoComparecimento)}</p>
-                  </div>
-                ))}
-              </div>
-              <Link 
-                href={createFilterLink({ urgencia: 'atrasados' })}
-                className="block mt-3 w-full bg-red-600 text-white py-2 rounded hover:bg-red-700 transition-colors text-sm text-center"
+          {/* Ações Rápidas */}
+          <Card className="p-6">
+            <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Ações Rápidas
+            </h3>
+            <div className="space-y-3">
+              <Link
+                href="/dashboard/registrar"
+                className="block w-full bg-secondary text-white py-3 rounded-lg hover:bg-green-600 transition-colors text-center"
               >
-                Gerenciar Inadimplentes
+                <div className="flex items-center justify-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Cadastrar Nova Pessoa
+                </div>
+              </Link>
+
+              <Link
+                href="/dashboard/geral"
+                className="block w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors text-center"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <UserCheck className="w-5 h-5" />
+                  Validação de Presença
+                </div>
+              </Link>
+
+              <Link
+                href={createFilterLink({ urgencia: 'hoje' })}
+                className="block w-full bg-warning text-text-base py-3 rounded-lg hover:opacity-90 transition-colors text-center"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Comparecimentos de Hoje ({stats.comparecimentosHoje})
+                </div>
+              </Link>
+
+              <Link
+                href="/dashboard/configuracoes"
+                className="block w-full bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors text-center"
+              >
+                Configurações do Sistema
               </Link>
             </div>
-          )}
-        </Card>
+
+            {/* Alertas de Inadimplência */}
+            {alertasUrgentes.length > 0 && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Atenção Urgente Necessária
+                </h4>
+                <div className="space-y-2">
+                  {alertasUrgentes.map((item, index) => (
+                    <div key={index} className="text-sm">
+                      <p className="font-medium text-red-700">{item.nome}</p>
+                      <p className="text-red-600">Comparecimento em atraso: {dateUtils.formatToBR(item.proximoComparecimento)}</p>
+                    </div>
+                  ))}
+                </div>
+                <Link
+                  href={createFilterLink({ urgencia: 'atrasados' })}
+                  className="block mt-3 w-full bg-red-600 text-white py-2 rounded hover:bg-red-700 transition-colors text-sm text-center"
+                >
+                  Gerenciar Inadimplentes
+                </Link>
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
