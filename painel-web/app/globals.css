@@ -4,14 +4,14 @@
 
 /* Ajustes para mobile */
 @media (max-width: 768px) {
-
   body {
-    overflow-x: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Ajusta padding do conteúdo principal */
   main {
-    padding-bottom: 5rem !important; /* Espaço para o menu inferior */
+    padding-bottom: 5rem !important;
   }
 
   /* Melhora touch targets */
@@ -29,6 +29,34 @@
   /* Esconde elementos desnecessários em mobile */
   .hide-mobile {
     display: none !important;
+  }
+
+  /* Scrollbar horizontal personalizada */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Cards compactos em mobile */
+  .card-mobile {
+    @apply p-3 rounded-lg shadow-sm;
+  }
+
+  /* Texto reduzido em mobile */
+  .text-mobile-xs {
+    font-size: 0.7rem;
+    line-height: 1rem;
+  }
+
+  /* Sticky elements */
+  .sticky-mobile {
+    position: sticky;
+    top: 0;
+    z-index: 20;
   }
 }
 
@@ -48,9 +76,58 @@
   }
 }
 
-/* Melhora visual dos botões em mobile */
+/* Slide in animations */
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.slide-in-bottom {
+  animation: slideInFromBottom 0.3s ease-out;
+}
+
+/* Touch feedback */
+@media (hover: none) {
+  .touch-feedback {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  .touch-feedback:active {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
+
+/* Safe area padding for iOS */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Mobile specific utilities */
 @media (max-width: 768px) {
-  .btn-mobile {
-    @apply w-full py-4 text-base font-medium;
+  .mobile-full-width {
+    width: 100vw;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Fixed bottom actions */
+  .fixed-bottom-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding: 1rem;
+    z-index: 30;
   }
 }

@@ -23,10 +23,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -56,8 +56,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         "fixed left-0 top-0 h-full z-30"
       )}>
         <div className="flex items-center justify-center h-16 text-lg font-bold border-b border-border">
-          <span className="group-hover:hidden">SCC</span>
-          <span className="hidden group-hover:block">Sistema de Controle</span>
+          <span >SCC</span>
         </div>
         <nav className="mt-4 space-y-1">
           {menuItems.map(({ label, path, icon: Icon }) => {
@@ -130,7 +129,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <FiX size={20} />
           </button>
         </div>
-        
+
         <nav className="mt-4 space-y-1 px-2">
           {menuItems.map(({ label, path, icon: Icon }) => {
             const isActive =

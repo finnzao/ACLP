@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, User, FileText, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, User, FileText, ChevronRight, Loader2, Filter, X, Calendar, AlertTriangle } from 'lucide-react';
 import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
 
@@ -11,11 +11,15 @@ export default function BuscarPage() {
   const [busca, setBusca] = useState('');
   const [resultados, setResultados] = useState<Comparecimento[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filtroStatus, setFiltroStatus] = useState<'todos' | 'em conformidade' | 'inadimplente'>('todos');
+  const [hasSearched, setHasSearched] = useState(false);
 
   const handleBusca = () => {
     if (!busca.trim()) return;
 
     setLoading(true);
+    setHasSearched(true);
     
     // Simular busca
     setTimeout(() => {
@@ -26,11 +30,16 @@ export default function BuscarPage() {
         periodicidade: item.periodicidade as Comparecimento['periodicidade']
       }));
 
-      const resultadosFiltrados = dados.filter(item => 
+      let resultadosFiltrados = dados.filter(item => 
         item.nome.toLowerCase().includes(termo) ||
         item.processo.toLowerCase().includes(termo) ||
         item.cpf.includes(termo)
       );
+
+      // Aplicar filtro de status
+      if (filtroStatus !== 'todos') {
+        resultadosFiltrados = resultadosFiltrados.filter(item => item.status === filtroStatus);
+      }
 
       setResultados(resultadosFiltrados);
       setLoading(false);
@@ -41,21 +50,44 @@ export default function BuscarPage() {
     router.push(`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(processo)}`);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4 md:p-6">
-      <div className="max-w-full md:max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-primary-dark">
-            Buscar Custodiado
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Pesquise por nome, CPF ou número do processo
-          </p>
-        </div>
+  const limparBusca = () => {
+    setBusca('');
+    setResultados([]);
+    setFiltroStatus('todos');
+    setHasSearched(false);
+  };
 
-        {/* Barra de Busca */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+  const getStatusColor = (status: string) => {
+    return status === 'em conformidade' 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800';
+  };
+
+  const getUrgencyInfo = (data: string) => {
+    const hoje = new Date().toDateString();
+    const comparecimento = new Date(data).toDateString();
+    const diasRestantes = Math.ceil((new Date(data).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+    if (comparecimento === hoje) {
+      return { label: 'HOJE', color: 'bg-yellow-500 text-white', urgent: true };
+    } else if (diasRestantes < 0) {
+      return { label: `${Math.abs(diasRestantes)}d atraso`, color: 'bg-red-500 text-white', urgent: true };
+    } else if (diasRestantes <= 7) {
+      return { label: `${diasRestantes}d`, color: 'bg-blue-500 text-white', urgent: false };
+    }
+    return null;
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Mobile */}
+      <div className="bg-white sticky top-0 z-20 shadow-sm">
+        <div className="p-4">
+          <h1 className="text-xl font-bold text-primary-dark mb-2">
+            Buscar Pessoa
+          </h1>
+          
+          {/* Barra de Busca */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -64,105 +96,166 @@ export default function BuscarPage() {
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleBusca()}
-                placeholder="Digite sua busca..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base md:text-lg"
+                placeholder="Nome, CPF ou processo..."
+                className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-base"
               />
+              {busca && (
+                <button
+                  onClick={limparBusca}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
+            
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-3 rounded-lg border transition-colors ${
+                showFilters || filtroStatus !== 'todos' 
+                  ? 'bg-primary text-white border-primary' 
+                  : 'bg-white text-gray-600 border-gray-300'
+              }`}
+            >
+              <Filter className="w-5 h-5" />
+            </button>
+            
             <button
               onClick={handleBusca}
               disabled={loading || !busca.trim()}
-              className="bg-primary text-white px-4 md:px-6 py-3 rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <>
-                  <Search className="w-5 h-5" />
-                  <span className="hidden md:inline">Buscar</span>
-                </>
+                <Search className="w-5 h-5" />
               )}
             </button>
           </div>
+
+          {/* Filtros */}
+          {showFilters && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg animate-in slide-in-from-top-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filtrar por status
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setFiltroStatus('todos')}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    filtroStatus === 'todos'
+                      ? 'bg-primary text-white'
+                      : 'bg-white text-gray-600 border border-gray-300'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setFiltroStatus('em conformidade')}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    filtroStatus === 'em conformidade'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-white text-gray-600 border border-gray-300'
+                  }`}
+                >
+                  Conformidade
+                </button>
+                <button
+                  onClick={() => setFiltroStatus('inadimplente')}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    filtroStatus === 'inadimplente'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white text-gray-600 border border-gray-300'
+                  }`}
+                >
+                  Inadimplente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Resultados */}
+        {/* Contador de resultados */}
+        {hasSearched && (
+          <div className="px-4 pb-2 flex items-center justify-between text-sm">
+            <span className="text-gray-600">
+              {resultados.length} resultado{resultados.length !== 1 ? 's' : ''} encontrado{resultados.length !== 1 ? 's' : ''}
+            </span>
+            {resultados.length > 0 && (
+              <button
+                onClick={limparBusca}
+                className="text-primary hover:text-primary-dark"
+              >
+                Limpar busca
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Conteúdo */}
+      <div className="p-4 pb-20">
+        {/* Resultados Mobile */}
         {resultados.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="font-semibold text-lg text-gray-700">
-              {resultados.length} resultado(s) encontrado(s)
-            </h2>
-
+          <div className="space-y-3">
             {resultados.map((pessoa, index) => {
-              const isToday = new Date(pessoa.proximoComparecimento).toDateString() === new Date().toDateString();
-              const isOverdue = new Date(pessoa.proximoComparecimento) < new Date();
-
+              const urgencyInfo = getUrgencyInfo(pessoa.proximoComparecimento);
+              
               return (
                 <div
                   key={index}
-                  className={`bg-white rounded-xl shadow-md p-4 transition-all hover:shadow-lg ${
-                    isOverdue ? 'border-l-4 border-red-500' : ''
-                  } ${isToday ? 'border-l-4 border-yellow-500' : ''}`}
+                  className="bg-white rounded-xl shadow-sm overflow-hidden touch-feedback"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      {/* Informações da Pessoa */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="w-6 h-6 text-blue-600" />
+                  {/* Header do Card */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User className="w-5 h-5 text-blue-600" />
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-800">{pessoa.nome}</h3>
-                          <p className="text-sm text-gray-600">CPF: {pessoa.cpf}</p>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-800 text-sm">{pessoa.nome}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">CPF: {pessoa.cpf}</p>
                         </div>
                       </div>
-
-                      {/* Processo */}
-                      <div className="flex items-center gap-2 mb-3">
-                        <FileText className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">Processo: {pessoa.processo}</span>
-                      </div>
-
-                      {/* Status */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          pessoa.status === 'em conformidade' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {pessoa.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente'}
+                      {urgencyInfo && (
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${urgencyInfo.color}`}>
+                          {urgencyInfo.label}
                         </span>
-
-                        {isToday && (
-                          <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                            Comparecimento Hoje
-                          </span>
-                        )}
-
-                        {isOverdue && !isToday && (
-                          <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                            Em Atraso
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Data do Próximo Comparecimento */}
-                      <div className="mt-3 text-sm text-gray-600">
-                        <span className="font-medium">Próximo comparecimento:</span>{' '}
-                        {new Date(pessoa.proximoComparecimento).toLocaleDateString('pt-BR')}
-                      </div>
+                      )}
                     </div>
 
-                    <ChevronRight className="w-5 h-5 text-gray-400 md:hidden" />
+                    {/* Informações do Card */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Processo: {pessoa.processo}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Próximo: {new Date(pessoa.proximoComparecimento).toLocaleDateString('pt-BR')}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pessoa.status)}`}>
+                          {pessoa.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Botão de Ação */}
                   <button
                     onClick={() => handleConfirmarPresenca(pessoa.processo)}
-                    className={`w-full mt-4 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-all font-medium flex items-center justify-center gap-2 ${
-                      (isToday || isOverdue) ? 'animate-pulse' : ''
+                    className={`w-full p-3 font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
+                      urgencyInfo?.urgent
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-t'
                     }`}
                   >
                     Confirmar Comparecimento
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               );
@@ -170,27 +263,81 @@ export default function BuscarPage() {
           </div>
         )}
 
-        {/* Estado Vazio */}
-        {!loading && busca && resultados.length === 0 && (
-          <div className="bg-white rounded-xl shadow-md p-8 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-gray-400" />
+        {/* Estado Inicial - Mobile */}
+        {!hasSearched && !loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Search className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="font-semibold text-gray-700 mb-2">Nenhum resultado encontrado</h3>
-            <p className="text-gray-500">
-              Tente buscar por outro nome, CPF ou processo
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Busque por uma pessoa</h3>
+            <p className="text-gray-500 text-center text-sm px-8">
+              Digite o nome, CPF ou número do processo para encontrar rapidamente
             </p>
+            
+            {/* Dicas de busca */}
+            <div className="mt-8 w-full max-w-sm">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Dicas de busca:</h4>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="text-primary">•</span>
+                  <span>Digite pelo menos 3 caracteres do nome</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="text-primary">•</span>
+                  <span>CPF pode ser digitado com ou sem pontos</span>
+                </div>
+                <div className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="text-primary">•</span>
+                  <span>Use o filtro para refinar os resultados</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Dicas para Mobile */}
-        <div className="md:hidden bg-blue-50 rounded-xl p-4 mt-6">
-          <h3 className="font-semibold text-blue-900 mb-2">Dicas de busca:</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Digite o nome completo ou parcial</li>
-            <li>• Use o CPF sem pontos ou traços</li>
-            <li>• Digite o número do processo completo</li>
-          </ul>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+            <p className="text-gray-600">Buscando...</p>
+          </div>
+        )}
+
+        {/* Estado Vazio */}
+        {hasSearched && !loading && resultados.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Search className="w-12 h-12 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum resultado encontrado</h3>
+            <p className="text-gray-500 text-center text-sm px-8 mb-6">
+              Não encontramos ninguém com "{busca}"
+            </p>
+            <button
+              onClick={limparBusca}
+              className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              Nova busca
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Ações Rápidas Fixas - Mobile */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => router.push('/dashboard/geral')}
+            className="bg-gray-100 text-gray-700 py-3 rounded-lg font-medium text-sm hover:bg-gray-200 transition-colors"
+          >
+            Ver Lista Geral
+          </button>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="bg-primary text-white py-3 rounded-lg font-medium text-sm hover:bg-primary-dark transition-colors"
+          >
+            Voltar ao Início
+          </button>
         </div>
       </div>
     </div>

@@ -26,7 +26,8 @@ import {
   AlertCircle,
   ArrowRight,
   Search,
-  ChevronRight
+  ChevronRight,
+  Menu
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   const [alertasUrgentes, setAlertasUrgentes] = useState<Comparecimento[]>([]);
   const [tendenciaData, setTendenciaData] = useState<TendenciaData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMobileStats, setShowMobileStats] = useState(false);
 
   // Utilitários de data
   const dateUtils = {
@@ -210,7 +212,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-8">
+      <div className="p-4 md:p-6 space-y-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
@@ -224,100 +226,239 @@ export default function DashboardPage() {
   return (
     <>
       {/* Interface Mobile */}
-      <div className="md:hidden p-4 space-y-4">
-        {/* Header Mobile */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-primary-dark">SCC Mobile</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Sistema de Controle de Comparecimentos
-          </p>
-        </div>
-
-        {/* Cards de Ação Rápida */}
-        <div className="grid grid-cols-2 gap-4">
-          <Link
-            href="/dashboard/buscar"
-            className="bg-primary text-white p-6 rounded-xl text-center hover:bg-primary-dark transition-all"
-          >
-            <Search className="w-8 h-8 mx-auto mb-2" />
-            <span className="text-sm font-medium">Buscar</span>
-          </Link>
-
-          <Link
-            href="/dashboard/geral"
-            className="bg-green-500 text-white p-6 rounded-xl text-center hover:bg-green-600 transition-all"
-          >
-            <Users className="w-8 h-8 mx-auto mb-2" />
-            <span className="text-sm font-medium">Lista Geral</span>
-          </Link>
-        </div>
-
-        {/* Estatísticas Resumidas */}
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">Resumo de Hoje</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Comparecimentos Hoje</span>
-              <span className="font-bold text-primary">{stats.comparecimentosHoje}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Em Atraso</span>
-              <span className="font-bold text-red-500">{stats.atrasados}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Próximos 7 dias</span>
-              <span className="font-bold text-yellow-600">{stats.proximosPrazos}</span>
+      <div className="md:hidden">
+        {/* Header Mobile com ações rápidas */}
+        <div className="bg-white sticky top-0 z-10 shadow-sm">
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-bold text-primary-dark">Dashboard</h1>
+                <p className="text-xs text-gray-600">
+                  {new Date().toLocaleDateString('pt-BR', { 
+                    weekday: 'short', 
+                    day: 'numeric', 
+                    month: 'short' 
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMobileStats(!showMobileStats)}
+                className="p-2 bg-gray-100 rounded-lg"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Lista de Comparecimentos de Hoje */}
-        {proximosComparecimentos.filter(item => dateUtils.isToday(item.proximoComparecimento)).length > 0 && (
-          <div className="bg-white rounded-xl shadow p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">Comparecimentos de Hoje</h3>
-            <div className="space-y-3">
-              {proximosComparecimentos
-                .filter(item => dateUtils.isToday(item.proximoComparecimento))
-                .map((item, index) => (
-                  <Link
-                    key={index}
-                    href={`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(item.processo)}`}
-                    className="block bg-yellow-50 border border-yellow-200 rounded-lg p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-800">{item.nome}</p>
-                        <p className="text-xs text-gray-600">Processo: {item.processo}</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </Link>
-                ))}
-            </div>
+          {/* Quick Actions */}
+          <div className="p-4 flex gap-2 overflow-x-auto scrollbar-hide">
+            <Link
+              href="/dashboard/buscar"
+              className="flex-shrink-0 bg-primary text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              Buscar
+            </Link>
+            <Link
+              href="/dashboard/geral"
+              className="flex-shrink-0 bg-green-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
+            >
+              <UserCheck className="w-4 h-4" />
+              Validar
+            </Link>
+            <Link
+              href="/dashboard/registrar"
+              className="flex-shrink-0 bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Cadastrar
+            </Link>
           </div>
-        )}
+        </div>
 
         {/* Alertas Mobile */}
         {alertasUrgentes.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <h4 className="font-semibold text-red-800 text-sm mb-2 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Atenção Urgente
-            </h4>
-            <p className="text-xs text-red-700">
-              {alertasUrgentes.length} pessoa(s) com comparecimento em atraso
-            </p>
-            <Link
+          <div className="p-4">
+            <Link 
               href={createFilterLink({ urgencia: 'atrasados' })}
-              className="mt-2 block w-full bg-red-600 text-white py-2 rounded text-center text-sm"
+              className="block bg-red-50 border border-red-200 rounded-lg p-3"
             >
-              Ver Todos
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <div>
+                    <p className="font-medium text-red-800 text-sm">
+                      {alertasUrgentes.length} em atraso
+                    </p>
+                    <p className="text-xs text-red-600">Toque para ver</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-red-400" />
+              </div>
             </Link>
           </div>
         )}
+
+        {/* Estatísticas Resumidas Mobile */}
+        <div className="p-4 space-y-4">
+          {/* Resumo Principal */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Link href={createFilterLink({ urgencia: 'hoje' })} className="text-center p-3 bg-yellow-50 rounded-lg">
+                <p className="text-2xl font-bold text-yellow-600">{stats.comparecimentosHoje}</p>
+                <p className="text-xs text-gray-600">Hoje</p>
+              </Link>
+              <Link href={createFilterLink({ urgencia: 'proximos' })} className="text-center p-3 bg-blue-50 rounded-lg">
+                <p className="text-2xl font-bold text-blue-600">{stats.proximosPrazos}</p>
+                <p className="text-xs text-gray-600">Próx. 7 dias</p>
+              </Link>
+              <Link href={createFilterLink({ status: 'em conformidade' })} className="text-center p-3 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">{stats.percentualConformidade}%</p>
+                <p className="text-xs text-gray-600">Conformidade</p>
+              </Link>
+              <Link href={createFilterLink({ status: 'inadimplente' })} className="text-center p-3 bg-red-50 rounded-lg">
+                <p className="text-2xl font-bold text-red-600">{stats.inadimplentes}</p>
+                <p className="text-xs text-gray-600">Inadimplentes</p>
+              </Link>
+            </div>
+          </div>
+
+          {/* Gráfico de Pizza Simplificado */}
+          {showMobileStats && (
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Distribuição</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {data.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-500 rounded"></div>
+                    <span>Conformidade</span>
+                  </div>
+                  <span className="font-medium">{stats.emConformidade}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded"></div>
+                    <span>Inadimplentes</span>
+                  </div>
+                  <span className="font-medium">{stats.inadimplentes}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de Comparecimentos de Hoje Mobile */}
+          {proximosComparecimentos.filter(item => dateUtils.isToday(item.proximoComparecimento)).length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-4 border-b">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Comparecimentos de Hoje
+                </h3>
+              </div>
+              <div className="divide-y">
+                {proximosComparecimentos
+                  .filter(item => dateUtils.isToday(item.proximoComparecimento))
+                  .map((item, index) => (
+                    <Link
+                      key={index}
+                      href={`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(item.processo)}`}
+                      className="block p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-800 text-sm">{item.nome}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {item.processo}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">
+                            Hoje
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+              </div>
+              <Link
+                href={createFilterLink({ urgencia: 'hoje' })}
+                className="block p-3 text-center text-primary text-sm font-medium border-t hover:bg-gray-50"
+              >
+                Ver todos ({stats.comparecimentosHoje})
+              </Link>
+            </div>
+          )}
+
+          {/* Próximos Comparecimentos Mobile */}
+          {proximosComparecimentos.filter(item => !dateUtils.isToday(item.proximoComparecimento)).length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-4 border-b">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Próximos Comparecimentos
+                </h3>
+              </div>
+              <div className="divide-y">
+                {proximosComparecimentos
+                  .filter(item => !dateUtils.isToday(item.proximoComparecimento))
+                  .slice(0, 3)
+                  .map((item, index) => {
+                    const diasRestantes = dateUtils.getDaysUntil(item.proximoComparecimento);
+                    return (
+                      <Link
+                        key={index}
+                        href={createFilterLink({ busca: item.processo })}
+                        className="block p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800 text-sm">{item.nome}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {dateUtils.formatToBR(item.proximoComparecimento)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">
+                              {diasRestantes === 1 ? 'Amanhã' : `${diasRestantes} dias`}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+              </div>
+              <Link
+                href={createFilterLink({ urgencia: 'proximos' })}
+                className="block p-3 text-center text-primary text-sm font-medium border-t hover:bg-gray-50"
+              >
+                Ver próximos 7 dias
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Interface Desktop */}
+      {/* Interface Desktop (mantida como estava) */}
       <div className="hidden md:block max-w-7xl mx-auto p-6 space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
