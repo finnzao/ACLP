@@ -218,6 +218,11 @@ export default function ConfirmarPresencaPage() {
     }
   };
 
+  const voltarParaPerguntas = () => {
+    setHouveAlteracaoEndereco(null);
+    setMostrarAtualizacaoEndereco(false);
+  };
+
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
@@ -556,7 +561,7 @@ export default function ConfirmarPresencaPage() {
     );
   }
 
-  // Desktop Layout e outros estados (mantidos como estavam)
+  // Desktop Layout
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
       <div className="max-w-4xl mx-auto">
@@ -577,7 +582,7 @@ export default function ConfirmarPresencaPage() {
           </div>
         </div>
 
-        {/* Estados Success e Error para Mobile e Desktop */}
+        {/* Estados Success e Error para Desktop */}
         {(estado === 'confirmando' || estado === 'sucesso' || estado === 'erro') && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             {/* Estado: Confirmando */}
@@ -673,7 +678,7 @@ export default function ConfirmarPresencaPage() {
           </div>
         )}
 
-        {/* Desktop Form Layout (mantido como estava) */}
+        {/* Desktop Form Layout */}
         {estado === 'inicial' && pessoa && !isMobile && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="p-8">
@@ -688,7 +693,7 @@ export default function ConfirmarPresencaPage() {
                     <p className="text-primary-light">Processo: {pessoa.processo}</p>
                   </div>
                 </div>
-
+                
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="font-semibold mb-1">CPF</p>
@@ -709,48 +714,304 @@ export default function ConfirmarPresencaPage() {
                 </div>
               </div>
 
-              {/* Formulário Desktop (mantido como estava) */}
-              <div id="secao-endereco" className="mb-8">
-                <div className={`bg-blue-50 border ${
-                  !enderecoRespondido && mensagem ? 'border-red-300 shadow-md' : 'border-blue-200'
-                } rounded-lg p-6 transition-all`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <MapPin className="w-6 h-6 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-blue-900">Atualização de Endereço</h3>
-                    {!enderecoRespondido && mensagem && (
-                      <span className="bg-red-100 text-red-700 text-sm py-1 px-3 rounded-full ml-2 flex items-center">
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        Resposta obrigatória
-                      </span>
-                    )}
+              {/* Seção de Atualização de Endereço */}
+              {!mostrarAtualizacaoEndereco && (
+                <div className="mb-8" id="secao-endereco">
+                  <div className={`bg-blue-50 border ${!enderecoRespondido && mensagem ? 'border-red-300 shadow-md' : 'border-blue-200'} rounded-lg p-6 transition-all`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <MapPin className="w-6 h-6 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-blue-900">Atualização de Endereço</h3>
+                      {!enderecoRespondido && mensagem && (
+                        <span className="bg-red-100 text-red-700 text-sm py-1 px-3 rounded-full ml-2 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          Resposta obrigatória
+                        </span>
+                      )}
+                    </div>
+                    
+                    <p className="text-blue-800 mb-4">
+                      Houve alguma mudança no endereço do custodiado desde o último comparecimento?
+                    </p>
+                    
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => handleRespostaAlteracaoEndereco(true)}
+                        className="bg-yellow-500 text-white px-8 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium flex items-center gap-2"
+                      >
+                        <MapPin className="w-5 h-5" />
+                        Sim, houve mudança
+                      </button>
+                      <button
+                        onClick={() => handleRespostaAlteracaoEndereco(false)}
+                        className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Não, mantém o mesmo
+                      </button>
+                    </div>
                   </div>
+                </div>
+              )}
 
-                  <p className="text-blue-800 mb-4">
-                    Houve alguma mudança no endereço do custodiado desde o último comparecimento?
-                  </p>
+              {/* Formulário de Atualização de Endereço */}
+              {mostrarAtualizacaoEndereco && houveAlteracaoEndereco === null && (
+                <div className="mb-8">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-6 h-6 text-blue-600" />
+                        <h3 className="text-lg font-semibold text-blue-900">Confirmação de Endereço</h3>
+                      </div>
+                      <button
+                        onClick={voltarParaPerguntas}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        <RefreshCw className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    <p className="text-blue-800 mb-6">
+                      O custodiado mudou de endereço desde o último comparecimento?
+                    </p>
+                    
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => handleRespostaAlteracaoEndereco(true)}
+                        className="bg-yellow-500 text-white px-8 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium flex items-center gap-2"
+                      >
+                        <MapPin className="w-5 h-5" />
+                        Sim, houve mudança
+                      </button>
+                      <button
+                        onClick={() => handleRespostaAlteracaoEndereco(false)}
+                        className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Não, mantém o mesmo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                  <div className="flex gap-4">
+              {/* Formulário de Novo Endereço */}
+              {houveAlteracaoEndereco === true && (
+                <div className="mb-8">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <MapPin className="w-6 h-6 text-yellow-600" />
+                      <h3 className="text-lg font-semibold text-yellow-900">Novo Endereço</h3>
+                    </div>
+
+                    <EnderecoForm
+                      endereco={novoEndereco}
+                      onEnderecoChange={setNovoEndereco}
+                      showTitle={false}
+                      className="mb-6"
+                    />
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Motivo da Alteração (Opcional)
+                      </label>
+                      <textarea
+                        value={motivoAlteracaoEndereco}
+                        onChange={(e) => setMotivoAlteracaoEndereco(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                        placeholder="Ex: Mudança por questões familiares, trabalho, etc."
+                      />
+                    </div>
+
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setHouveAlteracaoEndereco(null)}
+                        className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-all"
+                      >
+                        Voltar
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Endereço preenchido, continuar para o formulário principal
+                        }}
+                        className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition-all flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        Confirmar Novo Endereço
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirmação de Endereço Mantido */}
+              {houveAlteracaoEndereco === false && (
+                <div className="mb-8">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <p className="text-green-800 font-medium">
+                        Endereço confirmado como inalterado
+                      </p>
+                    </div>
                     <button
-                      onClick={() => handleRespostaAlteracaoEndereco(true)}
-                      className="bg-yellow-500 text-white px-8 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium flex items-center gap-2"
+                      onClick={() => setHouveAlteracaoEndereco(null)}
+                      className="text-green-600 hover:text-green-800 text-sm mt-2 underline"
                     >
-                      <MapPin className="w-5 h-5" />
-                      Sim, houve mudança
-                    </button>
-                    <button
-                      onClick={() => handleRespostaAlteracaoEndereco(false)}
-                      className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium flex items-center gap-2"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Não, mantém o mesmo
+                      Alterar resposta
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* Formulário de Confirmação */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Registrar Comparecimento
+                </h3>
+
+                {/* Tipo de Validação */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Validação *
+                  </label>
+                  <select
+                    value={formulario.tipoValidacao}
+                    onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    required
+                  >
+                    <option value="presencial">Presencial</option>
+                    <option value="documental">Balcão Virtual</option>
+                  </select>
+                </div>
+
+                {/* Campos de Data e Hora */}
+                {formulario.tipoValidacao !== 'justificado' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Data do Comparecimento *
+                      </label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="date"
+                          value={formulario.dataComparecimento}
+                          onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Horário do Comparecimento *
+                      </label>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="time"
+                          value={formulario.horaComparecimento}
+                          onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Observações
+                  </label>
+                  <textarea
+                    value={formulario.observacoes}
+                    onChange={(e) => handleInputChange('observacoes', e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                    placeholder="Adicione observações sobre o comparecimento (opcional)..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Validado por
+                  </label>
+                  <input
+                    type="text"
+                    value={formulario.validadoPor}
+                    onChange={(e) => handleInputChange('validadoPor', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50"
+                    placeholder="Nome do servidor responsável"
+                    required
+                  />
+                </div>
               </div>
 
-              {/* Resto do formulário desktop... */}
-              {/* (mantido como estava no código original) */}
+              {/* Mensagem de alerta para campos obrigatórios */}
+              {mostrarAlerta && !enderecoRespondido && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 mt-4 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <p className="text-red-700 font-medium">Por favor, responda a pergunta sobre atualização de endereço.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Botões de Ação */}
+              <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => router.back()}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
+                >
+                  Cancelar
+                </button>
+                
+                <button
+                  onClick={confirmarComparecimento}
+                  className="px-8 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg bg-green-500 text-white hover:bg-green-600"
+                >
+                  <Save className="w-5 h-5" />
+                  Confirmar Presença
+                </button>
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Dicas */}
+        {estado === 'inicial' && !isMobile && (
+          <div className="mt-6 bg-blue-50 rounded-xl p-6">
+            <h3 className="font-semibold text-lg mb-3 text-blue-900 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Importante
+            </h3>
+            <ul className="space-y-2 text-blue-800">
+              <li className="flex items-start">
+                <span className="mr-2">📝</span>
+                <span>Certifique-se de que a pessoa realmente compareceu antes de confirmar</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">🏠</span>
+                <span>Verifique se houve mudança de endereço para manter os dados atualizados</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">🕐</span>
+                <span>Registre o horário exato do comparecimento</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">📋</span>
+                <span>Adicione observações relevantes quando necessário</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">✅</span>
+                <span>Esta ação atualizará automaticamente o status da pessoa</span>
+              </li>
+            </ul>
           </div>
         )}
       </div>

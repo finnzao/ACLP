@@ -1,271 +1,295 @@
-import { ComparecimentoFormData, NovoComparecimento, FormValidation } from '@/types/comparecimento';
-import { validationUtils } from '@/lib/utils/formatting';
+// lib/utils/validation.ts
+import { ComparecimentoFormData, FormValidation } from '@/types/comparecimento';
 
-/**
- * Valida se pelo menos um documento (CPF ou RG) foi fornecido
- */
+// Função para validar CPF (deve corresponder ao padrão do Java)
+export function isValidCPF(cpf: string): boolean {
+  if (!cpf) return true; // CPF é opcional
+  
+  // Padrão do Java: \\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2}
+  const cpfRegex = /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/;
+  if (!cpfRegex.test(cpf)) return false;
+  
+  // Remove caracteres especiais para validação dos dígitos
+  const cleanCPF = cpf.replace(/[^\d]/g, '');
+  
+  // Verifica se tem 11 dígitos
+  if (cleanCPF.length !== 11) return false;
+  
+  // Verifica se todos os dígitos são iguais
+  if (/^(\d)\1{10}$/.test(cleanCPF)) return false;
+  
+  // Validação dos dígitos verificadores
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(cleanCPF.charAt(i)) * (10 - i);
+  }
+  
+  let checkDigit = 11 - (sum % 11);
+  if (checkDigit === 10 || checkDigit === 11) checkDigit = 0;
+  if (checkDigit !== parseInt(cleanCPF.charAt(9))) return false;
+  
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(cleanCPF.charAt(i)) * (11 - i);
+  }
+  
+  checkDigit = 11 - (sum % 11);
+  if (checkDigit === 10 || checkDigit === 11) checkDigit = 0;
+  if (checkDigit !== parseInt(cleanCPF.charAt(10))) return false;
+  
+  return true;
+}
+
+// Função para validar telefone brasileiro (padrão do Java)
+export function isValidPhone(phone: string): boolean {
+  if (!phone) return false;
+  
+  // Padrão do Java: \\(?\\d{2}\\)?\\s?\\d{4,5}-?\\d{4}
+  const phoneRegex = /^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/;
+  return phoneRegex.test(phone);
+}
+
+// Função para validar número de processo judicial (padrão do Java)
+export function isValidProcessNumber(process: string): boolean {
+  if (!process) return false;
+  
+  // Padrão do Java: \\d{7}-\\d{2}\\.\\d{4}\\.\\d{1}\\.\\d{2}\\.\\d{4}
+  const processRegex = /^\d{7}-\d{2}\.\d{4}\.\d{1}\.\d{2}\.\d{4}$/;
+  return processRegex.test(process);
+}
+
+// Função para validar CEP (padrão do Java)
+export function isValidCEP(cep: string): boolean {
+  if (!cep) return false;
+  
+  // Padrão do Java: \\d{5}-?\\d{3}
+  const cepRegex = /^\d{5}-?\d{3}$/;
+  return cepRegex.test(cep);
+}
+
+// Função para validar estado (padrão do Java)
+export function isValidEstado(estado: string): boolean {
+  if (!estado) return false;
+  
+  // Padrão do Java: [A-Z]{2}
+  const estadoRegex = /^[A-Z]{2}$/;
+  return estadoRegex.test(estado);
+}
+
+// Função principal de validação do formulário baseada nas validações do Java
+export function validatePessoaDTO(data: any): FormValidation {
+  const errors: Record<string, string> = {};
+  const warnings: Record<string, string> = {};
+
+  // Validação do nome
+  if (!data.nome?.trim()) {
+    errors.nome = 'Nome é obrigatório';
+  } else if (data.nome.trim().length < 2 || data.nome.trim().length > 150) {
+    errors.nome = 'Nome deve ter entre 2 e 150 caracteres';
+  }
+
+  // Validação do CPF (opcional, mas se fornecido deve ser válido)
+  if (data.cpf?.trim() && !isValidCPF(data.cpf)) {
+    errors.cpf = 'CPF deve ter o formato 000.000.000-00';
+  }
+
+  // Validação do RG (opcional)
+  if (data.rg?.trim() && data.rg.trim().length > 20) {
+    errors.rg = 'RG deve ter no máximo 20 caracteres';
+  }
+
+  // Validação do contato
+  if (!data.contato?.trim()) {
+    errors.contato = 'Contato é obrigatório';
+  } else if (!isValidPhone(data.contato)) {
+    errors.contato = 'Contato deve ter formato válido de telefone';
+  }
+
+  // Validação do processo
+  if (!data.processo?.trim()) {
+    errors.processo = 'Processo é obrigatório';
+  } else if (!isValidProcessNumber(data.processo)) {
+    errors.processo = 'Processo deve ter o formato 0000000-00.0000.0.00.0000';
+  }
+
+  // Validação da vara
+  if (!data.vara?.trim()) {
+    errors.vara = 'Vara é obrigatória';
+  } else if (data.vara.trim().length > 100) {
+    errors.vara = 'Vara deve ter no máximo 100 caracteres';
+  }
+
+  // Validação da comarca
+  if (!data.comarca?.trim()) {
+    errors.comarca = 'Comarca é obrigatória';
+  } else if (data.comarca.trim().length > 100) {
+    errors.comarca = 'Comarca deve ter no máximo 100 caracteres';
+  }
+
+  // Validação da data da decisão
+  if (!data.dataDecisao) {
+    errors.dataDecisao = 'Data da decisão é obrigatória';
+  }
+
+  // Validação da periodicidade
+  if (!data.periodicidade || data.periodicidade < 1) {
+    errors.periodicidade = 'Periodicidade é obrigatória';
+  }
+
+  // Validação da data do comparecimento inicial
+  if (!data.dataComparecimentoInicial) {
+    errors.dataComparecimentoInicial = 'Data do comparecimento inicial é obrigatória';
+  }
+
+  // Validação das observações
+  if (data.observacoes?.trim() && data.observacoes.trim().length > 500) {
+    errors.observacoes = 'Observações deve ter no máximo 500 caracteres';
+  }
+
+  // === VALIDAÇÕES DE ENDEREÇO - OBRIGATÓRIAS ===
+
+  // Validação do CEP
+  if (!data.cep?.trim()) {
+    errors.cep = 'CEP é obrigatório';
+  } else if (!isValidCEP(data.cep)) {
+    errors.cep = 'CEP deve ter o formato 00000-000';
+  }
+
+  // Validação do logradouro
+  if (!data.logradouro?.trim()) {
+    errors.logradouro = 'Logradouro é obrigatório';
+  } else if (data.logradouro.trim().length < 5 || data.logradouro.trim().length > 200) {
+    errors.logradouro = 'Logradouro deve ter entre 5 e 200 caracteres';
+  }
+
+  // Validação do número (opcional)
+  if (data.numero?.trim() && data.numero.trim().length > 20) {
+    errors.numero = 'Número deve ter no máximo 20 caracteres';
+  }
+
+  // Validação do complemento (opcional)
+  if (data.complemento?.trim() && data.complemento.trim().length > 100) {
+    errors.complemento = 'Complemento deve ter no máximo 100 caracteres';
+  }
+
+  // Validação do bairro
+  if (!data.bairro?.trim()) {
+    errors.bairro = 'Bairro é obrigatório';
+  } else if (data.bairro.trim().length < 2 || data.bairro.trim().length > 100) {
+    errors.bairro = 'Bairro deve ter entre 2 e 100 caracteres';
+  }
+
+  // Validação da cidade
+  if (!data.cidade?.trim()) {
+    errors.cidade = 'Cidade é obrigatória';
+  } else if (data.cidade.trim().length < 2 || data.cidade.trim().length > 100) {
+    errors.cidade = 'Cidade deve ter entre 2 e 100 caracteres';
+  }
+
+  // Validação do estado
+  if (!data.estado?.trim()) {
+    errors.estado = 'Estado é obrigatório';
+  } else if (!isValidEstado(data.estado)) {
+    errors.estado = 'Estado deve ser uma sigla válida com 2 letras maiúsculas';
+  }
+
+  // Validação de documentos - pelo menos um deve estar presente
+  const hasCpf = data.cpf?.trim();
+  const hasRg = data.rg?.trim();
+  
+  if (!hasCpf && !hasRg) {
+    errors.documentos = 'Pelo menos CPF ou RG deve ser informado';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    warnings
+  };
+}
+
+// Função para sanitizar dados antes do envio
+export function sanitizeComparecimentoData(data: ComparecimentoFormData): ComparecimentoFormData {
+  return {
+    ...data,
+    nome: data.nome?.trim(),
+    cpf: data.cpf?.replace(/[^\d]/g, '') || '',
+    rg: data.rg?.trim() || '',
+    contato: data.contato?.replace(/[^\d]/g, '') || '',
+    processo: data.processo?.replace(/[^\d]/g, '') || '',
+    vara: data.vara?.trim(),
+    comarca: data.comarca?.trim(),
+    observacoes: data.observacoes?.trim() || '',
+    endereco: {
+      ...data.endereco,
+      cep: data.endereco.cep?.replace(/[^\d]/g, '') || '',
+      logradouro: data.endereco.logradouro?.trim() || '',
+      numero: data.endereco.numero?.trim() || '',
+      complemento: data.endereco.complemento?.trim() || '',
+      bairro: data.endereco.bairro?.trim() || '',
+      cidade: data.endereco.cidade?.trim() || '',
+      estado: data.endereco.estado?.trim() || ''
+    }
+  };
+}
+
+// Função para validar documentos separadamente
 export function validateDocuments(cpf?: string, rg?: string): { isValid: boolean; error?: string } {
   const hasCpf = cpf?.trim();
   const hasRg = rg?.trim();
-  
+
   if (!hasCpf && !hasRg) {
     return {
       isValid: false,
       error: 'Pelo menos CPF ou RG deve ser informado'
     };
   }
-  
-  // Validar formato do CPF se fornecido
-  if (hasCpf && !validationUtils.isValidCPF(hasCpf)) {
+
+  if (hasCpf && !isValidCPF(cpf!)) {
     return {
       isValid: false,
-      error: 'CPF informado é inválido'
+      error: 'CPF inválido'
     };
   }
-  
-  // Validar formato do RG se fornecido
-  if (hasRg && !validationUtils.isValidRG(hasRg)) {
-    return {
-      isValid: false,
-      error: 'RG informado é inválido'
-    };
-  }
-  
+
   return { isValid: true };
 }
 
-/**
- * Type guard para verificar se os dados têm documentos válidos
- */
-export function hasRequiredDocuments(data: ComparecimentoFormData): data is NovoComparecimento {
-  const validation = validateDocuments(data.cpf, data.rg);
-  return validation.isValid;
+// Função para formatar CPF
+export function formatCPF(cpf: string): string {
+  const clean = cpf.replace(/[^\d]/g, '');
+  return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
-/**
- * Valida todos os campos obrigatórios do formulário de comparecimento
- */
-export function validateComparecimentoForm(data: ComparecimentoFormData): FormValidation {
-  const errors: Record<string, string> = {};
-  const warnings: Record<string, string> = {};
-
-  // Validar nome
-  if (!data.nome?.trim()) {
-    errors.nome = 'Nome é obrigatório';
-  } else if (data.nome.trim().length < 2) {
-    errors.nome = 'Nome deve ter pelo menos 2 caracteres';
-  }
-
-  // Validar documentos (CPF ou RG)
-  const docValidation = validateDocuments(data.cpf, data.rg);
-  if (!docValidation.isValid) {
-    errors.documentos = docValidation.error!;
-  }
-
-  // Validar contato
-  if (!data.contato?.trim()) {
-    errors.contato = 'Contato é obrigatório';
-  } else if (!validationUtils.isValidPhone(data.contato)) {
-    warnings.contato = 'Formato de telefone pode estar incorreto';
-  }
-
-  // Validar processo
-  if (!data.processo?.trim()) {
-    errors.processo = 'Número do processo é obrigatório';
-  } else if (!validationUtils.isValidProcess(data.processo)) {
-    errors.processo = 'Número do processo deve ter 20 dígitos';
-  }
-
-  // Validar vara
-  if (!data.vara?.trim()) {
-    errors.vara = 'Vara é obrigatória';
-  }
-
-  // Validar comarca
-  if (!data.comarca?.trim()) {
-    errors.comarca = 'Comarca é obrigatória';
-  }
-
-  // Validar data da decisão
-  if (!data.decisao) {
-    errors.decisao = 'Data da decisão é obrigatória';
-  } else {
-    const dataDecisao = new Date(data.decisao);
-    const hoje = new Date();
-    if (dataDecisao > hoje) {
-      errors.decisao = 'Data da decisão não pode ser futura';
-    }
-  }
-
-  // Validar data do comparecimento inicial
-  if (!data.dataComparecimentoInicial) {
-    errors.dataComparecimentoInicial = 'Data do primeiro comparecimento é obrigatória';
-  } else {
-    const dataComparecimento = new Date(data.dataComparecimentoInicial);
-    const dataDecisao = new Date(data.decisao);
-    if (dataComparecimento < dataDecisao) {
-      warnings.dataComparecimentoInicial = 'Data do comparecimento é anterior à data da decisão';
-    }
-  }
-
-  // Validar periodicidade
-  if (!data.periodicidade || data.periodicidade < 1) {
-    errors.periodicidade = 'Periodicidade deve ser maior que zero';
-  } else if (data.periodicidade > 365) {
-    errors.periodicidade = 'Periodicidade não pode ser maior que 365 dias';
-  }
-
-  // Validar endereço
-  const enderecoErrors = validateEndereco(data.endereco);
-  Object.assign(errors, enderecoErrors);
-
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors,
-    warnings
-  };
-}
-
-/**
- * Valida campos obrigatórios do endereço
- */
-export function validateEndereco(endereco: any): Record<string, string> {
-  const errors: Record<string, string> = {};
-
-  if (!endereco?.cep?.trim()) {
-    errors['endereco.cep'] = 'CEP é obrigatório';
-  } else if (!validationUtils.isValidCEP(endereco.cep)) {
-    errors['endereco.cep'] = 'CEP deve ter 8 dígitos';
-  }
-
-  if (!endereco?.logradouro?.trim()) {
-    errors['endereco.logradouro'] = 'Logradouro é obrigatório';
-  }
-
-  if (!endereco?.bairro?.trim()) {
-    errors['endereco.bairro'] = 'Bairro é obrigatório';
-  }
-
-  if (!endereco?.cidade?.trim()) {
-    errors['endereco.cidade'] = 'Cidade é obrigatória';
-  }
-
-  if (!endereco?.estado?.trim()) {
-    errors['endereco.estado'] = 'Estado é obrigatório';
-  } else if (endereco.estado.length !== 2) {
-    errors['endereco.estado'] = 'Estado deve ter 2 caracteres (UF)';
-  }
-
-  return errors;
-}
-
-/**
- * Função para sanitizar dados antes de salvar
- */
-export function sanitizeComparecimentoData(data: ComparecimentoFormData): ComparecimentoFormData {
-  return {
-    ...data,
-    nome: data.nome?.trim() || '',
-    cpf: data.cpf?.trim() || undefined,
-    rg: data.rg?.trim() || undefined,
-    contato: data.contato?.trim() || '',
-    processo: data.processo?.trim() || '',
-    vara: data.vara?.trim() || '',
-    comarca: data.comarca?.trim() || '',
-    endereco: {
-      cep: data.endereco?.cep?.trim() || '',
-      logradouro: data.endereco?.logradouro?.trim() || '',
-      numero: data.endereco?.numero?.trim() || undefined,
-      complemento: data.endereco?.complemento?.trim() || undefined,
-      bairro: data.endereco?.bairro?.trim() || '',
-      cidade: data.endereco?.cidade?.trim() || '',
-      estado: data.endereco?.estado?.trim().toUpperCase() || ''
-    },
-    observacoes: data.observacoes?.trim() || undefined
-  };
-}
-
-/**
- * Valida dados específicos para atualização (permite campos opcionais)
- */
-export function validateUpdateData(data: Partial<ComparecimentoFormData>): FormValidation {
-  const errors: Record<string, string> = {};
-  const warnings: Record<string, string> = {};
-
-  // Se CPF ou RG estão sendo atualizados, validar
-  if ((data.cpf !== undefined || data.rg !== undefined)) {
-    const docValidation = validateDocuments(data.cpf, data.rg);
-    if (!docValidation.isValid) {
-      errors.documentos = docValidation.error!;
-    }
-  }
-
-  // Validar outros campos apenas se fornecidos
-  if (data.nome !== undefined && !data.nome.trim()) {
-    errors.nome = 'Nome não pode estar vazio';
-  }
-
-  if (data.contato !== undefined && !data.contato.trim()) {
-    errors.contato = 'Contato não pode estar vazio';
-  }
-
-  if (data.processo !== undefined) {
-    if (!data.processo.trim()) {
-      errors.processo = 'Processo não pode estar vazio';
-    } else if (!validationUtils.isValidProcess(data.processo)) {
-      errors.processo = 'Número do processo inválido';
-    }
-  }
-
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors,
-    warnings
-  };
-}
-
-/**
- * Utilitário para verificar quais documentos estão presentes
- */
-export function getDocumentInfo(cpf?: string, rg?: string): {
-  hasCpf: boolean;
-  hasRg: boolean;
-  hasAnyDocument: boolean;
-  documentTypes: string[];
-} {
-  const hasCpf = !!(cpf?.trim());
-  const hasRg = !!(rg?.trim());
-  const hasAnyDocument = hasCpf || hasRg;
+// Função para formatar telefone
+export function formatPhone(phone: string): string {
+  const clean = phone.replace(/[^\d]/g, '');
   
-  const documentTypes: string[] = [];
-  if (hasCpf) documentTypes.push('CPF');
-  if (hasRg) documentTypes.push('RG');
-
-  return {
-    hasCpf,
-    hasRg,
-    hasAnyDocument,
-    documentTypes
-  };
-}
-
-/**
- * Gera mensagem descritiva sobre os documentos presentes
- */
-export function getDocumentSummary(cpf?: string, rg?: string): string {
-  const info = getDocumentInfo(cpf, rg);
-  
-  if (!info.hasAnyDocument) {
-    return 'Nenhum documento informado';
+  if (clean.length === 10) {
+    return clean.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  } else if (clean.length === 11) {
+    return clean.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   }
   
-  if (info.hasCpf && info.hasRg) {
-    return 'CPF e RG informados';
+  return phone;
+}
+
+// Função para formatar CEP
+export function formatCEP(cep: string): string {
+  const clean = cep.replace(/[^\d]/g, '');
+  return clean.replace(/(\d{5})(\d{3})/, '$1-$2');
+}
+
+// Função para formatar número do processo
+export function formatProcessNumber(process: string): string {
+  const clean = process.replace(/[^\d]/g, '');
+  
+  if (clean.length === 20) {
+    return clean.replace(
+      /(\d{7})(\d{2})(\d{4})(\d{1})(\d{2})(\d{4})/,
+      '$1-$2.$3.$4.$5.$6'
+    );
   }
   
-  if (info.hasCpf) {
-    return 'Apenas CPF informado';
-  }
-  
-  return 'Apenas RG informado';
+  return process;
 }

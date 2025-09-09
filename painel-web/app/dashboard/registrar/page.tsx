@@ -4,16 +4,33 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions, useAudit } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
+import { usePessoas } from '@/hooks/useBackendApi';
 import { Lock, AlertTriangle, ArrowLeft, UserPlus, CheckCircle } from 'lucide-react';
 import EnderecoForm from '@/components/EnderecoForm';
 import DocumentForm from '@/components/DocumentForm';
-import { Endereco, Periodicidade, ComparecimentoFormData } from '@/types/comparecimento';
-import { PERIODICIDADES_PADROES, PERIODOS_SUGERIDOS, formatarPeriodicidade } from '@/lib/utils/periodicidade';
-import { validateComparecimentoForm, sanitizeComparecimentoData } from '@/lib/utils/validation';
+import { PessoaDTO, EstadoBrasil } from '@/types/backend';
+import { Endereco } from '@/types/index';
 
-// Componente original de cadastro atualizado
+// Função para converter Endereco (frontend) para EnderecoDTO (backend)
+function convertEnderecoToDTO(endereco: Endereco): PessoaDTO['endereco'] {
+  return {
+    cep: endereco.cep,
+    logradouro: endereco.logradouro,
+    numero: endereco.numero,
+    complemento: endereco.complemento,
+    bairro: endereco.bairro,
+    cidade: endereco.cidade,
+    estado: endereco.estado as EstadoBrasil // Conversão de string para enum
+  };
+}
+
+// Componente principal de cadastro
 function OriginalRegistrarPage() {
-  const [formData, setFormData] = useState<ComparecimentoFormData>({
+  const { criarPessoa } = usePessoas();
+  const router = useRouter();
+
+  // Estado do formulário usando o DTO do backend
+  const [formData, setFormData] = useState<PessoaDTO>({
     nome: '',
     cpf: '',
     rg: '',
@@ -21,9 +38,10 @@ function OriginalRegistrarPage() {
     processo: '',
     vara: '',
     comarca: '',
-    decisao: '',
-    periodicidade: PERIODICIDADES_PADROES.MENSAL as Periodicidade,
+    dataDecisao: '',
     dataComparecimentoInicial: '',
+    periodicidade: 30,
+    observacoes: '',
     endereco: {
       cep: '',
       logradouro: '',
@@ -31,74 +49,176 @@ function OriginalRegistrarPage() {
       complemento: '',
       bairro: '',
       cidade: '',
-      estado: ''
+      estado: EstadoBrasil.BA // Valor padrão para Bahia
     }
   });
 
+  // Estados de controle
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [periodicidadeCustomizada, setPeriodicidadeCustomizada] = useState(false);
   const [diasCustomizados, setDiasCustomizados] = useState('');
-  const [validationState, setValidationState] = useState({
-    errors: {} as Record<string, string>,
-    warnings: {} as Record<string, string>,
-    isValid: false
-  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const router = useRouter();
+  // Validação do formulário
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
-  // Validar formulário sempre que dados mudarem
-  useEffect(() => {
-    const validation = validateComparecimentoForm(formData);
-    setValidationState({
-      errors: validation.errors,
-      warnings: validation.warnings || {},
-      isValid: validation.isValid
-    });
-  }, [formData]);
+    // Validações obrigatórias
+    if (!formData.nome.trim()) {
+      newErrors.nome = 'Nome é obrigatório';
+    }
+
+    if (!formData.contato.trim()) {
+      newErrors.contato = 'Contato é obrigatório';
+    }
+
+    if (!formData.processo.trim()) {
+      newErrors.processo = 'Número do processo é obrigatório';
+    }
+
+    if (!formData.vara.trim()) {
+      newErrors.vara = 'Vara é obrigatória';
+    }
+
+    if (!formData.comarca.trim()) {
+      newErrors.comarca = 'Comarca é obrigatória';
+    }
+
+    if (!formData.dataDecisao) {
+      newErrors.dataDecisao = 'Data da decisão é obrigatória';
+    }
+
+    if (!formData.dataComparecimentoInicial) {
+      newErrors.dataComparecimentoInicial = 'Data do primeiro comparecimento é obrigatória';
+    }
+
+    // Validação de endereço
+    if (!formData.endereco.cep.trim()) {
+      newErrors.cep = 'CEP é obrigatório';
+    }
+
+    if (!formData.endereco.logradouro.trim()) {
+      newErrors.logradouro = 'Logradouro é obrigatório';
+    }
+
+    if (!formData.endereco.bairro.trim()) {
+      newErrors.bairro = 'Bairro é obrigatório';
+    }
+
+    if (!formData.endereco.cidade.trim()) {
+      newErrors.cidade = 'Cidade é obrigatória';
+    }
+
+    // Validação de documentos - pelo menos um deve ser fornecido
+    if (!formData.cpf?.trim() && !formData.rg?.trim()) {
+      newErrors.documentos = 'Pelo menos CPF ou RG deve ser fornecido';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validação final
-    const validation = validateComparecimentoForm(formData);
-    if (!validation.isValid) {
-      alert(`Corrija os erros no formulário:\n${Object.values(validation.errors).join('\n')}`);
+    if (!validateForm()) {
+      alert('Corrija os erros no formulário antes de continuar.');
       return;
     }
 
     setLoading(true);
 
     try {
-      // Sanitizar dados
-      const cleanData = sanitizeComparecimentoData(formData);
+      // Preparar dados para envio - seguir exatamente as validações do Java
+      const dataToSend: PessoaDTO = {
+        nome: formData.nome.trim(),
+        contato: formData.contato.trim(),
+        processo: formData.processo.trim(),
+        vara: formData.vara.trim(),
+        comarca: formData.comarca.trim(),
+        dataDecisao: formData.dataDecisao,
+        dataComparecimentoInicial: formData.dataComparecimentoInicial,
+        periodicidade: formData.periodicidade,
+        // Campos de endereço obrigatórios
+        cep: formData.cep.trim(),
+        logradouro: formData.logradouro.trim(),
+        bairro: formData.bairro.trim(),
+        cidade: formData.cidade.trim(),
+        estado: formData.estado.trim().toUpperCase(), // Garantir maiúsculo
+        // Campos opcionais - só incluir se não estiverem vazios
+        ...(formData.numero?.trim() && { numero: formData.numero.trim() }),
+        ...(formData.complemento?.trim() && { complemento: formData.complemento.trim() }),
+        ...(formData.observacoes?.trim() && { observacoes: formData.observacoes.trim() }),
+        // Documentos - pelo menos um deve estar presente (validado anteriormente)
+        ...(formData.cpf?.trim() && { cpf: formData.cpf.trim() }),
+        ...(formData.rg?.trim() && { rg: formData.rg.trim() })
+      };
+
+      console.log('[Cadastro] Dados preparados para envio:', dataToSend);
+
+      // Chamar API do backend
+      const result = await criarPessoa(dataToSend);
       
-      // Simular salvamento
-      console.log('Dados para salvar:', cleanData);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('[Cadastro] Resultado da criação:', result);
       
-      setSuccess(true);
-      setTimeout(() => {
-        router.push('/dashboard/geral');
-      }, 2000);
+      if (result.success) {
+        console.log('[Cadastro] Pessoa criada com sucesso');
+        setSuccess(true);
+        
+        // Redirecionar após 2 segundos
+        setTimeout(() => {
+          router.push('/dashboard/geral');
+        }, 2000);
+      } else {
+        console.error('[Cadastro] Erro ao criar pessoa:', result.message);
+        alert(`Erro ao cadastrar pessoa: ${result.message}`);
+      }
     } catch (error) {
-      console.error('Erro ao cadastrar:', error);
-      alert('Erro ao cadastrar pessoa. Tente novamente.');
+      console.error('[Cadastro] Erro inesperado:', error);
+      alert('Erro interno do sistema. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (field: keyof ComparecimentoFormData, value: string | number) => {
+  const handleInputChange = (field: keyof PessoaDTO, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Limpar erro do campo quando usuário começar a digitar
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
 
   const handleEnderecoChange = (endereco: Endereco) => {
-    setFormData(prev => ({ ...prev, endereco }));
+    const enderecoDTO = convertEnderecoToDTO(endereco);
+    setFormData(prev => ({ ...prev, endereco: enderecoDTO }));
+    
+    // Limpar erros de endereço
+    const enderecoFields = ['cep', 'logradouro', 'bairro', 'cidade'];
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      enderecoFields.forEach(field => delete newErrors[field]);
+      return newErrors;
+    });
   };
 
   const handleDocumentChange = (field: 'cpf' | 'rg', value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Limpar erro de documentos quando algum documento for preenchido
+    if (value.trim() && errors.documentos) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.documentos;
+        return newErrors;
+      });
+    }
   };
 
   const handlePeriodicidadeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -109,7 +229,7 @@ function OriginalRegistrarPage() {
       setDiasCustomizados('');
     } else {
       setPeriodicidadeCustomizada(false);
-      handleInputChange('periodicidade', parseInt(value) as Periodicidade);
+      handleInputChange('periodicidade', parseInt(value));
     }
   };
 
@@ -119,12 +239,13 @@ function OriginalRegistrarPage() {
     
     if (value) {
       const dias = parseInt(value);
-      if (!isNaN(dias)) {
+      if (!isNaN(dias) && dias > 0) {
         handleInputChange('periodicidade', dias);
       }
     }
   };
 
+  // Página de sucesso
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-6">
@@ -139,6 +260,10 @@ function OriginalRegistrarPage() {
             <p className="text-green-700 mb-6">
               A pessoa foi cadastrada com sucesso no sistema.
             </p>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+              ✅ Dados enviados para o backend<br />
+              🔄 Redirecionando para a lista...
+            </div>
           </div>
         </div>
       </div>
@@ -154,7 +279,7 @@ function OriginalRegistrarPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-primary-dark">Cadastrar Nova Pessoa</h1>
-            <p className="text-gray-600">Adicione uma nova pessoa ao sistema de comparecimentos</p>
+            <p className="text-gray-600">Integração com backend API do TJBA</p>
           </div>
         </div>
 
@@ -170,14 +295,14 @@ function OriginalRegistrarPage() {
                 value={formData.nome}
                 onChange={(e) => handleInputChange('nome', e.target.value)}
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  validationState.errors.nome ? 'border-red-300' : 'border-gray-300'
+                  errors.nome ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="Digite o nome completo"
               />
-              {validationState.errors.nome && (
+              {errors.nome && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4" />
-                  {validationState.errors.nome}
+                  {errors.nome}
                 </p>
               )}
             </div>
@@ -189,46 +314,174 @@ function OriginalRegistrarPage() {
                 value={formData.contato}
                 onChange={(e) => handleInputChange('contato', e.target.value)}
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  validationState.errors.contato ? 'border-red-300' : 'border-gray-300'
+                  errors.contato ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="(00) 00000-0000"
               />
-              {validationState.errors.contato && (
+              {errors.contato && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4" />
-                  {validationState.errors.contato}
-                </p>
-              )}
-              {validationState.warnings.contato && (
-                <p className="text-yellow-600 text-sm mt-1 flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  {validationState.warnings.contato}
+                  {errors.contato}
                 </p>
               )}
             </div>
           </div>
 
           {/* Documentos */}
-          <DocumentForm
-            cpf={formData.cpf}
-            rg={formData.rg}
-            onDocumentChange={handleDocumentChange}
-          />
-          {validationState.errors.documentos && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-800 text-sm flex items-center gap-1">
-                <AlertTriangle className="w-4 h-4" />
-                {validationState.errors.documentos}
-              </p>
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Documentos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+                <input
+                  type="text"
+                  value={formData.cpf || ''}
+                  onChange={(e) => handleDocumentChange('cpf', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="000.000.000-00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">RG</label>
+                <input
+                  type="text"
+                  value={formData.rg || ''}
+                  onChange={(e) => handleDocumentChange('rg', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="00.000.000-0"
+                />
+              </div>
             </div>
-          )}
+            {errors.documentos && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-800 text-sm flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  {errors.documentos}
+                </p>
+              </div>
+            )}
+            <p className="text-sm text-gray-600">
+              * Pelo menos um documento (CPF ou RG) deve ser fornecido
+            </p>
+          </div>
 
           {/* Endereço */}
-          <EnderecoForm
-            endereco={formData.endereco}
-            onEnderecoChange={handleEnderecoChange}
-            required={true}
-          />
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Endereço</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CEP *</label>
+                <input
+                  type="text"
+                  value={formData.endereco.cep}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, cep: e.target.value }
+                  }))}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    errors.cep ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="00000-000"
+                />
+                {errors.cep && <p className="text-red-500 text-sm mt-1">{errors.cep}</p>}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Logradouro *</label>
+                <input
+                  type="text"
+                  value={formData.endereco.logradouro}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, logradouro: e.target.value }
+                  }))}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    errors.logradouro ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Rua, Avenida, etc."
+                />
+                {errors.logradouro && <p className="text-red-500 text-sm mt-1">{errors.logradouro}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                <input
+                  type="text"
+                  value={formData.endereco.numero || ''}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, numero: e.target.value }
+                  }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="123"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
+                <input
+                  type="text"
+                  value={formData.endereco.complemento || ''}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, complemento: e.target.value }
+                  }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Apto, Casa, etc."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bairro *</label>
+                <input
+                  type="text"
+                  value={formData.endereco.bairro}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, bairro: e.target.value }
+                  }))}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    errors.bairro ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Nome do bairro"
+                />
+                {errors.bairro && <p className="text-red-500 text-sm mt-1">{errors.bairro}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade *</label>
+                <input
+                  type="text"
+                  value={formData.endereco.cidade}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, cidade: e.target.value }
+                  }))}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+                    errors.cidade ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Nome da cidade"
+                />
+                {errors.cidade && <p className="text-red-500 text-sm mt-1">{errors.cidade}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estado *</label>
+                <select
+                  value={formData.endereco.estado}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    endereco: { ...prev.endereco, estado: e.target.value as EstadoBrasil }
+                  }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  {Object.values(EstadoBrasil).map(estado => (
+                    <option key={estado} value={estado}>{estado}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
 
           {/* Dados Processuais */}
           <div className="space-y-6">
@@ -242,14 +495,14 @@ function OriginalRegistrarPage() {
                   value={formData.processo}
                   onChange={(e) => handleInputChange('processo', e.target.value)}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    validationState.errors.processo ? 'border-red-300' : 'border-gray-300'
+                    errors.processo ? 'border-red-300' : 'border-gray-300'
                   }`}
                   placeholder="0000000-00.0000.0.00.0000"
                 />
-                {validationState.errors.processo && (
+                {errors.processo && (
                   <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
                     <AlertTriangle className="w-4 h-4" />
-                    {validationState.errors.processo}
+                    {errors.processo}
                   </p>
                 )}
               </div>
@@ -261,13 +514,11 @@ function OriginalRegistrarPage() {
                   value={formData.vara}
                   onChange={(e) => handleInputChange('vara', e.target.value)}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    validationState.errors.vara ? 'border-red-300' : 'border-gray-300'
+                    errors.vara ? 'border-red-300' : 'border-gray-300'
                   }`}
                   placeholder="Ex: 1ª Vara Criminal"
                 />
-                {validationState.errors.vara && (
-                  <p className="text-red-500 text-sm mt-1">{validationState.errors.vara}</p>
-                )}
+                {errors.vara && <p className="text-red-500 text-sm mt-1">{errors.vara}</p>}
               </div>
 
               <div>
@@ -277,28 +528,24 @@ function OriginalRegistrarPage() {
                   value={formData.comarca}
                   onChange={(e) => handleInputChange('comarca', e.target.value)}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    validationState.errors.comarca ? 'border-red-300' : 'border-gray-300'
+                    errors.comarca ? 'border-red-300' : 'border-gray-300'
                   }`}
                   placeholder="Ex: Salvador"
                 />
-                {validationState.errors.comarca && (
-                  <p className="text-red-500 text-sm mt-1">{validationState.errors.comarca}</p>
-                )}
+                {errors.comarca && <p className="text-red-500 text-sm mt-1">{errors.comarca}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Data da Decisão *</label>
                 <input
                   type="date"
-                  value={formData.decisao}
-                  onChange={(e) => handleInputChange('decisao', e.target.value)}
+                  value={formData.dataDecisao}
+                  onChange={(e) => handleInputChange('dataDecisao', e.target.value)}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    validationState.errors.decisao ? 'border-red-300' : 'border-gray-300'
+                    errors.dataDecisao ? 'border-red-300' : 'border-gray-300'
                   }`}
                 />
-                {validationState.errors.decisao && (
-                  <p className="text-red-500 text-sm mt-1">{validationState.errors.decisao}</p>
-                )}
+                {errors.dataDecisao && <p className="text-red-500 text-sm mt-1">{errors.dataDecisao}</p>}
               </div>
 
               <div>
@@ -308,93 +555,61 @@ function OriginalRegistrarPage() {
                   value={formData.dataComparecimentoInicial}
                   onChange={(e) => handleInputChange('dataComparecimentoInicial', e.target.value)}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    validationState.errors.dataComparecimentoInicial ? 'border-red-300' : 'border-gray-300'
+                    errors.dataComparecimentoInicial ? 'border-red-300' : 'border-gray-300'
                   }`}
                 />
-                {validationState.errors.dataComparecimentoInicial && (
-                  <p className="text-red-500 text-sm mt-1">{validationState.errors.dataComparecimentoInicial}</p>
-                )}
-                {validationState.warnings.dataComparecimentoInicial && (
-                  <p className="text-yellow-600 text-sm mt-1">{validationState.warnings.dataComparecimentoInicial}</p>
-                )}
+                {errors.dataComparecimentoInicial && <p className="text-red-500 text-sm mt-1">{errors.dataComparecimentoInicial}</p>}
               </div>
-            </div>
-          </div>
 
-          {/* Periodicidade */}
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Periodicidade de Comparecimento</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Periodicidade *</label>
-              <select
-                onChange={handlePeriodicidadeChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                {Object.entries(PERIODICIDADES_PADROES).map(([nome, dias]) => (
-                  <option key={nome} value={dias}>
-                    {formatarPeriodicidade(dias)}
-                  </option>
-                ))}
-                <option value="custom">Personalizada</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Periodicidade (dias) *</label>
+                <select
+                  value={periodicidadeCustomizada ? 'custom' : formData.periodicidade.toString()}
+                  onChange={handlePeriodicidadeChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="7">Semanal (7 dias)</option>
+                  <option value="15">Quinzenal (15 dias)</option>
+                  <option value="30">Mensal (30 dias)</option>
+                  <option value="60">Bimestral (60 dias)</option>
+                  <option value="90">Trimestral (90 dias)</option>
+                  <option value="custom">Personalizada</option>
+                </select>
+              </div>
             </div>
 
             {periodicidadeCustomizada && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quantidade de dias *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={diasCustomizados}
-                    onChange={handleDiasCustomizadosChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="Ex: 45"
-                  />
-                </div>
-
-                {/* Sugestões */}
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Sugestões:</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {PERIODOS_SUGERIDOS.map((periodo) => (
-                      <button
-                        key={periodo.dias}
-                        type="button"
-                        onClick={() => setDiasCustomizados(periodo.dias.toString())}
-                        className="text-sm px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-left"
-                      >
-                        {periodo.descricao.split('(')[0].trim()}
-                        <br />
-                        <span className="text-xs text-gray-500">({periodo.dias} dias)</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Validação de periodicidade */}
-                {diasCustomizados && validationState.errors.periodicidade && (
-                  <div className="bg-red-50 border border-red-200 rounded p-3">
-                    <p className="text-sm text-red-800">{validationState.errors.periodicidade}</p>
-                  </div>
-                )}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantidade de dias personalizada *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={diasCustomizados}
+                  onChange={handleDiasCustomizadosChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Ex: 45"
+                />
               </div>
             )}
-
-            {/* Prévia da periodicidade */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Periodicidade selecionada:</strong> {formatarPeriodicidade(formData.periodicidade)}
-              </p>
-            </div>
           </div>
 
-          {/* Indicador de validação geral */}
-          {Object.keys(validationState.errors).length > 0 && (
+          {/* Observações */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+            <textarea
+              value={formData.observacoes || ''}
+              onChange={(e) => handleInputChange('observacoes', e.target.value)}
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="Observações adicionais sobre o caso..."
+            />
+          </div>
+
+          {/* Indicador de erro geral */}
+          {Object.keys(errors).length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -403,7 +618,7 @@ function OriginalRegistrarPage() {
                     Corrija os erros para continuar:
                   </p>
                   <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
-                    {Object.entries(validationState.errors).map(([field, error]) => (
+                    {Object.entries(errors).map(([field, error]) => (
                       <li key={field}>{error}</li>
                     ))}
                   </ul>
@@ -425,13 +640,13 @@ function OriginalRegistrarPage() {
 
             <button
               type="submit"
-              disabled={loading || !validationState.isValid}
+              disabled={loading || Object.keys(errors).length > 0}
               className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Salvando...
+                  Enviando para API...
                 </>
               ) : (
                 <>

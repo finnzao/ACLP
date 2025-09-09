@@ -2,6 +2,8 @@ import './globals.css';
 import { Metadata } from 'next';
 import { ToastProvider } from '@/components/Toast';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ApiProvider, ApiStatusIndicator } from '@/contexts/ApiContext';
+import DebugApiStatus from '@/components/DebugApiStatus';
 
 export const metadata: Metadata = {
   title: 'Sistema de Controle de Comparecimento',
@@ -19,11 +21,15 @@ export default function RootLayout({
   return (
     <html lang="pt-br">
       <body>
-        <AuthProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </AuthProvider>
+        <ApiProvider autoCheck={true} checkInterval={300000}>
+          <AuthProvider>
+            <ToastProvider>
+              {children}
+              <ApiStatusIndicator />
+              <DebugApiStatus />
+            </ToastProvider>
+          </AuthProvider>
+        </ApiProvider>
       </body>
     </html>
   );
