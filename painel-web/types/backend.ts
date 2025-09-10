@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // types/backend.ts
 // Enums utilizados no backend
 export enum StatusComparecimento {
@@ -63,6 +64,19 @@ export interface VerificacaoStatusResponse {
   email: string;
   verified: boolean;
   expiresAt?: string;
+}
+
+// =====================
+// DTOs de Endereço
+// =====================
+export interface EnderecoDTO {
+  cep: string;
+  logradouro: string;
+  numero?: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  estado: EstadoBrasil | string;
 }
 
 // =====================

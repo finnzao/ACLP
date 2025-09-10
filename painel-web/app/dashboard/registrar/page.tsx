@@ -5,23 +5,97 @@ import { useRouter } from 'next/navigation';
 import { usePermissions, useAudit } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePessoas } from '@/hooks/useBackendApi';
-import { Lock, AlertTriangle, ArrowLeft, UserPlus, CheckCircle } from 'lucide-react';
-import EnderecoForm from '@/components/EnderecoForm';
-import DocumentForm from '@/components/DocumentForm';
+import { 
+  Lock, 
+  AlertTriangle, 
+  ArrowLeft, 
+  UserPlus, 
+  CheckCircle,
+  X,
+  Info,
+  AlertCircle
+} from 'lucide-react';
 import { PessoaDTO, EstadoBrasil } from '@/types/backend';
-import { Endereco } from '@/types/index';
 
-// Função para converter Endereco (frontend) para EnderecoDTO (backend)
-function convertEnderecoToDTO(endereco: Endereco): PessoaDTO['endereco'] {
-  return {
-    cep: endereco.cep,
-    logradouro: endereco.logradouro,
-    numero: endereco.numero,
-    complemento: endereco.complemento,
-    bairro: endereco.bairro,
-    cidade: endereco.cidade,
-    estado: endereco.estado as EstadoBrasil // Conversão de string para enum
+// Componente de Alerta Melhorado
+interface AlertMessageProps {
+  type: 'error' | 'warning' | 'info' | 'success';
+  title?: string;
+  message: string;
+  details?: string[];
+  onClose?: () => void;
+  className?: string;
+}
+
+function AlertMessage({ type, title, message, details, onClose, className = '' }: AlertMessageProps) {
+  const configs = {
+    error: {
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200',
+      textColor: 'text-red-800',
+      iconColor: 'text-red-500',
+      icon: AlertCircle,
+      defaultTitle: 'Erro'
+    },
+    warning: {
+      bgColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-200',
+      textColor: 'text-yellow-800',
+      iconColor: 'text-yellow-500',
+      icon: AlertTriangle,
+      defaultTitle: 'Atenção'
+    },
+    info: {
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      textColor: 'text-blue-800',
+      iconColor: 'text-blue-500',
+      icon: Info,
+      defaultTitle: 'Informação'
+    },
+    success: {
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      textColor: 'text-green-800',
+      iconColor: 'text-green-500',
+      icon: CheckCircle,
+      defaultTitle: 'Sucesso'
+    }
   };
+
+  const config = configs[type];
+  const Icon = config.icon;
+
+  return (
+    <div className={`${config.bgColor} ${config.borderColor} border rounded-lg p-4 ${className}`}>
+      <div className="flex items-start">
+        <Icon className={`w-5 h-5 ${config.iconColor} mt-0.5 flex-shrink-0`} />
+        <div className="ml-3 flex-1">
+          <h3 className={`text-sm font-medium ${config.textColor}`}>
+            {title || config.defaultTitle}
+          </h3>
+          <div className={`mt-1 text-sm ${config.textColor}`}>
+            <p>{message}</p>
+            {details && details.length > 0 && (
+              <ul className="mt-2 list-disc list-inside space-y-1">
+                {details.map((detail, index) => (
+                  <li key={index} className="text-xs">{detail}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className={`ml-3 inline-flex rounded-md ${config.bgColor} p-1.5 ${config.iconColor} hover:bg-opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-${type === 'error' ? 'red' : type === 'warning' ? 'yellow' : type === 'info' ? 'blue' : 'green'}-500`}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Componente principal de cadastro
@@ -29,7 +103,7 @@ function OriginalRegistrarPage() {
   const { criarPessoa } = usePessoas();
   const router = useRouter();
 
-  // Estado do formulário usando o DTO do backend
+  // Estado do formulário usando o DTO do backend com campos de endereço na raiz
   const [formData, setFormData] = useState<PessoaDTO>({
     nome: '',
     cpf: '',
@@ -42,15 +116,14 @@ function OriginalRegistrarPage() {
     dataComparecimentoInicial: '',
     periodicidade: 30,
     observacoes: '',
-    endereco: {
-      cep: '',
-      logradouro: '',
-      numero: '',
-      complemento: '',
-      bairro: '',
-      cidade: '',
-      estado: EstadoBrasil.BA // Valor padrão para Bahia
-    }
+    // Campos de endereço na raiz
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: 'BA'
   });
 
   // Estados de controle
@@ -59,6 +132,13 @@ function OriginalRegistrarPage() {
   const [periodicidadeCustomizada, setPeriodicidadeCustomizada] = useState(false);
   const [diasCustomizados, setDiasCustomizados] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Estados para mensagens de API
+  const [apiMessage, setApiMessage] = useState<{
+    type: 'error' | 'warning' | 'info' | 'success';
+    message: string;
+    details?: string[];
+  } | null>(null);
 
   // Validação do formulário
   const validateForm = (): boolean => {
@@ -94,19 +174,19 @@ function OriginalRegistrarPage() {
     }
 
     // Validação de endereço
-    if (!formData.endereco.cep.trim()) {
+    if (!formData.cep.trim()) {
       newErrors.cep = 'CEP é obrigatório';
     }
 
-    if (!formData.endereco.logradouro.trim()) {
+    if (!formData.logradouro.trim()) {
       newErrors.logradouro = 'Logradouro é obrigatório';
     }
 
-    if (!formData.endereco.bairro.trim()) {
+    if (!formData.bairro.trim()) {
       newErrors.bairro = 'Bairro é obrigatório';
     }
 
-    if (!formData.endereco.cidade.trim()) {
+    if (!formData.cidade.trim()) {
       newErrors.cidade = 'Cidade é obrigatória';
     }
 
@@ -119,18 +199,58 @@ function OriginalRegistrarPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Função para processar mensagens de erro do backend
+  const processBackendError = (message: string): { message: string; details: string[] } => {
+    const details: string[] = [];
+    let mainMessage = message;
+
+    // Extrair detalhes específicos da mensagem de erro
+    if (message.includes('CPF já cadastrado')) {
+      mainMessage = 'CPF já existe no sistema';
+      details.push('Este CPF já está cadastrado para outra pessoa');
+      details.push('Verifique se o CPF está correto ou busque a pessoa existente');
+    } else if (message.includes('Processo já cadastrado')) {
+      mainMessage = 'Processo duplicado';
+      details.push('Este número de processo já está cadastrado');
+      details.push('Verifique o número ou acesse o registro existente');
+    } else if (message.includes('validation')) {
+      mainMessage = 'Erro de validação dos dados';
+      // Tentar extrair campos específicos da mensagem
+      if (message.includes('nome')) details.push('Nome deve ter entre 2 e 150 caracteres');
+      if (message.includes('cpf')) details.push('CPF deve seguir o formato 000.000.000-00');
+      if (message.includes('processo')) details.push('Processo deve seguir o formato 0000000-00.0000.0.00.0000');
+      if (message.includes('telefone')) details.push('Telefone deve ser válido');
+    } else if (message.includes('Connection') || message.includes('Network')) {
+      mainMessage = 'Erro de conexão';
+      details.push('Não foi possível conectar ao servidor');
+      details.push('Verifique sua conexão e tente novamente');
+    }
+
+    return { message: mainMessage, details };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Limpar mensagens anteriores
+    setApiMessage(null);
+    
     if (!validateForm()) {
-      alert('Corrija os erros no formulário antes de continuar.');
+      setApiMessage({
+        type: 'warning',
+        message: 'Corrija os erros no formulário antes de continuar',
+        details: Object.values(errors)
+      });
+      
+      // Scroll para o topo para ver a mensagem
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
     setLoading(true);
 
     try {
-      // Preparar dados para envio - seguir exatamente as validações do Java
+      // Preparar dados para envio - todos os campos já estão na estrutura correta
       const dataToSend: PessoaDTO = {
         nome: formData.nome.trim(),
         contato: formData.contato.trim(),
@@ -140,43 +260,95 @@ function OriginalRegistrarPage() {
         dataDecisao: formData.dataDecisao,
         dataComparecimentoInicial: formData.dataComparecimentoInicial,
         periodicidade: formData.periodicidade,
-        // Campos de endereço obrigatórios
+        // Campos de endereço
         cep: formData.cep.trim(),
         logradouro: formData.logradouro.trim(),
         bairro: formData.bairro.trim(),
         cidade: formData.cidade.trim(),
-        estado: formData.estado.trim().toUpperCase(), // Garantir maiúsculo
-        // Campos opcionais - só incluir se não estiverem vazios
+        estado: formData.estado.trim().toUpperCase(),
+        // Campos opcionais
         ...(formData.numero?.trim() && { numero: formData.numero.trim() }),
         ...(formData.complemento?.trim() && { complemento: formData.complemento.trim() }),
         ...(formData.observacoes?.trim() && { observacoes: formData.observacoes.trim() }),
-        // Documentos - pelo menos um deve estar presente (validado anteriormente)
         ...(formData.cpf?.trim() && { cpf: formData.cpf.trim() }),
         ...(formData.rg?.trim() && { rg: formData.rg.trim() })
       };
 
-      console.log('[Cadastro] Dados preparados para envio:', dataToSend);
+      console.log('[Cadastro] Enviando dados para API:', dataToSend);
 
-      // Chamar API do backend
       const result = await criarPessoa(dataToSend);
       
-      console.log('[Cadastro] Resultado da criação:', result);
+      console.log('[Cadastro] Resposta da API:', result);
       
       if (result.success) {
-        console.log('[Cadastro] Pessoa criada com sucesso');
         setSuccess(true);
+        setApiMessage({
+          type: 'success',
+          message: 'Pessoa cadastrada com sucesso!',
+          details: ['Redirecionando para a lista geral...']
+        });
         
         // Redirecionar após 2 segundos
         setTimeout(() => {
           router.push('/dashboard/geral');
         }, 2000);
       } else {
-        console.error('[Cadastro] Erro ao criar pessoa:', result.message);
-        alert(`Erro ao cadastrar pessoa: ${result.message}`);
+        // Processar mensagem de erro do backend
+        const { message, details } = processBackendError(result.message || 'Erro desconhecido');
+        
+        setApiMessage({
+          type: 'error',
+          message,
+          details: details.length > 0 ? details : undefined
+        });
+        
+        // Scroll para o topo para ver a mensagem de erro
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[Cadastro] Erro inesperado:', error);
-      alert('Erro interno do sistema. Tente novamente.');
+      
+      // Tratar erro de rede ou outros erros
+      let errorMessage = 'Erro interno do sistema';
+      let errorDetails: string[] = [];
+      
+      // Type guard para verificar se é um erro com response
+      if (error && typeof error === 'object' && 'response' in error) {
+        const errorWithResponse = error as { response?: { data?: { message?: string }, status?: number } };
+        
+        if (errorWithResponse.response) {
+          // Erro de resposta do servidor
+          if (errorWithResponse.response.data?.message) {
+            const { message, details } = processBackendError(errorWithResponse.response.data.message);
+            errorMessage = message;
+            errorDetails = details;
+          } else if (errorWithResponse.response.status === 400) {
+            errorMessage = 'Dados inválidos';
+            errorDetails = ['Verifique os dados informados e tente novamente'];
+          } else if (errorWithResponse.response.status === 409) {
+            errorMessage = 'Conflito de dados';
+            errorDetails = ['Alguns dados já existem no sistema'];
+          } else if (errorWithResponse.response.status === 500) {
+            errorMessage = 'Erro no servidor';
+            errorDetails = ['O servidor encontrou um erro. Tente novamente mais tarde'];
+          }
+        }
+      } else if (error && typeof error === 'object' && 'request' in error) {
+        // Erro de rede
+        errorMessage = 'Erro de conexão';
+        errorDetails = [
+          'Não foi possível conectar ao servidor',
+          'Verifique sua conexão com a internet'
+        ];
+      }
+      
+      setApiMessage({
+        type: 'error',
+        message: errorMessage,
+        details: errorDetails.length > 0 ? errorDetails : undefined
+      });
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
     }
@@ -193,19 +365,11 @@ function OriginalRegistrarPage() {
         return newErrors;
       });
     }
-  };
-
-  const handleEnderecoChange = (endereco: Endereco) => {
-    const enderecoDTO = convertEnderecoToDTO(endereco);
-    setFormData(prev => ({ ...prev, endereco: enderecoDTO }));
     
-    // Limpar erros de endereço
-    const enderecoFields = ['cep', 'logradouro', 'bairro', 'cidade'];
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      enderecoFields.forEach(field => delete newErrors[field]);
-      return newErrors;
-    });
+    // Limpar mensagem de API quando usuário começar a corrigir
+    if (apiMessage?.type === 'error') {
+      setApiMessage(null);
+    }
   };
 
   const handleDocumentChange = (field: 'cpf' | 'rg', value: string) => {
@@ -251,18 +415,29 @@ function OriginalRegistrarPage() {
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-6">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-green-100">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
             <h1 className="text-2xl font-bold text-green-800 mb-3">
-              Cadastro Realizado!
+              Cadastro Realizado com Sucesso!
             </h1>
             <p className="text-green-700 mb-6">
-              A pessoa foi cadastrada com sucesso no sistema.
+              A pessoa foi cadastrada no sistema e está pronta para o acompanhamento.
             </p>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
-              ✅ Dados enviados para o backend<br />
-              🔄 Redirecionando para a lista...
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700">
+              <div className="space-y-2">
+                <p className="flex items-center justify-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Dados salvos com sucesso
+                </p>
+                <p className="flex items-center justify-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Próximo comparecimento calculado
+                </p>
+                <p className="text-xs text-green-600 mt-3">
+                  Redirecionando para a lista geral...
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -272,6 +447,18 @@ function OriginalRegistrarPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      {/* Mensagem de API no topo */}
+      {apiMessage && (
+        <div className="mb-6 animate-in slide-in-from-top-2">
+          <AlertMessage
+            type={apiMessage.type}
+            message={apiMessage.message}
+            details={apiMessage.details}
+            onClose={() => setApiMessage(null)}
+          />
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-lg p-8">
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
@@ -279,7 +466,7 @@ function OriginalRegistrarPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-primary-dark">Cadastrar Nova Pessoa</h1>
-            <p className="text-gray-600">Integração com backend API do TJBA</p>
+            <p className="text-gray-600">Preencha todos os campos obrigatórios (*)</p>
           </div>
         </div>
 
@@ -294,14 +481,14 @@ function OriginalRegistrarPage() {
                 type="text"
                 value={formData.nome}
                 onChange={(e) => handleInputChange('nome', e.target.value)}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  errors.nome ? 'border-red-300' : 'border-gray-300'
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                  errors.nome ? 'border-red-300 bg-red-50' : 'border-gray-300'
                 }`}
                 placeholder="Digite o nome completo"
               />
               {errors.nome && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
+                  <AlertCircle className="w-4 h-4" />
                   {errors.nome}
                 </p>
               )}
@@ -313,14 +500,14 @@ function OriginalRegistrarPage() {
                 type="text"
                 value={formData.contato}
                 onChange={(e) => handleInputChange('contato', e.target.value)}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  errors.contato ? 'border-red-300' : 'border-gray-300'
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                  errors.contato ? 'border-red-300 bg-red-50' : 'border-gray-300'
                 }`}
                 placeholder="(00) 00000-0000"
               />
               {errors.contato && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
+                  <AlertCircle className="w-4 h-4" />
                   {errors.contato}
                 </p>
               )}
@@ -330,6 +517,15 @@ function OriginalRegistrarPage() {
           {/* Documentos */}
           <div className="space-y-4">
             <h3 className="text-xl font-semibold text-primary-dark border-b pb-2">Documentos</h3>
+            
+            {errors.documentos && (
+              <AlertMessage
+                type="warning"
+                message={errors.documentos}
+                className="mb-4"
+              />
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
@@ -352,16 +548,9 @@ function OriginalRegistrarPage() {
                 />
               </div>
             </div>
-            {errors.documentos && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-800 text-sm flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  {errors.documentos}
-                </p>
-              </div>
-            )}
-            <p className="text-sm text-gray-600">
-              * Pelo menos um documento (CPF ou RG) deve ser fornecido
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              <Info className="w-4 h-4" />
+              Pelo menos um documento (CPF ou RG) deve ser fornecido
             </p>
           </div>
 
@@ -373,13 +562,10 @@ function OriginalRegistrarPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">CEP *</label>
                 <input
                   type="text"
-                  value={formData.endereco.cep}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, cep: e.target.value }
-                  }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.cep ? 'border-red-300' : 'border-gray-300'
+                  value={formData.cep}
+                  onChange={(e) => handleInputChange('cep', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.cep ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="00000-000"
                 />
@@ -390,13 +576,10 @@ function OriginalRegistrarPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Logradouro *</label>
                 <input
                   type="text"
-                  value={formData.endereco.logradouro}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, logradouro: e.target.value }
-                  }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.logradouro ? 'border-red-300' : 'border-gray-300'
+                  value={formData.logradouro}
+                  onChange={(e) => handleInputChange('logradouro', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.logradouro ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Rua, Avenida, etc."
                 />
@@ -407,11 +590,8 @@ function OriginalRegistrarPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
                 <input
                   type="text"
-                  value={formData.endereco.numero || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, numero: e.target.value }
-                  }))}
+                  value={formData.numero || ''}
+                  onChange={(e) => handleInputChange('numero', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="123"
                 />
@@ -421,11 +601,8 @@ function OriginalRegistrarPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
                 <input
                   type="text"
-                  value={formData.endereco.complemento || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, complemento: e.target.value }
-                  }))}
+                  value={formData.complemento || ''}
+                  onChange={(e) => handleInputChange('complemento', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Apto, Casa, etc."
                 />
@@ -435,13 +612,10 @@ function OriginalRegistrarPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bairro *</label>
                 <input
                   type="text"
-                  value={formData.endereco.bairro}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, bairro: e.target.value }
-                  }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.bairro ? 'border-red-300' : 'border-gray-300'
+                  value={formData.bairro}
+                  onChange={(e) => handleInputChange('bairro', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.bairro ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Nome do bairro"
                 />
@@ -452,13 +626,10 @@ function OriginalRegistrarPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cidade *</label>
                 <input
                   type="text"
-                  value={formData.endereco.cidade}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, cidade: e.target.value }
-                  }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.cidade ? 'border-red-300' : 'border-gray-300'
+                  value={formData.cidade}
+                  onChange={(e) => handleInputChange('cidade', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.cidade ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Nome da cidade"
                 />
@@ -468,11 +639,8 @@ function OriginalRegistrarPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estado *</label>
                 <select
-                  value={formData.endereco.estado}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    endereco: { ...prev.endereco, estado: e.target.value as EstadoBrasil }
-                  }))}
+                  value={formData.estado}
+                  onChange={(e) => handleInputChange('estado', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   {Object.values(EstadoBrasil).map(estado => (
@@ -494,14 +662,14 @@ function OriginalRegistrarPage() {
                   type="text"
                   value={formData.processo}
                   onChange={(e) => handleInputChange('processo', e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.processo ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.processo ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="0000000-00.0000.0.00.0000"
                 />
                 {errors.processo && (
                   <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4" />
                     {errors.processo}
                   </p>
                 )}
@@ -513,8 +681,8 @@ function OriginalRegistrarPage() {
                   type="text"
                   value={formData.vara}
                   onChange={(e) => handleInputChange('vara', e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.vara ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.vara ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Ex: 1ª Vara Criminal"
                 />
@@ -527,8 +695,8 @@ function OriginalRegistrarPage() {
                   type="text"
                   value={formData.comarca}
                   onChange={(e) => handleInputChange('comarca', e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.comarca ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.comarca ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Ex: Salvador"
                 />
@@ -541,8 +709,8 @@ function OriginalRegistrarPage() {
                   type="date"
                   value={formData.dataDecisao}
                   onChange={(e) => handleInputChange('dataDecisao', e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.dataDecisao ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.dataDecisao ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                 />
                 {errors.dataDecisao && <p className="text-red-500 text-sm mt-1">{errors.dataDecisao}</p>}
@@ -554,8 +722,8 @@ function OriginalRegistrarPage() {
                   type="date"
                   value={formData.dataComparecimentoInicial}
                   onChange={(e) => handleInputChange('dataComparecimentoInicial', e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                    errors.dataComparecimentoInicial ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
+                    errors.dataComparecimentoInicial ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                 />
                 {errors.dataComparecimentoInicial && <p className="text-red-500 text-sm mt-1">{errors.dataComparecimentoInicial}</p>}
@@ -608,31 +776,13 @@ function OriginalRegistrarPage() {
             />
           </div>
 
-          {/* Indicador de erro geral */}
-          {Object.keys(errors).length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-red-800 mb-2">
-                    Corrija os erros para continuar:
-                  </p>
-                  <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
-                    {Object.entries(errors).map(([field, error]) => (
-                      <li key={field}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Botões de Ação */}
           <div className="flex justify-between items-center pt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={() => router.back()}
               className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              disabled={loading}
             >
               <ArrowLeft className="w-4 h-4" />
               Voltar
@@ -640,13 +790,13 @@ function OriginalRegistrarPage() {
 
             <button
               type="submit"
-              disabled={loading || Object.keys(errors).length > 0}
+              disabled={loading}
               className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Enviando para API...
+                  Cadastrando...
                 </>
               ) : (
                 <>

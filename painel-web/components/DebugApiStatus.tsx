@@ -10,6 +10,7 @@ import { Activity, Send, Database, AlertCircle, CheckCircle } from 'lucide-react
 export default function DebugApiStatus() {
   const { isConnected, health, appInfo, checkConnection } = useApi();
   const [testLoading, setTestLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [testResult, setTestResult] = useState<any>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -25,13 +26,12 @@ export default function DebugApiStatus() {
       dataDecisao: '2025-01-01',
       dataComparecimentoInicial: '2025-01-15',
       periodicidade: 30,
-      // Campos de endereço diretos (não aninhados)
       cep: '40070-110', // Formato válido com hífen
       logradouro: 'Rua Teste Debug', // Mínimo 5 caracteres
       numero: '123',
       bairro: 'Centro',
       cidade: 'Salvador',
-      estado: 'BA', // Maiúsculo, exatamente 2 caracteres
+      estado: EstadoBrasil.BA, 
       cpf: '123.456.789-01', // Formato válido
       observacoes: 'Teste de debug da API'
     };
