@@ -15,6 +15,7 @@ import {
   // Pessoas types
   PessoaDTO,
   PessoaResponse,
+  ListarPessoasResponse,
   
   // Comparecimentos types
   ComparecimentoDTO,
@@ -43,9 +44,7 @@ import {
   EstadoBrasil
 } from '@/types/backend';
 
-// =====================
-// 🔧 SETUP SERVICE
-// =====================
+// SETUP SERVICE
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
     const response = await httpClient.get<SetupStatusResponse>(ENDPOINTS.SETUP.STATUS);
@@ -73,9 +72,7 @@ export const setupService = {
   }
 };
 
-// =====================
-// 📧 EMAIL VERIFICATION SERVICE
-// =====================
+// EMAIL VERIFICATION SERVICE
 export const verificacaoService = {
   async solicitarCodigo(data: SolicitarCodigoDTO): Promise<ApiResponse> {
     const response = await httpClient.post<ApiResponse>(ENDPOINTS.VERIFICACAO.SOLICITAR_CODIGO, data);
@@ -110,15 +107,25 @@ export const verificacaoService = {
   }
 };
 
-// =====================
-// 👥 PESSOAS SERVICE
-// =====================
+// PESSOAS SERVICE
 export const pessoasService = {
-  async listar(): Promise<PessoaResponse[]> {
+  // Corrigido para usar ListarPessoasResponse
+  async listar(): Promise<ListarPessoasResponse> {
     console.log('[pessoasService] Listando pessoas...');
-    const response = await httpClient.get<PessoaResponse[]>(ENDPOINTS.PESSOAS.LIST);
+    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.LIST);
     console.log('[pessoasService] Resposta da listagem:', response);
-    return response.success && response.data ? response.data : [];
+    
+    // Retornar a resposta completa ou estrutura padrão em caso de erro
+    if (response.success && response.data) {
+      return response.data;
+    }
+    
+    // Estrutura padrão quando há erro
+    return {
+      success: false,
+      message: response.error || 'Erro ao carregar pessoas',
+      data: []
+    };
   },
 
   async criar(data: PessoaDTO): Promise<ApiResponse<PessoaResponse>> {
@@ -142,8 +149,8 @@ export const pessoasService = {
   },
 
   async buscarPorId(id: number): Promise<PessoaResponse | null> {
-    const response = await httpClient.get<PessoaResponse>(ENDPOINTS.PESSOAS.BY_ID(id));
-    return response.success ? response.data || null : null;
+    const response = await httpClient.get<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.BY_ID(id));
+    return response.success && response.data?.data ? response.data.data : null;
   },
 
   async atualizar(id: number, data: Partial<PessoaDTO>): Promise<ApiResponse<PessoaResponse>> {
@@ -157,36 +164,34 @@ export const pessoasService = {
   },
 
   async buscarPorProcesso(processo: string): Promise<PessoaResponse | null> {
-    const response = await httpClient.get<PessoaResponse>(ENDPOINTS.PESSOAS.BY_PROCESSO(processo));
-    return response.success ? response.data || null : null;
+    const response = await httpClient.get<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.BY_PROCESSO(processo));
+    return response.success && response.data?.data ? response.data.data : null;
   },
 
   async buscarPorStatus(status: StatusComparecimento): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<PessoaResponse[]>(ENDPOINTS.PESSOAS.BY_STATUS(status));
-    return response.data || [];
+    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.BY_STATUS(status));
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async comparecimentosHoje(): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<PessoaResponse[]>(ENDPOINTS.PESSOAS.COMPARECIMENTOS_HOJE);
-    return response.data || [];
+    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.COMPARECIMENTOS_HOJE);
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async atrasados(): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<PessoaResponse[]>(ENDPOINTS.PESSOAS.ATRASADOS);
-    return response.data || [];
+    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.ATRASADOS);
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async buscar(params: BuscarParams): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<PessoaResponse[]>(
+    const response = await httpClient.get<ListarPessoasResponse>(
       buildUrl(ENDPOINTS.PESSOAS.BUSCAR, params)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   }
 };
 
-// =====================
-// ✅ COMPARECIMENTOS SERVICE
-// =====================
+// COMPARECIMENTOS SERVICE
 export const comparecimentosService = {
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     const response = await httpClient.post<ApiResponse<ComparecimentoResponse>>(ENDPOINTS.COMPARECIMENTOS.CREATE, data);
@@ -194,27 +199,27 @@ export const comparecimentosService = {
   },
 
   async buscarPorPessoa(pessoaId: number): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ComparecimentoResponse[]>(ENDPOINTS.COMPARECIMENTOS.BY_PESSOA(pessoaId));
-    return response.data || [];
+    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(ENDPOINTS.COMPARECIMENTOS.BY_PESSOA(pessoaId));
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async buscarPorPeriodo(params: PeriodoParams): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ComparecimentoResponse[]>(
+    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(
       buildUrl(ENDPOINTS.COMPARECIMENTOS.BY_PERIODO, params)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async comparecimentosHoje(): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ComparecimentoResponse[]>(ENDPOINTS.COMPARECIMENTOS.HOJE);
-    return response.data || [];
+    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(ENDPOINTS.COMPARECIMENTOS.HOJE);
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async mudancasEndereco(pessoaId: number): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<HistoricoEnderecoResponse[]>(
+    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
       ENDPOINTS.COMPARECIMENTOS.MUDANCAS_ENDERECO(pessoaId)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async atualizarObservacoes(historicoId: number, observacoes: string): Promise<ApiResponse> {
@@ -231,10 +236,10 @@ export const comparecimentosService = {
   },
 
   async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
-    const response = await httpClient.get<EstatisticasComparecimentoResponse>(
+    const response = await httpClient.get<ApiResponse<EstatisticasComparecimentoResponse>>(
       buildUrl(ENDPOINTS.COMPARECIMENTOS.ESTATISTICAS, params)
     );
-    return response.data || {
+    return response.success && response.data?.data ? response.data.data : {
       totalPessoas: 0,
       emConformidade: 0,
       inadimplentes: 0,
@@ -245,64 +250,62 @@ export const comparecimentosService = {
   }
 };
 
-// =====================
-// 🏠 HISTÓRICO ENDEREÇOS SERVICE
-// =====================
+// HISTÓRICO ENDEREÇOS SERVICE
 export const historicoEnderecosService = {
   async buscarPorPessoa(pessoaId: number): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<HistoricoEnderecoResponse[]>(
+    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
       ENDPOINTS.HISTORICO_ENDERECOS.BY_PESSOA(pessoaId)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async obterEnderecoAtivo(pessoaId: number): Promise<HistoricoEnderecoResponse | null> {
-    const response = await httpClient.get<HistoricoEnderecoResponse>(
+    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse>>(
       ENDPOINTS.HISTORICO_ENDERECOS.ENDERECO_ATIVO(pessoaId)
     );
-    return response.success ? response.data || null : null;
+    return response.success && response.data?.data ? response.data.data : null;
   },
 
   async obterHistoricos(pessoaId: number): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<HistoricoEnderecoResponse[]>(
+    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
       ENDPOINTS.HISTORICO_ENDERECOS.HISTORICOS(pessoaId)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async buscarPorPeriodo(pessoaId: number, params: PeriodoParams): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<HistoricoEnderecoResponse[]>(
+    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
       buildUrl(ENDPOINTS.HISTORICO_ENDERECOS.BY_PERIODO(pessoaId), params)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async buscarPorCidade(cidade: string): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<PessoaResponse[]>(
+    const response = await httpClient.get<ListarPessoasResponse>(
       ENDPOINTS.HISTORICO_ENDERECOS.BY_CIDADE(cidade)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async buscarPorEstado(estado: EstadoBrasil): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<PessoaResponse[]>(
+    const response = await httpClient.get<ListarPessoasResponse>(
       ENDPOINTS.HISTORICO_ENDERECOS.BY_ESTADO(estado)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async mudancasPorPeriodo(params: PeriodoParams): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<HistoricoEnderecoResponse[]>(
+    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
       buildUrl(ENDPOINTS.HISTORICO_ENDERECOS.MUDANCAS_PERIODO, params)
     );
-    return response.data || [];
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async obterEstatisticas(): Promise<EstatisticasEnderecoResponse> {
-    const response = await httpClient.get<EstatisticasEnderecoResponse>(
+    const response = await httpClient.get<ApiResponse<EstatisticasEnderecoResponse>>(
       ENDPOINTS.HISTORICO_ENDERECOS.ESTATISTICAS
     );
-    return response.data || {
+    return response.success && response.data?.data ? response.data.data : {
       totalMudancas: 0,
       mudancasUltimoMes: 0,
       cidadesMaisFrequentes: [],
@@ -311,13 +314,11 @@ export const historicoEnderecosService = {
   }
 };
 
-// =====================
-// 👨‍💼 USUÁRIOS SERVICE
-// =====================
+// USUÁRIOS SERVICE
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
-    const response = await httpClient.get<UsuarioResponse[]>(ENDPOINTS.USUARIOS.LIST);
-    return response.data || [];
+    const response = await httpClient.get<ApiResponse<UsuarioResponse[]>>(ENDPOINTS.USUARIOS.LIST);
+    return response.success && response.data?.data ? response.data.data : [];
   },
 
   async criar(data: UsuarioDTO): Promise<ApiResponse<UsuarioResponse>> {
@@ -326,8 +327,8 @@ export const usuariosService = {
   },
 
   async buscarPorId(id: number): Promise<UsuarioResponse | null> {
-    const response = await httpClient.get<UsuarioResponse>(ENDPOINTS.USUARIOS.BY_ID(id));
-    return response.success ? response.data || null : null;
+    const response = await httpClient.get<ApiResponse<UsuarioResponse>>(ENDPOINTS.USUARIOS.BY_ID(id));
+    return response.success && response.data?.data ? response.data.data : null;
   },
 
   async atualizar(id: number, data: Partial<UsuarioDTO>): Promise<ApiResponse<UsuarioResponse>> {
@@ -341,14 +342,12 @@ export const usuariosService = {
   },
 
   async buscarPorTipo(tipo: TipoUsuario): Promise<UsuarioResponse[]> {
-    const response = await httpClient.get<UsuarioResponse[]>(ENDPOINTS.USUARIOS.BY_TIPO(tipo));
-    return response.data || [];
+    const response = await httpClient.get<ApiResponse<UsuarioResponse[]>>(ENDPOINTS.USUARIOS.BY_TIPO(tipo));
+    return response.success && response.data?.data ? response.data.data : [];
   }
 };
 
-// =====================
-// 🧪 TEST SERVICE
-// =====================
+// TEST SERVICE
 export const testService = {
   async health(): Promise<HealthResponse> {
     try {
@@ -413,9 +412,7 @@ export const testService = {
   }
 };
 
-// =====================
-// 🔧 UTILITY FUNCTIONS
-// =====================
+// UTILITY FUNCTIONS
 
 // Função para configurar headers de autenticação
 export const configureAuthHeaders = (token: string) => {

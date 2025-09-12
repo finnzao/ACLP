@@ -13,7 +13,7 @@ export function useAddressValidation() {
 
   /**
    * Valida e busca dados de endereço a partir do CEP
-   * @param cep CEP sem formatação (apenas números)
+   * @param cep
    */
   const validateCEP = async (cep: string): Promise<ValidateCEPResult> => {
     setIsLoading(true);

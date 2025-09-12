@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// types/backend.ts
-// Enums utilizados no backend
+
 export enum StatusComparecimento {
   EM_CONFORMIDADE = 'EM_CONFORMIDADE',
   INADIMPLENTE = 'INADIMPLENTE'
@@ -25,9 +24,7 @@ export enum EstadoBrasil {
   SP = 'SP', SE = 'SE', TO = 'TO'
 }
 
-// =====================
 // DTOs de Setup
-// =====================
 export interface SetupAdminDTO {
   nome: string;
   email: string;
@@ -43,9 +40,7 @@ export interface SetupStatusResponse {
   timestamp: string;
 }
 
-// =====================
 // DTOs de Verificação de Email
-// =====================
 export interface SolicitarCodigoDTO {
   email: string;
   tipoUsuario: TipoUsuario;
@@ -66,9 +61,7 @@ export interface VerificacaoStatusResponse {
   expiresAt?: string;
 }
 
-// =====================
 // DTOs de Endereço
-// =====================
 export interface EnderecoDTO {
   cep: string;
   logradouro: string;
@@ -79,9 +72,8 @@ export interface EnderecoDTO {
   estado: EstadoBrasil | string;
 }
 
-// =====================
+
 // DTOs de Pessoas
-// =====================
 export interface PessoaDTO {
   id?: number; // Opcional para criação
   nome: string; // @NotBlank, 2-150 caracteres
@@ -99,7 +91,6 @@ export interface PessoaDTO {
   ultimoComparecimento?: string; // LocalDate
   proximoComparecimento?: string; // LocalDate
   observacoes?: string; // Opcional, máximo 500 caracteres
-  
   // Campos de endereço - TODOS OBRIGATÓRIOS
   cep: string; // @NotBlank, formato 00000-000
   logradouro: string; // @NotBlank, 5-200 caracteres
@@ -110,17 +101,62 @@ export interface PessoaDTO {
   estado: string; // @NotBlank, exatamente 2 caracteres maiúsculos [A-Z]{2}
 }
 
-export interface PessoaResponse extends PessoaDTO {
-  id: number; // Sempre presente na resposta
-  status: StatusComparecimento;
-  proximoComparecimento: string;
-  criadoEm: string; // LocalDateTime
-  atualizadoEm: string; // LocalDateTime
+export interface EnderecoResponse extends EnderecoDTO {
+  id: number;
+  criadoEm: string;
+  atualizadoEm?: string;
+  version: number;
+  
+  // Campos calculados/derivados
+  enderecoCompleto: string;
+  enderecoResumido: string;
+  completo: boolean;
+  nomeEstado: string;
+  regiaoEstado: string;
+  cepSomenteNumeros: string;
+  estadoBrasil: string;
 }
 
-// =====================
+export interface PessoaResponse extends Omit<PessoaDTO, 'cep' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'estado'> {
+  // Sobrescrever campos que têm tipo diferente no response
+  id: number; // Obrigatório na response
+  status: StatusComparecimento; // Sempre presente na response
+  primeiroComparecimento: string; // Sempre presente na response
+  ultimoComparecimento: string; // Sempre presente na response
+  proximoComparecimento: string; // Sempre presente na response
+  endereco: EnderecoResponse; // Objeto completo em vez de campos separados
+  
+  // Campos de auditoria
+  criadoEm: string;
+  atualizadoEm?: string;
+  version: number;
+  
+  // Relacionamentos
+  historicoComparecimentos: any[]; // Array de histórico
+  
+  // Campos calculados/derivados
+  enderecoCompleto: string;
+  enderecoResumido: string;
+  cep: string;
+  nomeEstado: string;
+  regiaoEstado: string;
+  periodicidadeDescricao: string;
+  comparecimentoHoje: boolean;
+  documentosValidos: boolean;
+  resumo: string;
+  diasAtraso: number;
+  enderecoValido: boolean;
+  identificacao: string;
+  atrasado: boolean;
+  cidadeEstado: string;
+}
+// Interface para a resposta completa da API
+export interface ListarPessoasResponse {
+  success: boolean;
+  message: string;
+  data: PessoaResponse[];
+}
 // DTOs de Comparecimentos
-// =====================
 export interface ComparecimentoDTO {
   pessoaId: number;
   dataComparecimento: string; // LocalDate
@@ -149,9 +185,7 @@ export interface EstatisticasComparecimentoResponse {
   percentualConformidade: number;
 }
 
-// =====================
 // DTOs de Histórico de Endereços
-// =====================
 export interface HistoricoEnderecoResponse {
   id: number;
   pessoa: PessoaResponse;
@@ -162,6 +196,7 @@ export interface HistoricoEnderecoResponse {
   ativo: boolean;
   criadoEm: string; // LocalDateTime
 }
+
 
 export interface EstatisticasEnderecoResponse {
   totalMudancas: number;
@@ -176,9 +211,7 @@ export interface EstatisticasEnderecoResponse {
   }>;
 }
 
-// =====================
 // DTOs de Usuários
-// =====================
 export interface UsuarioDTO {
   nome: string;
   email: string;
@@ -195,9 +228,7 @@ export interface UsuarioResponse extends Omit<UsuarioDTO, 'senha'> {
   ultimoLogin?: string; // LocalDateTime
 }
 
-// =====================
 // Responses Padrão da API
-// =====================
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -224,9 +255,7 @@ export interface ErrorResponse {
   status: number;
 }
 
-// =====================
 // Parâmetros de Query
-// =====================
 export interface PeriodoParams {
   inicio: string; // LocalDate (YYYY-MM-DD)
   fim: string; // LocalDate (YYYY-MM-DD)
@@ -245,9 +274,7 @@ export interface PaginationParams {
   direction?: 'ASC' | 'DESC';
 }
 
-// =====================
 // Health Check Response
-// =====================
 export interface HealthResponse {
   status: 'UP' | 'DOWN';
   timestamp: string;

@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import usuarios from '@/db/usuarios_mock.json';
+import { usePessoas } from '@/hooks/useBackendApi';
+import type { PessoaResponse, ListarPessoasResponse } from '@/types/backend';
 import type { Comparecimento } from '@/types';
-import DetalhesAcusadoModal from '@/components/detalhesSubmetido';
-import EditarAcusadoModal from '@/components/editarSubmetido';
+import DetalhesAcusadoModal from '@/components/DetalhesSubmetido';
+import EditarAcusadoModal from '@/components/EditarSubmetido';
 import ExportButton from '@/components/ExportButton';
 import { 
   Search, 
   Filter, 
   AlertTriangle, 
-  CheckCircle, 
   Clock, 
   ChevronLeft, 
   ChevronRight, 
@@ -20,16 +20,26 @@ import {
   User,
   FileText,
   SlidersHorizontal,
-  Download
+  Download,
+  RefreshCw,
+  MapPin
 } from 'lucide-react';
 
 export default function GeralPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Hook do backend
+  const { 
+    pessoas: pessoasBackend, 
+    loading: loadingBackend, 
+    error: errorBackend, 
+    refetch: refetchPessoas 
+  } = usePessoas();
+
   // Estados principais
   const [filtro, setFiltro] = useState('');
-  const [colunaOrdenacao, setColunaOrdenacao] = useState<keyof Comparecimento>('nome');
+  const [colunaOrdenacao, setColunaOrdenacao] = useState<string>('nome');
   const [ordem, setOrdem] = useState<'asc' | 'desc'>('asc');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -39,9 +49,6 @@ export default function GeralPage() {
   // Estados de controle
   const [selecionado, setSelecionado] = useState<Comparecimento | null>(null);
   const [editando, setEditando] = useState<Comparecimento | null>(null);
-  const [todosOsDados, setTodosOsDados] = useState<Comparecimento[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileExport, setShowMobileExport] = useState(false);
 
@@ -64,28 +71,116 @@ export default function GeralPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    if (!initialLoad) return;
-
-    setLoading(true);
-
-    const loadData = async () => {
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      const todosOsDados = usuarios.map((item) => ({
-        ...item,
-        periodicidade: item.periodicidade as Comparecimento['periodicidade'],
-        status: item.status as Comparecimento['status'],
-      }));
-
-      setTodosOsDados(todosOsDados);
-      setInitialLoad(false);
-      setLoading(false);
+  // Converter dados do backend para formato esperado com tipagem correta
+  const todosOsDados = useMemo(() => {
+    // Type guard para verificar se é ListarPessoasResponse
+    const isListarPessoasResponse = (data: any): data is ListarPessoasResponse => {
+      return data && typeof data === 'object' && 'success' in data && 'data' in data;
     };
 
-    loadData();
-  }, [initialLoad]);
+    // Guard Clauses com tipagem correta
+    if (!pessoasBackend) {
+      console.warn('pessoasBackend não está disponível');
+      return [];
+    }
+
+    // Verificar se tem a estrutura esperada
+    if (!isListarPessoasResponse(pessoasBackend)) {
+      console.warn('pessoasBackend não tem a estrutura esperada:', pessoasBackend);
+      // Se for PessoaResponse[] diretamente, trabalhar com isso
+      if (Array.isArray(pessoasBackend)) {
+        return pessoasBackend.map((pessoa: PessoaResponse) => ({
+          id: pessoa.id,
+          nome: pessoa.nome,
+          cpf: pessoa.cpf || '',
+          rg: pessoa.rg || '',
+          contato: pessoa.contato,
+          processo: pessoa.processo,
+          vara: pessoa.vara,
+          comarca: pessoa.comarca,
+          decisao: pessoa.dataDecisao,
+          periodicidade: pessoa.periodicidade,
+          status: pessoa.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
+          primeiroComparecimento: pessoa.primeiroComparecimento,
+          ultimoComparecimento: pessoa.ultimoComparecimento,
+          proximoComparecimento: pessoa.proximoComparecimento,
+          endereco: pessoa.endereco ? {
+            cep: pessoa.endereco.cep,
+            logradouro: pessoa.endereco.logradouro,
+            numero: pessoa.endereco.numero,
+            complemento: pessoa.endereco.complemento,
+            bairro: pessoa.endereco.bairro,
+            cidade: pessoa.endereco.cidade,
+            estado: pessoa.endereco.estado
+          } : undefined,
+          observacoes: pessoa.observacoes,
+          atrasado: pessoa.atrasado,
+          diasAtraso: pessoa.diasAtraso,
+          comparecimentoHoje: pessoa.comparecimentoHoje,
+          enderecoCompleto: pessoa.enderecoCompleto,
+          cidadeEstado: pessoa.cidadeEstado
+        }));
+      }
+      return [];
+    }
+
+    if (!pessoasBackend.success) {
+      console.warn('Resposta da API não foi bem-sucedida:', pessoasBackend.message);
+      return [];
+    }
+
+    if (!pessoasBackend.data) {
+      console.warn('Dados não estão presentes na resposta');
+      return [];
+    }
+
+    if (!Array.isArray(pessoasBackend.data)) {
+      console.warn('Dados não são um array:', typeof pessoasBackend.data);
+      return [];
+    }
+
+    if (pessoasBackend.data.length === 0) {
+      console.info('Nenhuma pessoa encontrada na resposta');
+      return [];
+    }
+
+    console.info(`Processando ${pessoasBackend.data.length} pessoas`);
+
+    // Extrair pessoas após todas as validações
+    const pessoas = pessoasBackend.data;
+
+    return pessoas.map((pessoa: PessoaResponse) => ({
+      id: pessoa.id,
+      nome: pessoa.nome,
+      cpf: pessoa.cpf || '',
+      rg: pessoa.rg || '',
+      contato: pessoa.contato,
+      processo: pessoa.processo,
+      vara: pessoa.vara,
+      comarca: pessoa.comarca,
+      decisao: pessoa.dataDecisao,
+      periodicidade: pessoa.periodicidade,
+      status: pessoa.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
+      primeiroComparecimento: pessoa.primeiroComparecimento,
+      ultimoComparecimento: pessoa.ultimoComparecimento,
+      proximoComparecimento: pessoa.proximoComparecimento,
+      endereco: pessoa.endereco ? {
+        cep: pessoa.endereco.cep,
+        logradouro: pessoa.endereco.logradouro,
+        numero: pessoa.endereco.numero,
+        complemento: pessoa.endereco.complemento,
+        bairro: pessoa.endereco.bairro,
+        cidade: pessoa.endereco.cidade,
+        estado: pessoa.endereco.estado
+      } : undefined,
+      observacoes: pessoa.observacoes,
+      atrasado: pessoa.atrasado,
+      diasAtraso: pessoa.diasAtraso,
+      comparecimentoHoje: pessoa.comparecimentoHoje,
+      enderecoCompleto: pessoa.enderecoCompleto,
+      cidadeEstado: pessoa.cidadeEstado
+    }));
+  }, [pessoasBackend]);
 
   // Configurar busca inicial a partir da URL
   useEffect(() => {
@@ -150,8 +245,8 @@ export default function GeralPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) < 0;
   }, []);
 
-  // Filtros
-  const filtrarDados = useCallback((data: Comparecimento[]): Comparecimento[] => {
+  // Filtros adaptados para trabalhar com dados do backend
+  const filtrarDados = useCallback((data: any[]): any[] => {
     return data.filter((item) => {
       const termo = filtro.trim();
       let matchTexto = true;
@@ -174,8 +269,8 @@ export default function GeralPage() {
 
       let matchUrgencia = true;
       if (filtroUrgencia !== 'todos') {
-        const hoje = isToday(item.proximoComparecimento);
-        const atrasado = isOverdue(item.proximoComparecimento);
+        const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
+        const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
         const proximo = getDaysUntil(item.proximoComparecimento) <= 7 && !hoje && !atrasado;
 
         switch (filtroUrgencia) {
@@ -193,12 +288,12 @@ export default function GeralPage() {
     });
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim, normalizarTexto, limparMascaraProcesso, isToday, isOverdue, getDaysUntil]);
 
-  const ordenarDados = useCallback((data: Comparecimento[]): Comparecimento[] => {
+  const ordenarDados = useCallback((data: any[]): any[] => {
     return [...data].sort((a, b) => {
       const valA = a[colunaOrdenacao];
       const valB = b[colunaOrdenacao];
 
-      if (colunaOrdenacao.includes('Comparecimento') || colunaOrdenacao === 'decisao') {
+      if (colunaOrdenacao.includes('Comparecimento') || colunaOrdenacao === 'decisao' || colunaOrdenacao === 'dataDecisao') {
         const dateA = valA ? new Date(valA as string | number | Date) : undefined;
         const dateB = valB ? new Date(valB as string | number | Date) : undefined;
         if (!dateA || !dateB) return 0;
@@ -211,7 +306,6 @@ export default function GeralPage() {
     });
   }, [colunaOrdenacao, ordem]);
 
-  // Limpar todos os filtros
   const limparFiltros = () => {
     setFiltro('');
     setFiltroStatus('todos');
@@ -222,6 +316,10 @@ export default function GeralPage() {
     router.push('/dashboard/geral');
   };
 
+  const handleRefresh = async () => {
+    await refetchPessoas();
+  };
+
   const dadosFiltrados = useMemo(() => {
     return ordenarDados(filtrarDados(todosOsDados));
   }, [todosOsDados, filtrarDados, ordenarDados]);
@@ -229,8 +327,8 @@ export default function GeralPage() {
   const totalFiltrados = dadosFiltrados.length;
   const totalEmConformidade = dadosFiltrados.filter(d => d.status === 'em conformidade').length;
   const totalInadimplentes = dadosFiltrados.filter(d => d.status === 'inadimplente').length;
-  const totalHoje = dadosFiltrados.filter(d => isToday(d.proximoComparecimento)).length;
-  const totalAtrasados = dadosFiltrados.filter(d => isOverdue(d.proximoComparecimento)).length;
+  const totalHoje = dadosFiltrados.filter(d => d.comparecimentoHoje || isToday(d.proximoComparecimento)).length;
+  const totalAtrasados = dadosFiltrados.filter(d => d.atrasado || isOverdue(d.proximoComparecimento)).length;
 
   // Paginação
   const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
@@ -246,7 +344,6 @@ export default function GeralPage() {
     containerRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Informações para exportação
   const exportFilterInfo = {
     filtro: filtro || undefined,
     status: filtroStatus !== 'todos' ? filtroStatus : undefined,
@@ -257,11 +354,42 @@ export default function GeralPage() {
 
   const hasActiveFilters = filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim;
 
-  // Componente Mobile Card
-  const MobileCard = ({ item }: { item: Comparecimento }) => {
-    const hoje = isToday(item.proximoComparecimento);
-    const atrasado = isOverdue(item.proximoComparecimento);
-    const diasRestantes = getDaysUntil(item.proximoComparecimento);
+  // Tratamento de estados de loading e erro
+  if (loadingBackend) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600">Carregando dados do servidor...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorBackend) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto mt-8">
+          <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados</h3>
+          <p className="text-red-600 mb-4">{errorBackend}</p>
+          <button
+            onClick={handleRefresh}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Componente Mobile Card adaptado para dados do backend
+  const MobileCard = ({ item }: { item: any }) => {
+    const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
+    const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
+    const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
 
     return (
       <div
@@ -297,6 +425,12 @@ export default function GeralPage() {
             <Calendar className="w-3.5 h-3.5" />
             <span>Próximo: {new Date(item.proximoComparecimento).toLocaleDateString('pt-BR')}</span>
           </div>
+          {item.cidadeEstado && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{item.cidadeEstado}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
@@ -318,19 +452,6 @@ export default function GeralPage() {
     );
   };
 
-  if (initialLoad || loading) {
-    return (
-      <div className="p-4 sm:p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">Carregando dados...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50" ref={containerRef}>
       {/* Mobile Layout */}
@@ -342,6 +463,12 @@ export default function GeralPage() {
               <div className="flex items-center justify-between mb-3">
                 <h1 className="text-xl font-bold text-primary-dark">Lista Geral</h1>
                 <div className="flex gap-2">
+                  <button
+                    onClick={handleRefresh}
+                    className="p-2 bg-gray-100 rounded-lg"
+                  >
+                    <RefreshCw className="w-5 h-5 text-gray-600" />
+                  </button>
                   <button
                     onClick={() => setShowMobileExport(!showMobileExport)}
                     className="p-2 bg-gray-100 rounded-lg"
@@ -515,7 +642,7 @@ export default function GeralPage() {
           {/* Mobile Cards */}
           <div className="p-4 pb-20 space-y-3">
             {dadosPaginados.map((item, index) => (
-              <MobileCard key={index} item={item} />
+              <MobileCard key={item.id || index} item={item} />
             ))}
 
             {/* Empty State */}
@@ -566,7 +693,7 @@ export default function GeralPage() {
           </div>
         </>
       ) : (
-        /* Desktop Layout (mantido como estava) */
+        /* Desktop Layout */
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -575,6 +702,13 @@ export default function GeralPage() {
             </div>
 
             <div className="flex gap-2">
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Atualizar
+              </button>
               <ExportButton
                 dados={todosOsDados}
                 dadosFiltrados={dadosFiltrados}
@@ -660,13 +794,13 @@ export default function GeralPage() {
                 <select
                   className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={colunaOrdenacao}
-                  onChange={(e) => setColunaOrdenacao(e.target.value as keyof Comparecimento)}
+                  onChange={(e) => setColunaOrdenacao(e.target.value)}
                 >
                   <option value="nome">Nome</option>
                   <option value="status">Status</option>
                   <option value="proximoComparecimento">Próximo Comparecimento</option>
                   <option value="ultimoComparecimento">Último Comparecimento</option>
-                  <option value="decisao">Data da Decisão</option>
+                  <option value="dataDecisao">Data da Decisão</option>
                 </select>
               </div>
 
@@ -756,13 +890,13 @@ export default function GeralPage() {
                 </thead>
                 <tbody>
                   {dadosPaginados.map((item, index) => {
-                    const hoje = isToday(item.proximoComparecimento);
-                    const atrasado = isOverdue(item.proximoComparecimento);
-                    const diasRestantes = getDaysUntil(item.proximoComparecimento);
+                    const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
+                    const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
+                    const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
 
                     return (
                       <tr
-                        key={index}
+                        key={item.id || index}
                         className={`border-b border-border hover:bg-gray-50 transition-colors ${
                           atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''
                         }`}
@@ -812,7 +946,7 @@ export default function GeralPage() {
                               Hoje
                             </span>
                           )}
-                          {!atrasado && !hoje && diasRestantes <= 7 && (
+                          {!atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
                               <Clock className="w-3 h-3" />
                               Próximo
@@ -918,6 +1052,11 @@ export default function GeralPage() {
               </div>
             )}
           </div>
+
+          {/* Informação sobre a fonte dos dados */}
+          <div className="text-center text-xs text-gray-500 mt-4">
+            Dados carregados do servidor em {new Date().toLocaleTimeString('pt-BR')}
+          </div>
         </div>
       )}
 
@@ -941,10 +1080,8 @@ export default function GeralPage() {
             setSelecionado(editando);
             setEditando(null);
           }}
-          onSave={(novo: Comparecimento) => {
-            setTodosOsDados((prev) =>
-              prev.map((item) => (item.processo === novo.processo ? novo : item))
-            );
+          onSave={(dados: Comparecimento) => {
+            handleRefresh();
             setEditando(null);
           }}
         />

@@ -1,4 +1,3 @@
-// hooks/useBackendApi.ts
 import { useState, useEffect, useCallback } from 'react';
 import {
   pessoasService,
@@ -26,9 +25,9 @@ import {
   AppInfoResponse
 } from '@/types/backend';
 
-// =====================
+
 // Hook para Pessoas
-// =====================
+
 export function usePessoas() {
   const [pessoas, setPessoas] = useState<PessoaResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,9 +129,9 @@ export function usePessoas() {
   };
 }
 
-// =====================
+
 // Hook para Comparecimentos
-// =====================
+
 export function useComparecimentos() {
   const [comparecimentos, setComparecimentos] = useState<ComparecimentoResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,9 +203,9 @@ export function useComparecimentos() {
   };
 }
 
-// =====================
+
 // Hook para Usuários
-// =====================
+
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState<UsuarioResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -268,9 +267,9 @@ export function useUsuarios() {
   };
 }
 
-// =====================
+
 // Hook para Estatísticas
-// =====================
+
 export function useEstatisticas() {
   const [stats, setStats] = useState<EstatisticasComparecimentoResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -303,9 +302,9 @@ export function useEstatisticas() {
   };
 }
 
-// =====================
+
 // Hook para Setup
-// =====================
+
 export function useSetup() {
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -349,9 +348,7 @@ export function useSetup() {
   };
 }
 
-// =====================
 // Hook para Health Check
-// =====================
 export function useHealthCheck() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfoResponse | null>(null);
@@ -383,9 +380,9 @@ export function useHealthCheck() {
   };
 }
 
-// =====================
+
 // Hook para Busca Geral
-// =====================
+
 export function useBusca() {
   const [resultados, setResultados] = useState<PessoaResponse[]>([]);
   const [loading, setLoading] = useState(false);
