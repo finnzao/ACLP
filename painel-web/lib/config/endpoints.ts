@@ -1,27 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// lib/config/endpoints.ts
 export const API_CONFIG = {
-  // Base URLs - configura automaticamente baseado no ambiente
   BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
-  
-  // Configurações gerais
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
-  
-  // Headers padrão
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  
-  // Configurações por ambiente
   IS_DEVELOPMENT: process.env.NODE_ENV === 'development',
   IS_PRODUCTION: process.env.NODE_ENV === 'production',
 } as const;
 
 // Mapeamento completo de todos os endpoints do backend
 export const ENDPOINTS = {
-  // 🔧 SETUP CONTROLLER
+  // Setup Controller
   SETUP: {
     STATUS: '/setup/status',
     CREATE_ADMIN: '/setup/admin',
@@ -30,7 +22,7 @@ export const ENDPOINTS = {
     HEALTH: '/setup/health',
   },
 
-  // 📧 EMAIL VERIFICATION
+  // Email Verification
   VERIFICACAO: {
     SOLICITAR_CODIGO: '/verificacao/solicitar-codigo',
     VERIFICAR_CODIGO: '/verificacao/verificar-codigo',
@@ -40,7 +32,7 @@ export const ENDPOINTS = {
     HEALTH: '/verificacao/health',
   },
 
-  // 👥 PESSOAS CONTROLLER
+  // Pessoas Controller
   PESSOAS: {
     BASE: '/pessoas',
     LIST: '/pessoas',
@@ -55,7 +47,7 @@ export const ENDPOINTS = {
     BUSCAR: (termo: string) => `/pessoas/buscar?termo=${encodeURIComponent(termo)}`,
   },
 
-  // ✅ COMPARECIMENTOS CONTROLLER
+  // Comparecimentos Controller
   COMPARECIMENTOS: {
     BASE: '/comparecimentos',
     CREATE: '/comparecimentos',
@@ -66,9 +58,12 @@ export const ENDPOINTS = {
     UPDATE_OBSERVACOES: (historicoId: number) => `/comparecimentos/${historicoId}/observacoes`,
     VERIFICAR_INADIMPLENTES: '/comparecimentos/verificar-inadimplentes',
     ESTATISTICAS: '/comparecimentos/estatisticas',
+    ESTATISTICAS_GERAL: '/comparecimentos/estatisticas/geral',
+    RESUMO_SISTEMA: '/comparecimentos/resumo/sistema',
+    MIGRAR_CADASTROS_INICIAIS: '/comparecimentos/migrar/cadastros-iniciais',
   },
 
-  // 🏠 HISTÓRICO ENDEREÇOS
+  // Histórico Endereços
   HISTORICO_ENDERECOS: {
     BY_PESSOA: (pessoaId: number) => `/historico-enderecos/pessoa/${pessoaId}`,
     ENDERECO_ATIVO: (pessoaId: number) => `/historico-enderecos/pessoa/${pessoaId}/ativo`,
@@ -84,7 +79,7 @@ export const ENDPOINTS = {
     ESTATISTICAS: '/historico-enderecos/estatisticas',
   },
 
-  // 👨‍💼 USUÁRIOS CONTROLLER
+  // Usuários Controller
   USUARIOS: {
     BASE: '/usuarios',
     LIST: '/usuarios',
@@ -95,13 +90,13 @@ export const ENDPOINTS = {
     BY_TIPO: (tipo: string) => `/usuarios/tipo/${tipo}`,
   },
 
-  // 🧪 TEST CONTROLLER
+  // Test Controller
   TEST: {
     HEALTH: '/test/health',
     INFO: '/test/info',
   },
 
-  // 🌐 SETUP VIEWS (páginas)
+  // Setup Views (páginas)
   SETUP_VIEWS: {
     SETUP: '/setup',
     SUCCESS: '/setup/success',

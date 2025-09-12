@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   PieChart,
   Pie,
@@ -31,10 +31,11 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
-import { Comparecimento } from '@/types';
-import usuarios from '@/db/usuarios_mock.json';
+import { usePessoas, useEstatisticas } from '@/hooks/useBackendApi';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import type { PessoaResponse } from '@/types/backend';
+import { Endereco } from '@/types';
 
 interface DashboardStats {
   total: number;
@@ -51,10 +52,35 @@ interface TendenciaData {
   inadimplencia: number;
 }
 
+interface DashboardPessoa {
+  id: number;
+  nome: string;
+  cpf: string;
+  rg: string;
+  contato: string;
+  processo: string;
+  vara: string;
+  comarca: string;
+  decisao: string;
+  periodicidade: number;
+  status: 'em conformidade' | 'inadimplente';
+  primeiroComparecimento: string;
+  ultimoComparecimento: string;
+  proximoComparecimento: string;
+  endereco?: Endereco;
+  observacoes?: string;
+}
+
 const COLORS = ['#7ED6A7', '#E57373', '#F6D365'];
 
 export default function DashboardPage() {
   const router = useRouter();
+  
+  // Hooks do backend
+  const { pessoas: pessoasBackend, loading: loadingPessoas, error: errorPessoas, refetch: refetchPessoas } = usePessoas();
+  const { stats: statsBackend, loading: loadingStats } = useEstatisticas();
+
+  // Estados locais
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,
     emConformidade: 0,
@@ -64,8 +90,8 @@ export default function DashboardPage() {
     percentualConformidade: 0
   });
 
-  const [proximosComparecimentos, setProximosComparecimentos] = useState<Comparecimento[]>([]);
-  const [alertasUrgentes, setAlertasUrgentes] = useState<Comparecimento[]>([]);
+  const [proximosComparecimentos, setProximosComparecimentos] = useState<DashboardPessoa[]>([]);
+  const [alertasUrgentes, setAlertasUrgentes] = useState<DashboardPessoa[]>([]);
   const [tendenciaData, setTendenciaData] = useState<TendenciaData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMobileStats, setShowMobileStats] = useState(false);
@@ -93,62 +119,127 @@ export default function DashboardPage() {
     }
   };
 
+  // Processar dados do backend
+  const todosOsDados = useMemo((): DashboardPessoa[] => {
+    if (!pessoasBackend || loadingPessoas) {
+      console.log('Aguardando dados do backend...');
+      return [];
+    }
+
+    let pessoas: PessoaResponse[] = [];
+
+    // Verificar estrutura da resposta
+    if (typeof pessoasBackend === 'object' && 'success' in pessoasBackend) {
+      // Formato de resposta da API
+      if (pessoasBackend.success && pessoasBackend.data) {
+        pessoas = Array.isArray(pessoasBackend.data) ? pessoasBackend.data : [];
+      }
+    } else if (Array.isArray(pessoasBackend)) {
+      // Array direto
+      pessoas = pessoasBackend;
+    }
+
+    console.log(`Processando ${pessoas.length} pessoas do backend`);
+
+    return pessoas.map((pessoa: PessoaResponse): DashboardPessoa => ({
+      id: pessoa.id,
+      nome: pessoa.nome,
+      cpf: pessoa.cpf || '',
+      rg: pessoa.rg || '',
+      contato: pessoa.contato,
+      processo: pessoa.processo,
+      vara: pessoa.vara,
+      comarca: pessoa.comarca,
+      decisao: pessoa.dataDecisao,
+      periodicidade: pessoa.periodicidade,
+      status: pessoa.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
+      primeiroComparecimento: pessoa.primeiroComparecimento,
+      ultimoComparecimento: pessoa.ultimoComparecimento,
+      proximoComparecimento: pessoa.proximoComparecimento,
+      endereco: pessoa.endereco,
+      observacoes: pessoa.observacoes
+    }));
+  }, [pessoasBackend, loadingPessoas]);
+
+  // Carregamento dos dados
   useEffect(() => {
     const loadDashboardData = async () => {
-      setLoading(true);
+      console.log('Iniciando carregamento do dashboard...');
+      
+      if (loadingPessoas || loadingStats) {
+        setLoading(true);
+        return;
+      }
+      
+      if (errorPessoas) {
+        console.error('Erro ao carregar pessoas:', errorPessoas);
+        setLoading(false);
+        return;
+      }
 
-      // Simular carregamento de dados
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      calcularEstatisticas();
-      obterProximosComparecimentos();
-      obterAlertasUrgentes();
-      gerarDadosTendencia();
-
-      setLoading(false);
+      try {
+        // Calcular estatísticas a partir dos dados
+        await calcularEstatisticas();
+        obterProximosComparecimentos();
+        obterAlertasUrgentes();
+        gerarDadosTendencia();
+        
+        console.log('Dashboard carregado com sucesso');
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao processar dados do dashboard:', error);
+        setLoading(false);
+      }
     };
 
     loadDashboardData();
-  }, []);
+  }, [todosOsDados, statsBackend, loadingPessoas, loadingStats, errorPessoas]);
 
-  const calcularEstatisticas = () => {
-    const dados = usuarios.map(item => ({
-      ...item,
-      status: item.status as Comparecimento['status'],
-      periodicidade: item.periodicidade as Comparecimento['periodicidade']
-    }));
+  const calcularEstatisticas = async () => {
+    if (statsBackend && !loadingStats) {
+      // Usar estatísticas do backend se disponíveis
+      console.log('Usando estatísticas do backend:', statsBackend);
+      setStats({
+        total: statsBackend.totalPessoas,
+        emConformidade: statsBackend.emConformidade,
+        inadimplentes: statsBackend.inadimplentes,
+        proximosPrazos: statsBackend.comparecimentosPeriodo || 0,
+        comparecimentosHoje: statsBackend.comparecimentosHoje,
+        percentualConformidade: statsBackend.percentualConformidade
+      });
+    } else {
+      // Calcular a partir dos dados locais
+      console.log('Calculando estatísticas localmente...');
+      const dados = todosOsDados;
+      const hoje = dateUtils.getCurrentDate();
+      const proximaSemana = new Date();
+      proximaSemana.setDate(proximaSemana.getDate() + 7);
+      const proximaSemanaTxt = proximaSemana.toISOString().split('T')[0];
 
-    const hoje = dateUtils.getCurrentDate();
-    const proximaSemana = new Date();
-    proximaSemana.setDate(proximaSemana.getDate() + 7);
-    const proximaSemanaTxt = proximaSemana.toISOString().split('T')[0];
+      const total = dados.length;
+      const emConformidade = dados.filter(d => d.status === 'em conformidade').length;
+      const inadimplentes = dados.filter(d => d.status === 'inadimplente').length;
+      const proximosPrazos = dados.filter(d =>
+        d.proximoComparecimento >= hoje && d.proximoComparecimento <= proximaSemanaTxt
+      ).length;
+      const comparecimentosHoje = dados.filter(d => dateUtils.isToday(d.proximoComparecimento)).length;
+      const percentualConformidade = total > 0 ? Math.round((emConformidade / total) * 100) : 0;
 
-    const total = dados.length;
-    const emConformidade = dados.filter(d => d.status === 'em conformidade').length;
-    const inadimplentes = dados.filter(d => d.status === 'inadimplente').length;
-    const proximosPrazos = dados.filter(d =>
-      d.proximoComparecimento >= hoje && d.proximoComparecimento <= proximaSemanaTxt
-    ).length;
-    const comparecimentosHoje = dados.filter(d => dateUtils.isToday(d.proximoComparecimento)).length;
-    const percentualConformidade = Math.round((emConformidade / total) * 100);
+      setStats({
+        total,
+        emConformidade,
+        inadimplentes,
+        proximosPrazos,
+        comparecimentosHoje,
+        percentualConformidade
+      });
 
-    setStats({
-      total,
-      emConformidade,
-      inadimplentes,
-      proximosPrazos,
-      comparecimentosHoje,
-      percentualConformidade
-    });
+      console.log('Estatísticas calculadas:', { total, emConformidade, inadimplentes, proximosPrazos, comparecimentosHoje });
+    }
   };
 
   const obterProximosComparecimentos = () => {
-    const dados = usuarios.map(item => ({
-      ...item,
-      status: item.status as Comparecimento['status'],
-      periodicidade: item.periodicidade as Comparecimento['periodicidade']
-    }));
-
+    const dados = todosOsDados;
     const hoje = new Date();
     const proximos7Dias = new Date();
     proximos7Dias.setDate(hoje.getDate() + 7);
@@ -162,15 +253,11 @@ export default function DashboardPage() {
       .slice(0, 5);
 
     setProximosComparecimentos(proximosComparecimentos);
+    console.log(`Encontrados ${proximosComparecimentos.length} próximos comparecimentos`);
   };
 
   const obterAlertasUrgentes = () => {
-    const dados = usuarios.map(item => ({
-      ...item,
-      status: item.status as Comparecimento['status'],
-      periodicidade: item.periodicidade as Comparecimento['periodicidade']
-    }));
-
+    const dados = todosOsDados;
     const hoje = new Date();
     const alertas = dados.filter(d => {
       const dataComparecimento = new Date(d.proximoComparecimento);
@@ -178,10 +265,12 @@ export default function DashboardPage() {
     }).slice(0, 3);
 
     setAlertasUrgentes(alertas);
+    console.log(`Encontrados ${alertas.length} alertas urgentes`);
   };
 
   const gerarDadosTendencia = () => {
     // Simulação de dados de tendência dos últimos 6 meses
+    // TODO: Implementar endpoint específico no backend para tendências
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
     const tendencia = meses.map(mes => ({
       mes,
@@ -210,13 +299,50 @@ export default function DashboardPage() {
     return `/dashboard/geral?${searchParams.toString()}`;
   };
 
-  if (loading) {
+  // Handle refresh
+  const handleRefresh = async () => {
+    console.log('Atualizando dados...');
+    try {
+      await refetchPessoas();
+      console.log('Dados atualizados com sucesso');
+    } catch (error) {
+      console.error('Erro ao atualizar dados:', error);
+    }
+  };
+
+  // Estados de loading e erro
+  if (loading || loadingPessoas) {
     return (
       <div className="p-4 md:p-6 space-y-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">Carregando dashboard...</p>
+            <p className="text-lg text-gray-600">Carregando dados do servidor...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorPessoas) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto mt-8">
+          <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados do servidor</h3>
+          <p className="text-red-600 mb-4">{errorPessoas}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefresh}
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+            >
+              Tentar Novamente
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors"
+            >
+              Recarregar Página
+            </button>
           </div>
         </div>
       </div>
@@ -241,12 +367,21 @@ export default function DashboardPage() {
                   })}
                 </p>
               </div>
-              <button
-                onClick={() => setShowMobileStats(!showMobileStats)}
-                className="p-2 bg-gray-100 rounded-lg"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRefresh}
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  title="Atualizar dados"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowMobileStats(!showMobileStats)}
+                  className="p-2 bg-gray-100 rounded-lg"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -466,9 +601,19 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold text-primary-dark">Dashboard</h1>
             <p className="text-text-muted mt-1">Visão geral do sistema de comparecimentos</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-text-muted">Última atualização</p>
-            <p className="font-semibold">{new Date().toLocaleString('pt-BR')}</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              title="Atualizar dados"
+            >
+              <ArrowRight className="w-4 h-4" />
+              Atualizar
+            </button>
+            <div className="text-right">
+              <p className="text-sm text-text-muted">Última atualização</p>
+              <p className="font-semibold">{new Date().toLocaleString('pt-BR')}</p>
+            </div>
           </div>
         </div>
 
@@ -529,7 +674,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-text-muted text-sm font-medium">Inadimplentes</p>
                   <p className="text-3xl font-bold text-danger">{stats.inadimplentes}</p>
-                  <p className="text-sm text-danger font-medium">{Math.round((stats.inadimplentes / stats.total) * 100)}% do total</p>
+                  <p className="text-sm text-danger font-medium">{stats.total > 0 ? Math.round((stats.inadimplentes / stats.total) * 100) : 0}% do total</p>
                 </div>
                 <div className="flex items-center">
                   <AlertTriangle className="w-12 h-12 text-danger opacity-80" />
@@ -755,6 +900,12 @@ export default function DashboardPage() {
               </div>
             )}
           </Card>
+        </div>
+
+        {/* Informação sobre os dados */}
+        <div className="text-center text-sm text-gray-500 mt-8 p-4 bg-gray-50 rounded-lg">
+          <p>Dados carregados do servidor • Total de {stats.total} pessoas cadastradas</p>
+          <p className="mt-1">Última sincronização: {new Date().toLocaleString('pt-BR')}</p>
         </div>
       </div>
     </>
