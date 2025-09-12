@@ -161,12 +161,6 @@ export default function DashboardPage() {
     }));
     setTendenciaData(tendencia);
   };
-
-  const data = [
-    { name: 'Em Conformidade', value: stats.emConformidade },
-    { name: 'Inadimplentes', value: stats.inadimplentes },
-  ];
-
   const dataComparecimentos = [
     { name: 'Segunda', comparecimentos: 12 },
     { name: 'Terça', comparecimentos: 8 },
@@ -174,6 +168,12 @@ export default function DashboardPage() {
     { name: 'Quinta', comparecimentos: 10 },
     { name: 'Sexta', comparecimentos: 18 },
   ];
+  const data = [
+    { name: 'Em Conformidade', value: stats.emConformidade },
+    { name: 'Inadimplentes', value: stats.inadimplentes },
+  ];
+
+
 
   // Função para criar links com filtros
   const createFilterLink = (params: Record<string, string>) => {
