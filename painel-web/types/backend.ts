@@ -234,7 +234,6 @@ export interface ApiResponse<T = any> {
   data?: T;
   message?: string;
   error?: string;
-  timestamp: string;
 }
 
 export interface PageResponse<T> {
@@ -250,7 +249,6 @@ export interface PageResponse<T> {
 export interface ErrorResponse {
   error: string;
   message: string;
-  timestamp: string;
   path: string;
   status: number;
 }

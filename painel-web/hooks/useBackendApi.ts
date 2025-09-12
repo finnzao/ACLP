@@ -54,11 +54,11 @@ export function usePessoas() {
   const criarPessoa = useCallback(async (data: PessoaDTO) => {
     try {
       console.log('[usePessoas] Enviando dados para o backend:', data);
-      
+
       const result = await pessoasService.criar(data);
-      
+
       console.log('[usePessoas] Resposta do backend:', result);
-      
+
       if (result.success) {
         await carregarPessoas(); // Recarregar lista
         return { success: true, message: result.message || 'Pessoa criada com sucesso', data: result.data };
@@ -347,7 +347,38 @@ export function useSetup() {
     verificarStatus
   };
 }
+// Hook para Resumo do Sistema (Dashboard)
+export function useResumoSistema() {
+  const [resumo, setResumo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  const carregarResumo = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await comparecimentosService.obterResumoSistema();
+      setResumo(data);
+      console.log('[useResumoSistema] Resumo carregado:', data);
+    } catch (err) {
+      setError('Erro ao carregar resumo do sistema');
+      console.error('[useResumoSistema] Erro:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarResumo();
+  }, [carregarResumo]);
+
+  return {
+    resumo,
+    loading,
+    error,
+    refetch: carregarResumo
+  };
+}
 // Hook para Health Check
 export function useHealthCheck() {
   const [health, setHealth] = useState<HealthResponse | null>(null);

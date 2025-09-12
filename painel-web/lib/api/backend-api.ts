@@ -5,31 +5,31 @@ import {
   // Setup types
   SetupAdminDTO,
   SetupStatusResponse,
-  
+
   // Verificação types
   SolicitarCodigoDTO,
   VerificarCodigoDTO,
   ReenviarCodigoDTO,
   VerificacaoStatusResponse,
-  
+
   // Pessoas types
   PessoaDTO,
   PessoaResponse,
   ListarPessoasResponse,
-  
+
   // Comparecimentos types
   ComparecimentoDTO,
   ComparecimentoResponse,
   EstatisticasComparecimentoResponse,
-  
+
   // Histórico endereços types
   HistoricoEnderecoResponse,
   EstatisticasEnderecoResponse,
-  
+
   // Usuários types
   UsuarioDTO,
   UsuarioResponse,
-  
+
   // Utility types
   ApiResponse,
   PeriodoParams,
@@ -37,7 +37,7 @@ import {
   PaginationParams,
   HealthResponse,
   AppInfoResponse,
-  
+
   // Enums
   StatusComparecimento,
   TipoUsuario,
@@ -114,12 +114,12 @@ export const pessoasService = {
     console.log('[pessoasService] Listando pessoas...');
     const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.LIST);
     console.log('[pessoasService] Resposta da listagem:', response);
-    
+
     // Retornar a resposta completa ou estrutura padrão em caso de erro
     if (response.success && response.data) {
       return response.data;
     }
-    
+
     // Estrutura padrão quando há erro
     return {
       success: false,
@@ -130,21 +130,21 @@ export const pessoasService = {
 
   async criar(data: PessoaDTO): Promise<ApiResponse<PessoaResponse>> {
     console.log('[pessoasService] Criando pessoa:', data);
-    
+
     const response = await httpClient.post<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.CREATE, data);
-    
+
     console.log('[pessoasService] Resposta da criação:', response);
-    
+
     // Se a resposta foi bem-sucedida, retornar os dados
     if (response.success && response.data) {
       return response.data;
     }
-    
+
     // Se houve erro, retornar estrutura de erro
-    return { 
-      success: false, 
-      message: response.error || 'Erro ao criar pessoa', 
-      timestamp: new Date().toISOString() 
+    return {
+      success: false,
+      message: response.error || 'Erro ao criar pessoa',
+      timestamp: new Date().toISOString()
     };
   },
 
@@ -193,6 +193,30 @@ export const pessoasService = {
 
 // COMPARECIMENTOS SERVICE
 export const comparecimentosService = {
+
+  async obterResumoSistema(): Promise<any> {
+    console.log('[comparecimentosService] Buscando resumo do sistema...');
+    const response = await httpClient.get<ApiResponse<any>>(ENDPOINTS.COMPARECIMENTOS.RESUMO_SISTEMA);
+
+    console.log(response)
+    if (response.success && response.data?.data) {
+      return response.data.data;
+    }
+
+    return {
+      totalPessoas: 0,
+      emConformidade: 0,
+      inadimplentes: 0,
+      comparecimentosHoje: 0,
+      atrasados: 0,
+      proximos7Dias: 0,
+      percentualConformidade: 0,
+      proximosComparecimentos: [],
+      alertasUrgentes: [],
+      pessoasAtrasadas: []
+    };
+  },
+
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     const response = await httpClient.post<ApiResponse<ComparecimentoResponse>>(ENDPOINTS.COMPARECIMENTOS.CREATE, data);
     return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
@@ -353,23 +377,23 @@ export const testService = {
     try {
       console.log('[testService] Fazendo health check...');
       const response = await httpClient.get<HealthResponse>(ENDPOINTS.TEST.HEALTH);
-      
+
       console.log('[testService] Resposta do health check:', response);
-      
+
       if (response.success && response.data) {
         return response.data;
       } else {
         // Se a requisição falhou, mas houve resposta, considerar DOWN
-        return { 
-          status: 'DOWN', 
+        return {
+          status: 'DOWN',
           timestamp: new Date().toISOString(),
           details: { error: response.error || 'Health check failed' }
         };
       }
     } catch (error) {
       console.error('[testService] Erro no health check:', error);
-      return { 
-        status: 'DOWN', 
+      return {
+        status: 'DOWN',
         timestamp: new Date().toISOString(),
         details: { error: 'Network error' }
       };
@@ -380,9 +404,9 @@ export const testService = {
     try {
       console.log('[testService] Obtendo informações da aplicação...');
       const response = await httpClient.get<AppInfoResponse>(ENDPOINTS.TEST.INFO);
-      
+
       console.log('[testService] Resposta do info:', response);
-      
+
       if (response.success && response.data) {
         return response.data;
       } else {

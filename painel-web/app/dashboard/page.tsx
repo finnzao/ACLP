@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import {
   PieChart,
   Pie,
@@ -27,15 +27,14 @@ import {
   ArrowRight,
   Search,
   ChevronRight,
-  Menu
+  Menu,
+  RefreshCw
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
-import { usePessoas, useEstatisticas } from '@/hooks/useBackendApi';
+import { useResumoSistema } from '@/hooks/useBackendApi';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { PessoaResponse } from '@/types/backend';
-import { Endereco } from '@/types';
 
 interface DashboardStats {
   total: number;
@@ -43,6 +42,7 @@ interface DashboardStats {
   inadimplentes: number;
   proximosPrazos: number;
   comparecimentosHoje: number;
+  atrasados: number;
   percentualConformidade: number;
 }
 
@@ -52,33 +52,23 @@ interface TendenciaData {
   inadimplencia: number;
 }
 
-interface DashboardPessoa {
+interface ProximoComparecimento {
   id: number;
   nome: string;
-  cpf: string;
-  rg: string;
-  contato: string;
   processo: string;
-  vara: string;
-  comarca: string;
-  decisao: string;
-  periodicidade: number;
-  status: 'em conformidade' | 'inadimplente';
-  primeiroComparecimento: string;
-  ultimoComparecimento: string;
   proximoComparecimento: string;
-  endereco?: Endereco;
-  observacoes?: string;
+  status: string;
+  vara?: string;
+  comarca?: string;
 }
 
 const COLORS = ['#7ED6A7', '#E57373', '#F6D365'];
 
 export default function DashboardPage() {
   const router = useRouter();
-  
-  // Hooks do backend
-  const { pessoas: pessoasBackend, loading: loadingPessoas, error: errorPessoas, refetch: refetchPessoas } = usePessoas();
-  const { stats: statsBackend, loading: loadingStats } = useEstatisticas();
+
+  // Hook principal do resumo do sistema
+  const { resumo, loading: loadingResumo, error: errorResumo, refetch } = useResumoSistema();
 
   // Estados locais
   const [stats, setStats] = useState<DashboardStats>({
@@ -87,13 +77,13 @@ export default function DashboardPage() {
     inadimplentes: 0,
     proximosPrazos: 0,
     comparecimentosHoje: 0,
+    atrasados: 0,
     percentualConformidade: 0
   });
-
-  const [proximosComparecimentos, setProximosComparecimentos] = useState<DashboardPessoa[]>([]);
-  const [alertasUrgentes, setAlertasUrgentes] = useState<DashboardPessoa[]>([]);
+  console.log(stats)
+  const [proximosComparecimentos, setProximosComparecimentos] = useState<ProximoComparecimento[]>([]);
+  const [alertasUrgentes, setAlertasUrgentes] = useState<ProximoComparecimento[]>([]);
   const [tendenciaData, setTendenciaData] = useState<TendenciaData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showMobileStats, setShowMobileStats] = useState(false);
 
   // Utilitários de data
@@ -119,154 +109,46 @@ export default function DashboardPage() {
     }
   };
 
-  // Processar dados do backend
-  const todosOsDados = useMemo((): DashboardPessoa[] => {
-    if (!pessoasBackend || loadingPessoas) {
-      console.log('Aguardando dados do backend...');
-      return [];
-    }
-
-    let pessoas: PessoaResponse[] = [];
-
-    // Verificar estrutura da resposta
-    if (typeof pessoasBackend === 'object' && 'success' in pessoasBackend) {
-      // Formato de resposta da API
-      if (pessoasBackend.success && pessoasBackend.data) {
-        pessoas = Array.isArray(pessoasBackend.data) ? pessoasBackend.data : [];
-      }
-    } else if (Array.isArray(pessoasBackend)) {
-      // Array direto
-      pessoas = pessoasBackend;
-    }
-
-    console.log(`Processando ${pessoas.length} pessoas do backend`);
-
-    return pessoas.map((pessoa: PessoaResponse): DashboardPessoa => ({
-      id: pessoa.id,
-      nome: pessoa.nome,
-      cpf: pessoa.cpf || '',
-      rg: pessoa.rg || '',
-      contato: pessoa.contato,
-      processo: pessoa.processo,
-      vara: pessoa.vara,
-      comarca: pessoa.comarca,
-      decisao: pessoa.dataDecisao,
-      periodicidade: pessoa.periodicidade,
-      status: pessoa.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
-      primeiroComparecimento: pessoa.primeiroComparecimento,
-      ultimoComparecimento: pessoa.ultimoComparecimento,
-      proximoComparecimento: pessoa.proximoComparecimento,
-      endereco: pessoa.endereco,
-      observacoes: pessoa.observacoes
-    }));
-  }, [pessoasBackend, loadingPessoas]);
-
-  // Carregamento dos dados
+  // Processar dados do resumo do sistema
   useEffect(() => {
-    const loadDashboardData = async () => {
-      console.log('Iniciando carregamento do dashboard...');
-      
-      if (loadingPessoas || loadingStats) {
-        setLoading(true);
-        return;
-      }
-      
-      if (errorPessoas) {
-        console.error('Erro ao carregar pessoas:', errorPessoas);
-        setLoading(false);
-        return;
-      }
+    if (resumo && !loadingResumo) {
+      console.log('[Dashboard] Processando resumo do sistema:', resumo);
 
-      try {
-        // Calcular estatísticas a partir dos dados
-        await calcularEstatisticas();
-        obterProximosComparecimentos();
-        obterAlertasUrgentes();
-        gerarDadosTendencia();
-        
-        console.log('Dashboard carregado com sucesso');
-        setLoading(false);
-      } catch (error) {
-        console.error('Erro ao processar dados do dashboard:', error);
-        setLoading(false);
-      }
-    };
-
-    loadDashboardData();
-  }, [todosOsDados, statsBackend, loadingPessoas, loadingStats, errorPessoas]);
-
-  const calcularEstatisticas = async () => {
-    if (statsBackend && !loadingStats) {
-      // Usar estatísticas do backend se disponíveis
-      console.log('Usando estatísticas do backend:', statsBackend);
+      // Extrair estatísticas principais
       setStats({
-        total: statsBackend.totalPessoas,
-        emConformidade: statsBackend.emConformidade,
-        inadimplentes: statsBackend.inadimplentes,
-        proximosPrazos: statsBackend.comparecimentosPeriodo || 0,
-        comparecimentosHoje: statsBackend.comparecimentosHoje,
-        percentualConformidade: statsBackend.percentualConformidade
-      });
-    } else {
-      // Calcular a partir dos dados locais
-      console.log('Calculando estatísticas localmente...');
-      const dados = todosOsDados;
-      const hoje = dateUtils.getCurrentDate();
-      const proximaSemana = new Date();
-      proximaSemana.setDate(proximaSemana.getDate() + 7);
-      const proximaSemanaTxt = proximaSemana.toISOString().split('T')[0];
-
-      const total = dados.length;
-      const emConformidade = dados.filter(d => d.status === 'em conformidade').length;
-      const inadimplentes = dados.filter(d => d.status === 'inadimplente').length;
-      const proximosPrazos = dados.filter(d =>
-        d.proximoComparecimento >= hoje && d.proximoComparecimento <= proximaSemanaTxt
-      ).length;
-      const comparecimentosHoje = dados.filter(d => dateUtils.isToday(d.proximoComparecimento)).length;
-      const percentualConformidade = total > 0 ? Math.round((emConformidade / total) * 100) : 0;
-
-      setStats({
-        total,
-        emConformidade,
-        inadimplentes,
-        proximosPrazos,
-        comparecimentosHoje,
-        percentualConformidade
+        total: resumo.totalPessoas || 0,
+        emConformidade: resumo.emConformidade || 0,
+        inadimplentes: resumo.inadimplentes || 0,
+        proximosPrazos: resumo.proximos7Dias || 0,
+        comparecimentosHoje: resumo.comparecimentosHoje || 0,
+        atrasados: resumo.atrasados || 0,
+        percentualConformidade: resumo.percentualConformidade || 0
       });
 
-      console.log('Estatísticas calculadas:', { total, emConformidade, inadimplentes, proximosPrazos, comparecimentosHoje });
+      // Processar próximos comparecimentos
+      if (resumo.proximosComparecimentos && Array.isArray(resumo.proximosComparecimentos)) {
+        setProximosComparecimentos(resumo.proximosComparecimentos);
+      }
+
+      // Processar alertas urgentes
+      if (resumo.alertasUrgentes && Array.isArray(resumo.alertasUrgentes)) {
+        setAlertasUrgentes(resumo.alertasUrgentes);
+      } else if (resumo.pessoasAtrasadas && Array.isArray(resumo.pessoasAtrasadas)) {
+        setAlertasUrgentes(resumo.pessoasAtrasadas);
+      }
+
+      // Gerar dados de tendência (simulação até implementar no backend)
+      gerarDadosTendencia();
+
+      console.log('[Dashboard] Stats processadas:', {
+        total: resumo.totalPessoas,
+        emConformidade: resumo.emConformidade,
+        inadimplentes: resumo.inadimplentes,
+        hoje: resumo.comparecimentosHoje,
+        atrasados: resumo.atrasados
+      });
     }
-  };
-
-  const obterProximosComparecimentos = () => {
-    const dados = todosOsDados;
-    const hoje = new Date();
-    const proximos7Dias = new Date();
-    proximos7Dias.setDate(hoje.getDate() + 7);
-
-    const proximosComparecimentos = dados
-      .filter(d => {
-        const dataComparecimento = new Date(d.proximoComparecimento);
-        return dataComparecimento >= hoje && dataComparecimento <= proximos7Dias;
-      })
-      .sort((a, b) => new Date(a.proximoComparecimento).getTime() - new Date(b.proximoComparecimento).getTime())
-      .slice(0, 5);
-
-    setProximosComparecimentos(proximosComparecimentos);
-    console.log(`Encontrados ${proximosComparecimentos.length} próximos comparecimentos`);
-  };
-
-  const obterAlertasUrgentes = () => {
-    const dados = todosOsDados;
-    const hoje = new Date();
-    const alertas = dados.filter(d => {
-      const dataComparecimento = new Date(d.proximoComparecimento);
-      return dataComparecimento < hoje && d.status === 'inadimplente';
-    }).slice(0, 3);
-
-    setAlertasUrgentes(alertas);
-    console.log(`Encontrados ${alertas.length} alertas urgentes`);
-  };
+  }, [resumo, loadingResumo]);
 
   const gerarDadosTendencia = () => {
     // Simulação de dados de tendência dos últimos 6 meses
@@ -301,40 +183,45 @@ export default function DashboardPage() {
 
   // Handle refresh
   const handleRefresh = async () => {
-    console.log('Atualizando dados...');
+    console.log('[Dashboard] Atualizando resumo do sistema...');
     try {
-      await refetchPessoas();
-      console.log('Dados atualizados com sucesso');
+      await refetch();
+      console.log('[Dashboard] Resumo atualizado com sucesso');
     } catch (error) {
-      console.error('Erro ao atualizar dados:', error);
+      console.error('[Dashboard] Erro ao atualizar resumo:', error);
     }
   };
 
   // Estados de loading e erro
-  if (loading || loadingPessoas) {
+  if (loadingResumo) {
     return (
       <div className="p-4 md:p-6 space-y-8">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">Carregando dados do servidor...</p>
+            <p className="text-lg text-gray-600">Carregando resumo do sistema...</p>
+            <p className="text-sm text-gray-500 mt-2">Obtendo dados do servidor</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (errorPessoas) {
+  if (errorResumo) {
     return (
       <div className="p-4 md:p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto mt-8">
-          <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados do servidor</h3>
-          <p className="text-red-600 mb-4">{errorPessoas}</p>
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600" />
+            <h3 className="text-red-800 font-semibold">Erro ao carregar resumo do sistema</h3>
+          </div>
+          <p className="text-red-600 mb-4">{errorResumo}</p>
           <div className="flex gap-2">
             <button
               onClick={handleRefresh}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+              className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
             >
+              <RefreshCw className="w-4 h-4" />
               Tentar Novamente
             </button>
             <button
@@ -360,10 +247,10 @@ export default function DashboardPage() {
               <div>
                 <h1 className="text-xl font-bold text-primary-dark">Dashboard</h1>
                 <p className="text-xs text-gray-600">
-                  {new Date().toLocaleDateString('pt-BR', { 
-                    weekday: 'short', 
-                    day: 'numeric', 
-                    month: 'short' 
+                  {new Date().toLocaleDateString('pt-BR', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short'
                   })}
                 </p>
               </div>
@@ -373,7 +260,7 @@ export default function DashboardPage() {
                   className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                   title="Atualizar dados"
                 >
-                  <ArrowRight className="w-4 h-4" />
+                  <RefreshCw className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setShowMobileStats(!showMobileStats)}
@@ -414,7 +301,7 @@ export default function DashboardPage() {
         {/* Alertas Mobile */}
         {alertasUrgentes.length > 0 && (
           <div className="p-4">
-            <Link 
+            <Link
               href={createFilterLink({ urgencia: 'atrasados' })}
               className="block bg-red-50 border border-red-200 rounded-lg p-3"
             >
@@ -459,7 +346,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Gráfico de Pizza Simplificado */}
-          {showMobileStats && (
+          {showMobileStats && stats.total > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Distribuição</h3>
               <ResponsiveContainer width="100%" height={200}>
@@ -593,7 +480,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Interface Desktop (mantida como estava) */}
+      {/* Interface Desktop (continuação similar com os dados do resumo) */}
       <div className="hidden md:block max-w-7xl mx-auto p-6 space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -605,9 +492,9 @@ export default function DashboardPage() {
             <button
               onClick={handleRefresh}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-              title="Atualizar dados"
+              title="Atualizar resumo do sistema"
             >
-              <ArrowRight className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4" />
               Atualizar
             </button>
             <div className="text-right">
@@ -636,7 +523,7 @@ export default function DashboardPage() {
         )}
 
         {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <Link href="/dashboard/geral">
             <Card className="p-6 border-l-4 border-l-primary hover:shadow-lg transition-all cursor-pointer group">
               <div className="flex items-center justify-between">
@@ -699,36 +586,55 @@ export default function DashboardPage() {
               </div>
             </Card>
           </Link>
+
+          <Link href={createFilterLink({ urgencia: 'atrasados' })}>
+            <Card className="p-6 border-l-4 border-l-red-500 hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Atrasados</p>
+                  <p className="text-3xl font-bold text-red-500">{stats.atrasados}</p>
+                  <p className="text-sm text-text-muted">Requerem atenção</p>
+                </div>
+                <div className="flex items-center">
+                  <AlertTriangle className="w-12 h-12 text-red-500 opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-red-500 ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Card>
+          </Link>
         </div>
 
+        {/* Resto da interface desktop (gráficos, ações, etc.) */}
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Gráfico de Pizza - Distribuição */}
-          <Card className="p-6">
-            <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Distribuição de Status
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={data}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
+          {stats.total > 0 && (
+            <Card className="p-6">
+              <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Distribuição de Status
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {data.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
 
           {/* Gráfico de Barras - Comparecimentos por Dia */}
           <Card className="p-6">
@@ -788,7 +694,7 @@ export default function DashboardPage() {
             </h3>
             <div className="space-y-3">
               {proximosComparecimentos.length > 0 ? (
-                proximosComparecimentos.map((item, index) => {
+                proximosComparecimentos.slice(0, 5).map((item, index) => {
                   const diasRestantes = dateUtils.getDaysUntil(item.proximoComparecimento);
                   const isHoje = dateUtils.isToday(item.proximoComparecimento);
                   return (
@@ -804,14 +710,13 @@ export default function DashboardPage() {
                           <p className="text-sm text-text-muted">Data: {dateUtils.formatToBR(item.proximoComparecimento)}</p>
                         </div>
                         <div className="text-right">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            isHoje ? 'bg-danger text-white' :
-                            diasRestantes === 1 ? 'bg-warning text-text-base' :
-                            'bg-secondary text-white'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${isHoje ? 'bg-danger text-white' :
+                              diasRestantes === 1 ? 'bg-warning text-text-base' :
+                                'bg-secondary text-white'
+                            }`}>
                             {isHoje ? 'Hoje' :
-                             diasRestantes === 1 ? 'Amanhã' :
-                             `${diasRestantes} dias`}
+                              diasRestantes === 1 ? 'Amanhã' :
+                                `${diasRestantes} dias`}
                           </span>
                           <ArrowRight className="w-4 h-4 text-primary mt-1 group-hover:translate-x-1 transition-transform" />
                         </div>
@@ -884,7 +789,7 @@ export default function DashboardPage() {
                   Atenção Urgente Necessária
                 </h4>
                 <div className="space-y-2">
-                  {alertasUrgentes.map((item, index) => (
+                  {alertasUrgentes.slice(0, 3).map((item, index) => (
                     <div key={index} className="text-sm">
                       <p className="font-medium text-red-700">{item.nome}</p>
                       <p className="text-red-600">Comparecimento em atraso: {dateUtils.formatToBR(item.proximoComparecimento)}</p>
@@ -895,7 +800,7 @@ export default function DashboardPage() {
                   href={createFilterLink({ urgencia: 'atrasados' })}
                   className="block mt-3 w-full bg-red-600 text-white py-2 rounded hover:bg-red-700 transition-colors text-sm text-center"
                 >
-                  Gerenciar Inadimplentes
+                  Gerenciar Inadimplentes ({stats.atrasados})
                 </Link>
               </div>
             )}
@@ -904,8 +809,9 @@ export default function DashboardPage() {
 
         {/* Informação sobre os dados */}
         <div className="text-center text-sm text-gray-500 mt-8 p-4 bg-gray-50 rounded-lg">
-          <p>Dados carregados do servidor • Total de {stats.total} pessoas cadastradas</p>
-          <p className="mt-1">Última sincronização: {new Date().toLocaleString('pt-BR')}</p>
+          <p>📊 Resumo do sistema carregado do servidor • Total de {stats.total} pessoas cadastradas</p>
+          <p className="mt-1">🔄 Dados atualizados em tempo real • Endpoint: /api/comparecimentos/resumo/sistema</p>
+          <p className="mt-1">🕐 Última sincronização: {new Date().toLocaleString('pt-BR')}</p>
         </div>
       </div>
     </>
