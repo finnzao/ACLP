@@ -3,8 +3,8 @@
 
 import { useState } from 'react';
 import { useApi } from '@/contexts/ApiContext';
-import { pessoasService } from '@/lib/api/backend-api';
-import { PessoaDTO, EstadoBrasil } from '@/types/backend';
+import { custodiadosService } from '@/lib/api/services';
+import { CustodiadoDTO, EstadoBrasil } from '@/types/api';
 import { Activity, Send, Database, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function DebugApiStatus() {
@@ -17,7 +17,7 @@ export default function DebugApiStatus() {
   const testCreatePerson = async () => {
     setTestLoading(true);
     
-    const testData: PessoaDTO = {
+    const testData: CustodiadoDTO = {
       nome: 'Teste Debug API',
       contato: '(71)99999-9999', // Formato válido
       processo: '1234567-89.2025.8.05.0001', // Formato válido
@@ -39,7 +39,7 @@ export default function DebugApiStatus() {
     try {
       console.log('[DEBUG] Testando criação de pessoa:', testData);
       
-      const result = await pessoasService.criar(testData);
+      const result = await custodiadosService.criar(testData);
       
       console.log('[DEBUG] Resultado do teste:', result);
       setTestResult(result);

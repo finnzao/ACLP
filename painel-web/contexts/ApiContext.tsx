@@ -2,8 +2,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { testService, initializeBackendApi, configureAuthHeaders } from '@/lib/api/backend-api';
-import { HealthResponse, AppInfoResponse } from '@/types/backend';
+import { testService, initializeBackendApi, configureAuthHeaders } from '@/lib/api/services';
+import { HealthResponse, AppInfoResponse } from '@/types/api';
 
 interface ApiContextType {
   isConnected: boolean;
@@ -210,7 +210,7 @@ export function useAppInfo(): AppInfoResponse | null {
 
 // Componente para exibir status da conexão (útil para debug)
 export function ApiStatusIndicator() {
-  const { isConnected, health, lastCheck, checkConnection } = useApi();
+  const { isConnected, lastCheck, checkConnection } = useApi();
 
   if (process.env.NODE_ENV !== 'development') {
     return null; // Só mostrar em desenvolvimento

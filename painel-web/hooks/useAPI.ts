@@ -1,46 +1,47 @@
+// hooks/useApi.ts - Hooks para interação com a API
+
 import { useState, useEffect, useCallback } from 'react';
 import {
-  pessoasService,
+  custodiadosService,
   comparecimentosService,
-  historicoEnderecosService,
   usuariosService,
   setupService,
-  verificacaoService,
+  statusService,
   testService
-} from '@/lib/api/backend-api';
+} from '@/lib/api/services';
 import {
-  PessoaResponse,
+  CustodiadoResponse,
   ComparecimentoResponse,
   UsuarioResponse,
-  PessoaDTO,
+  CustodiadoDTO,
   ComparecimentoDTO,
   UsuarioDTO,
   StatusComparecimento,
-  TipoUsuario,
   PeriodoParams,
   BuscarParams,
   EstatisticasComparecimentoResponse,
   SetupStatusResponse,
   HealthResponse,
-  AppInfoResponse
-} from '@/types/backend';
+  AppInfoResponse,
+  ResumoSistemaResponse
+} from '@/types/api';
 
-
-// Hook para Pessoas
-
-export function usePessoas() {
-  const [pessoas, setPessoas] = useState<PessoaResponse[]>([]);
+// ===========================
+// Hook para Custodiados
+// ===========================
+export function useCustodiados() {
+  const [custodiados, setCustodiados] = useState<CustodiadoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const carregarPessoas = useCallback(async () => {
+  const carregarCustodiados = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await pessoasService.listar();
-      setPessoas(data);
+      const data = await custodiadosService.listar();
+      setCustodiados(data);
     } catch (err) {
-      setError('Erro ao carregar pessoas');
+      setError('Erro ao carregar custodiados');
       console.error(err);
     } finally {
       setLoading(false);
@@ -48,59 +49,57 @@ export function usePessoas() {
   }, []);
 
   useEffect(() => {
-    carregarPessoas();
-  }, [carregarPessoas]);
+    carregarCustodiados();
+  }, [carregarCustodiados]);
 
-  const criarPessoa = useCallback(async (data: PessoaDTO) => {
+  const criarCustodiado = useCallback(async (data: CustodiadoDTO) => {
     try {
-      console.log('[usePessoas] Enviando dados para o backend:', data);
-
-      const result = await pessoasService.criar(data);
-
-      console.log('[usePessoas] Resposta do backend:', result);
+      console.log('[useCustodiados] Enviando dados para o backend:', data);
+      const result = await custodiadosService.criar(data);
+      console.log('[useCustodiados] Resposta do backend:', result);
 
       if (result.success) {
-        await carregarPessoas(); // Recarregar lista
-        return { success: true, message: result.message || 'Pessoa criada com sucesso', data: result.data };
+        await carregarCustodiados();
+        return { success: true, message: result.message || 'Custodiado criado com sucesso', data: result.data };
       }
-      return { success: false, message: result.message || 'Erro ao criar pessoa' };
+      return { success: false, message: result.message || 'Erro ao criar custodiado' };
     } catch (error) {
-      console.error('[usePessoas] Erro ao criar pessoa:', error);
+      console.error('[useCustodiados] Erro ao criar custodiado:', error);
       return { success: false, message: 'Erro interno do sistema' };
     }
-  }, [carregarPessoas]);
+  }, [carregarCustodiados]);
 
-  const atualizarPessoa = useCallback(async (id: number, data: Partial<PessoaDTO>) => {
+  const atualizarCustodiado = useCallback(async (id: number, data: Partial<CustodiadoDTO>) => {
     try {
-      const result = await pessoasService.atualizar(id, data);
+      const result = await custodiadosService.atualizar(id, data);
       if (result.success) {
-        await carregarPessoas();
-        return { success: true, message: 'Pessoa atualizada com sucesso' };
+        await carregarCustodiados();
+        return { success: true, message: 'Custodiado atualizado com sucesso' };
       }
-      return { success: false, message: result.message || 'Erro ao atualizar pessoa' };
+      return { success: false, message: result.message || 'Erro ao atualizar custodiado' };
     } catch (error) {
-      console.error('Erro ao atualizar pessoa:', error);
+      console.error('Erro ao atualizar custodiado:', error);
       return { success: false, message: 'Erro interno do sistema' };
     }
-  }, [carregarPessoas]);
+  }, [carregarCustodiados]);
 
-  const excluirPessoa = useCallback(async (id: number) => {
+  const excluirCustodiado = useCallback(async (id: number) => {
     try {
-      const result = await pessoasService.excluir(id);
+      const result = await custodiadosService.excluir(id);
       if (result.success) {
-        await carregarPessoas();
-        return { success: true, message: 'Pessoa excluída com sucesso' };
+        await carregarCustodiados();
+        return { success: true, message: 'Custodiado excluído com sucesso' };
       }
-      return { success: false, message: result.message || 'Erro ao excluir pessoa' };
+      return { success: false, message: result.message || 'Erro ao excluir custodiado' };
     } catch (error) {
-      console.error('Erro ao excluir pessoa:', error);
+      console.error('Erro ao excluir custodiado:', error);
       return { success: false, message: 'Erro interno do sistema' };
     }
-  }, [carregarPessoas]);
+  }, [carregarCustodiados]);
 
   const buscarPorProcesso = useCallback(async (processo: string) => {
     try {
-      return await pessoasService.buscarPorProcesso(processo);
+      return await custodiadosService.buscarPorProcesso(processo);
     } catch (error) {
       console.error('Erro ao buscar por processo:', error);
       return null;
@@ -109,29 +108,39 @@ export function usePessoas() {
 
   const buscarPorStatus = useCallback(async (status: StatusComparecimento) => {
     try {
-      return await pessoasService.buscarPorStatus(status);
+      return await custodiadosService.buscarPorStatus(status);
     } catch (error) {
       console.error('Erro ao buscar por status:', error);
       return [];
     }
   }, []);
 
+  const buscarInadimplentes = useCallback(async () => {
+    try {
+      return await custodiadosService.buscarInadimplentes();
+    } catch (error) {
+      console.error('Erro ao buscar inadimplentes:', error);
+      return [];
+    }
+  }, []);
+
   return {
-    pessoas,
+    custodiados,
     loading,
     error,
-    criarPessoa,
-    atualizarPessoa,
-    excluirPessoa,
+    criarCustodiado,
+    atualizarCustodiado,
+    excluirCustodiado,
     buscarPorProcesso,
     buscarPorStatus,
-    refetch: carregarPessoas
+    buscarInadimplentes,
+    refetch: carregarCustodiados
   };
 }
 
-
+// ===========================
 // Hook para Comparecimentos
-
+// ===========================
 export function useComparecimentos() {
   const [comparecimentos, setComparecimentos] = useState<ComparecimentoResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -153,10 +162,10 @@ export function useComparecimentos() {
     }
   }, []);
 
-  const buscarPorPessoa = useCallback(async (pessoaId: number) => {
+  const buscarPorCustodiado = useCallback(async (custodiadoId: number) => {
     try {
       setLoading(true);
-      const data = await comparecimentosService.buscarPorPessoa(pessoaId);
+      const data = await comparecimentosService.buscarPorCustodiado(custodiadoId);
       setComparecimentos(data);
       return data;
     } catch (error) {
@@ -197,15 +206,15 @@ export function useComparecimentos() {
     loading,
     error,
     registrarComparecimento,
-    buscarPorPessoa,
+    buscarPorCustodiado,
     buscarPorPeriodo,
     comparecimentosHoje
   };
 }
 
-
+// ===========================
 // Hook para Usuários
-
+// ===========================
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState<UsuarioResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,9 +276,9 @@ export function useUsuarios() {
   };
 }
 
-
+// ===========================
 // Hook para Estatísticas
-
+// ===========================
 export function useEstatisticas() {
   const [stats, setStats] = useState<EstatisticasComparecimentoResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,54 +311,11 @@ export function useEstatisticas() {
   };
 }
 
-
-// Hook para Setup
-
-export function useSetup() {
-  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const verificarStatus = useCallback(async () => {
-    try {
-      setLoading(true);
-      const status = await setupService.getStatus();
-      setSetupStatus(status);
-      return status;
-    } catch (error) {
-      console.error('Erro ao verificar status do setup:', error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    verificarStatus();
-  }, [verificarStatus]);
-
-  const criarAdmin = useCallback(async (data: any) => {
-    try {
-      const result = await setupService.createAdmin(data);
-      if (result.success) {
-        await verificarStatus(); // Reverificar status
-      }
-      return result;
-    } catch (error) {
-      console.error('Erro ao criar admin:', error);
-      return { success: false, message: 'Erro interno', timestamp: new Date().toISOString() };
-    }
-  }, [verificarStatus]);
-
-  return {
-    setupStatus,
-    loading,
-    criarAdmin,
-    verificarStatus
-  };
-}
-// Hook para Resumo do Sistema (Dashboard)
+// ===========================
+// Hook para Resumo do Sistema
+// ===========================
 export function useResumoSistema() {
-  const [resumo, setResumo] = useState<any>(null);
+  const [resumo, setResumo] = useState<ResumoSistemaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -379,7 +345,84 @@ export function useResumoSistema() {
     refetch: carregarResumo
   };
 }
+
+// ===========================
+// Hook para Status
+// ===========================
+export function useStatus() {
+  const verificarInadimplentes = useCallback(async () => {
+    try {
+      return await statusService.verificarInadimplentes();
+    } catch (error) {
+      console.error('Erro ao verificar inadimplentes:', error);
+      return { success: false, message: 'Erro ao verificar inadimplentes' };
+    }
+  }, []);
+
+  const obterEstatisticas = useCallback(async () => {
+    try {
+      return await statusService.obterEstatisticas();
+    } catch (error) {
+      console.error('Erro ao obter estatísticas:', error);
+      return null;
+    }
+  }, []);
+
+  return {
+    verificarInadimplentes,
+    obterEstatisticas
+  };
+}
+
+// ===========================
+// Hook para Setup
+// ===========================
+export function useSetup() {
+  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const verificarStatus = useCallback(async () => {
+    try {
+      setLoading(true);
+      const status = await setupService.getStatus();
+      setSetupStatus(status);
+      return status;
+    } catch (error) {
+      console.error('Erro ao verificar status do setup:', error);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    verificarStatus();
+  }, [verificarStatus]);
+
+  const criarAdmin = useCallback(async (data: any) => {
+    try {
+      const result = await setupService.createAdmin(data);
+      if (result.success) {
+        await verificarStatus();
+      }
+      return result;
+    } catch (error) {
+      console.error('Erro ao criar admin:', error);
+      return { success: false, message: 'Erro interno', timestamp: new Date().toISOString() };
+    }
+  }, [verificarStatus]);
+
+  return {
+    setupStatus,
+    loading,
+    criarAdmin,
+    verificarStatus
+  };
+}
+
+// ===========================
 // Hook para Health Check
+// ===========================
 export function useHealthCheck() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfoResponse | null>(null);
@@ -411,11 +454,11 @@ export function useHealthCheck() {
   };
 }
 
-
+// ===========================
 // Hook para Busca Geral
-
+// ===========================
 export function useBusca() {
-  const [resultados, setResultados] = useState<PessoaResponse[]>([]);
+  const [resultados, setResultados] = useState<CustodiadoResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -423,7 +466,7 @@ export function useBusca() {
     try {
       setLoading(true);
       setError(null);
-      const data = await pessoasService.buscar(params);
+      const data = await custodiadosService.buscar(params);
       setResultados(data);
       return data;
     } catch (err) {

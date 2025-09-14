@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions, useAudit } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
-import { usePessoas } from '@/hooks/useBackendApi';
+import { useCustodiados } from '@/hooks/useBackendApi';
 import { 
   Lock, 
   AlertTriangle, 
@@ -15,7 +15,7 @@ import {
   Info,
   AlertCircle
 } from 'lucide-react';
-import { PessoaDTO, EstadoBrasil } from '@/types/backend';
+import { CustodiadoDTO, EstadoBrasil } from '@/types/backend';
 
 // Componente de Alerta Melhorado
 interface AlertMessageProps {
@@ -100,11 +100,11 @@ function AlertMessage({ type, title, message, details, onClose, className = '' }
 
 // Componente principal de cadastro
 function OriginalRegistrarPage() {
-  const { criarPessoa } = usePessoas();
+  const { criarPessoa } = useCustodiados();
   const router = useRouter();
 
   // Estado do formulário usando o DTO do backend com campos de endereço na raiz
-  const [formData, setFormData] = useState<PessoaDTO>({
+  const [formData, setFormData] = useState<CustodiadoDTO>({
     nome: '',
     cpf: '',
     rg: '',
@@ -251,7 +251,7 @@ function OriginalRegistrarPage() {
 
     try {
       // Preparar dados para envio - todos os campos já estão na estrutura correta
-      const dataToSend: PessoaDTO = {
+      const dataToSend: CustodiadoDTO = {
         nome: formData.nome.trim(),
         contato: formData.contato.trim(),
         processo: formData.processo.trim(),
@@ -354,7 +354,7 @@ function OriginalRegistrarPage() {
     }
   };
 
-  const handleInputChange = (field: keyof PessoaDTO, value: string | number) => {
+  const handleInputChange = (field: keyof CustodiadoDTO, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Limpar erro do campo quando usuário começar a digitar

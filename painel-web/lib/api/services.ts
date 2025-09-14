@@ -1,50 +1,45 @@
-// lib/services/backend-api.ts
+// lib/api/services.ts - Serviços para comunicação com a API
+
 import { httpClient } from '@/lib/http/client';
 import { ENDPOINTS, buildUrl } from '@/lib/config/endpoints';
 import {
-  // Setup types
+  // DTOs
   SetupAdminDTO,
-  SetupStatusResponse,
-
-  // Verificação types
   SolicitarCodigoDTO,
   VerificarCodigoDTO,
   ReenviarCodigoDTO,
-  VerificacaoStatusResponse,
-
-  // Pessoas types
-  PessoaDTO,
-  PessoaResponse,
-  ListarPessoasResponse,
-
-  // Comparecimentos types
+  CustodiadoDTO,
   ComparecimentoDTO,
+  UsuarioDTO,
+  
+  // Response Types
+  SetupStatusResponse,
+  VerificacaoStatusResponse,
+  CustodiadoResponse,
+  ListarCustodiadosResponse,
   ComparecimentoResponse,
   EstatisticasComparecimentoResponse,
-
-  // Histórico endereços types
   HistoricoEnderecoResponse,
-  EstatisticasEnderecoResponse,
-
-  // Usuários types
-  UsuarioDTO,
   UsuarioResponse,
-
-  // Utility types
   ApiResponse,
-  PeriodoParams,
-  BuscarParams,
-  PaginationParams,
   HealthResponse,
   AppInfoResponse,
-
+  ResumoSistemaResponse,
+  StatusVerificacaoResponse,
+  StatusEstatisticasResponse,
+  
+  // Params
+  PeriodoParams,
+  BuscarParams,
+  
   // Enums
   StatusComparecimento,
   TipoUsuario,
-  EstadoBrasil
-} from '@/types/backend';
+} from '@/types/api';
 
+// ===========================
 // SETUP SERVICE
+// ===========================
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
     const response = await httpClient.get<SetupStatusResponse>(ENDPOINTS.SETUP.STATUS);
@@ -72,7 +67,9 @@ export const setupService = {
   }
 };
 
+// ===========================
 // EMAIL VERIFICATION SERVICE
+// ===========================
 export const verificacaoService = {
   async solicitarCodigo(data: SolicitarCodigoDTO): Promise<ApiResponse> {
     const response = await httpClient.post<ApiResponse>(ENDPOINTS.VERIFICACAO.SOLICITAR_CODIGO, data);
@@ -107,147 +104,128 @@ export const verificacaoService = {
   }
 };
 
-// PESSOAS SERVICE
-export const pessoasService = {
-  // Corrigido para usar ListarPessoasResponse
-  async listar(): Promise<ListarPessoasResponse> {
-    console.log('[pessoasService] Listando pessoas...');
-    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.LIST);
-    console.log('[pessoasService] Resposta da listagem:', response);
+// ===========================
+// CUSTODIADOS SERVICE
+// ===========================
+export const custodiadosService = {
+  async listar(): Promise<ListarCustodiadosResponse> {
+    console.log('[custodiadosService] Listando custodiados...');
+    const response = await httpClient.get<ListarCustodiadosResponse>(ENDPOINTS.CUSTODIADOS.LIST);
+    console.log('[custodiadosService] Resposta da listagem:', response);
 
-    // Retornar a resposta completa ou estrutura padrão em caso de erro
     if (response.success && response.data) {
       return response.data;
     }
 
-    // Estrutura padrão quando há erro
     return {
       success: false,
-      message: response.error || 'Erro ao carregar pessoas',
+      message: response.error || 'Erro ao carregar custodiados',
       data: []
     };
   },
 
-  async criar(data: PessoaDTO): Promise<ApiResponse<PessoaResponse>> {
-    console.log('[pessoasService] Criando pessoa:', data);
+  async criar(data: CustodiadoDTO): Promise<ApiResponse<CustodiadoResponse>> {
+    console.log('[custodiadosService] Criando custodiado:', data);
+    const response = await httpClient.post<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.CREATE, data);
+    console.log('[custodiadosService] Resposta da criação:', response);
 
-    const response = await httpClient.post<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.CREATE, data);
-
-    console.log('[pessoasService] Resposta da criação:', response);
-
-    // Se a resposta foi bem-sucedida, retornar os dados
     if (response.success && response.data) {
       return response.data;
     }
 
-    // Se houve erro, retornar estrutura de erro
     return {
       success: false,
-      message: response.error || 'Erro ao criar pessoa',
+      message: response.error || 'Erro ao criar custodiado',
       timestamp: new Date().toISOString()
     };
   },
 
-  async buscarPorId(id: number): Promise<PessoaResponse | null> {
-    const response = await httpClient.get<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.BY_ID(id));
+  async buscarPorId(id: number): Promise<CustodiadoResponse | null> {
+    const response = await httpClient.get<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.BY_ID(id));
     return response.success && response.data?.data ? response.data.data : null;
   },
 
-  async atualizar(id: number, data: Partial<PessoaDTO>): Promise<ApiResponse<PessoaResponse>> {
-    const response = await httpClient.put<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.UPDATE(id), data);
+  async atualizar(id: number, data: Partial<CustodiadoDTO>): Promise<ApiResponse<CustodiadoResponse>> {
+    const response = await httpClient.put<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.UPDATE(id), data);
     return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
   },
 
   async excluir(id: number): Promise<ApiResponse> {
-    const response = await httpClient.delete<ApiResponse>(ENDPOINTS.PESSOAS.DELETE(id));
+    const response = await httpClient.delete<ApiResponse>(ENDPOINTS.CUSTODIADOS.DELETE(id));
     return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
   },
 
-  async buscarPorProcesso(processo: string): Promise<PessoaResponse | null> {
-    const response = await httpClient.get<ApiResponse<PessoaResponse>>(ENDPOINTS.PESSOAS.BY_PROCESSO(processo));
+  async buscarPorProcesso(processo: string): Promise<CustodiadoResponse | null> {
+    const response = await httpClient.get<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.BY_PROCESSO(processo));
     return response.success && response.data?.data ? response.data.data : null;
   },
 
-  async buscarPorStatus(status: StatusComparecimento): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.BY_STATUS(status));
+  async buscarPorStatus(status: StatusComparecimento): Promise<CustodiadoResponse[]> {
+    const response = await httpClient.get<ListarCustodiadosResponse>(ENDPOINTS.CUSTODIADOS.BY_STATUS(status));
     return response.success && response.data?.data ? response.data.data : [];
   },
 
-  async comparecimentosHoje(): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.COMPARECIMENTOS_HOJE);
+  async buscarInadimplentes(): Promise<CustodiadoResponse[]> {
+    const response = await httpClient.get<ListarCustodiadosResponse>(ENDPOINTS.CUSTODIADOS.INADIMPLENTES);
     return response.success && response.data?.data ? response.data.data : [];
   },
 
-  async atrasados(): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<ListarPessoasResponse>(ENDPOINTS.PESSOAS.ATRASADOS);
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async buscar(params: BuscarParams): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<ListarPessoasResponse>(
-      buildUrl(ENDPOINTS.PESSOAS.BUSCAR, params)
+  async buscar(params: BuscarParams): Promise<CustodiadoResponse[]> {
+    const response = await httpClient.get<ListarCustodiadosResponse>(
+      ENDPOINTS.CUSTODIADOS.BUSCAR(params.termo || '')
     );
     return response.success && response.data?.data ? response.data.data : [];
   }
 };
 
+// ===========================
 // COMPARECIMENTOS SERVICE
+// ===========================
 export const comparecimentosService = {
-
-  async obterResumoSistema(): Promise<any> {
+  async obterResumoSistema(): Promise<ResumoSistemaResponse> {
     console.log('[comparecimentosService] Buscando resumo do sistema...');
-    const response = await httpClient.get<ApiResponse<any>>(ENDPOINTS.COMPARECIMENTOS.RESUMO_SISTEMA);
+    const response = await httpClient.get<ApiResponse<ResumoSistemaResponse>>(ENDPOINTS.COMPARECIMENTOS.RESUMO_SISTEMA);
 
-    console.log(response)
     if (response.success && response.data?.data) {
       return response.data.data;
     }
 
+    // Retorno padrão com estrutura completa
     return {
+      totalCustodiados: 0,
+      custodiadosEmConformidade: 0,
+      custodiadosInadimplentes: 0,
+      comparecimentosHoje: 0,
+      totalComparecimentos: 0,
+      comparecimentosEsteMes: 0,
+      totalMudancasEndereco: 0,
+      enderecosAtivos: 0,
+      custodiadosSemHistorico: 0,
+      custodiadosSemEnderecoAtivo: 0,
+      percentualConformidade: 0,
+      percentualInadimplencia: 0,
+      dataConsulta: new Date().toISOString(),
+      // Campos adicionais para o dashboard
       totalPessoas: 0,
       emConformidade: 0,
       inadimplentes: 0,
-      comparecimentosHoje: 0,
       atrasados: 0,
       proximos7Dias: 0,
-      percentualConformidade: 0,
       proximosComparecimentos: [],
       alertasUrgentes: [],
       pessoasAtrasadas: []
     };
   },
-  async obterDadosTendencia(meses: number = 6): Promise<any[]> {
-    console.log('[comparecimentosService] Buscando dados de tendência...');
-    const response = await httpClient.get<ApiResponse<any[]>>(
-      buildUrl(ENDPOINTS.COMPARECIMENTOS.TENDENCIA, { meses })
-    );
-    
-    if (response.success && response.data?.data) {
-      return response.data.data;
-    }
-    
-    return [];
-  },
-  
-  async obterComparecimentosSemana(): Promise<any[]> {
-    console.log('[comparecimentosService] Buscando comparecimentos da semana...');
-    const response = await httpClient.get<ApiResponse<any[]>>(
-      ENDPOINTS.COMPARECIMENTOS.COMPARECIMENTOS_SEMANA
-    );
-    
-    if (response.success && response.data?.data) {
-      return response.data.data;
-    }
-    
-    return [];
-  },
+
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     const response = await httpClient.post<ApiResponse<ComparecimentoResponse>>(ENDPOINTS.COMPARECIMENTOS.CREATE, data);
     return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
   },
 
-  async buscarPorPessoa(pessoaId: number): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(ENDPOINTS.COMPARECIMENTOS.BY_PESSOA(pessoaId));
+  async buscarPorCustodiado(custodiadoId: number): Promise<ComparecimentoResponse[]> {
+    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(
+      ENDPOINTS.COMPARECIMENTOS.BY_CUSTODIADO(custodiadoId)
+    );
     return response.success && response.data?.data ? response.data.data : [];
   },
 
@@ -263,106 +241,44 @@ export const comparecimentosService = {
     return response.success && response.data?.data ? response.data.data : [];
   },
 
-  async mudancasEndereco(pessoaId: number): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
-      ENDPOINTS.COMPARECIMENTOS.MUDANCAS_ENDERECO(pessoaId)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async atualizarObservacoes(historicoId: number, observacoes: string): Promise<ApiResponse> {
-    const response = await httpClient.put<ApiResponse>(
-      ENDPOINTS.COMPARECIMENTOS.UPDATE_OBSERVACOES(historicoId),
-      { observacoes }
-    );
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async verificarInadimplentes(): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.COMPARECIMENTOS.VERIFICAR_INADIMPLENTES);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
   async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
     const response = await httpClient.get<ApiResponse<EstatisticasComparecimentoResponse>>(
       buildUrl(ENDPOINTS.COMPARECIMENTOS.ESTATISTICAS, params)
     );
     return response.success && response.data?.data ? response.data.data : {
-      totalPessoas: 0,
-      emConformidade: 0,
-      inadimplentes: 0,
-      comparecimentosHoje: 0,
-      comparecimentosPeriodo: 0,
-      percentualConformidade: 0
+      totalComparecimentos: 0,
+      comparecimentosPresenciais: 0,
+      comparecimentosOnline: 0,
+      cadastrosIniciais: 0,
+      mudancasEndereco: 0,
+      percentualPresencial: 0,
+      percentualOnline: 0
     };
   }
 };
 
+// ===========================
 // HISTÓRICO ENDEREÇOS SERVICE
+// ===========================
 export const historicoEnderecosService = {
-  async buscarPorPessoa(pessoaId: number): Promise<HistoricoEnderecoResponse[]> {
+  async buscarPorCustodiado(custodiadoId: number): Promise<HistoricoEnderecoResponse[]> {
     const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
-      ENDPOINTS.HISTORICO_ENDERECOS.BY_PESSOA(pessoaId)
+      ENDPOINTS.HISTORICO_ENDERECOS.BY_PESSOA(custodiadoId)
     );
     return response.success && response.data?.data ? response.data.data : [];
   },
 
-  async obterEnderecoAtivo(pessoaId: number): Promise<HistoricoEnderecoResponse | null> {
+  async obterEnderecoAtivo(custodiadoId: number): Promise<HistoricoEnderecoResponse | null> {
     const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse>>(
-      ENDPOINTS.HISTORICO_ENDERECOS.ENDERECO_ATIVO(pessoaId)
+      ENDPOINTS.HISTORICO_ENDERECOS.ENDERECO_ATIVO(custodiadoId)
     );
     return response.success && response.data?.data ? response.data.data : null;
-  },
-
-  async obterHistoricos(pessoaId: number): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
-      ENDPOINTS.HISTORICO_ENDERECOS.HISTORICOS(pessoaId)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async buscarPorPeriodo(pessoaId: number, params: PeriodoParams): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
-      buildUrl(ENDPOINTS.HISTORICO_ENDERECOS.BY_PERIODO(pessoaId), params)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async buscarPorCidade(cidade: string): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<ListarPessoasResponse>(
-      ENDPOINTS.HISTORICO_ENDERECOS.BY_CIDADE(cidade)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async buscarPorEstado(estado: EstadoBrasil): Promise<PessoaResponse[]> {
-    const response = await httpClient.get<ListarPessoasResponse>(
-      ENDPOINTS.HISTORICO_ENDERECOS.BY_ESTADO(estado)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async mudancasPorPeriodo(params: PeriodoParams): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
-      buildUrl(ENDPOINTS.HISTORICO_ENDERECOS.MUDANCAS_PERIODO, params)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async obterEstatisticas(): Promise<EstatisticasEnderecoResponse> {
-    const response = await httpClient.get<ApiResponse<EstatisticasEnderecoResponse>>(
-      ENDPOINTS.HISTORICO_ENDERECOS.ESTATISTICAS
-    );
-    return response.success && response.data?.data ? response.data.data : {
-      totalMudancas: 0,
-      mudancasUltimoMes: 0,
-      cidadesMaisFrequentes: [],
-      estadosMaisFrequentes: []
-    };
   }
 };
 
+// ===========================
 // USUÁRIOS SERVICE
+// ===========================
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
     const response = await httpClient.get<ApiResponse<UsuarioResponse[]>>(ENDPOINTS.USUARIOS.LIST);
@@ -395,19 +311,34 @@ export const usuariosService = {
   }
 };
 
+// ===========================
+// STATUS SERVICE
+// ===========================
+export const statusService = {
+  async verificarInadimplentes(): Promise<ApiResponse<StatusVerificacaoResponse>> {
+    const response = await httpClient.post<ApiResponse<StatusVerificacaoResponse>>(ENDPOINTS.STATUS.VERIFICAR_INADIMPLENTES);
+    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
+  },
+
+  async obterEstatisticas(): Promise<StatusEstatisticasResponse | null> {
+    const response = await httpClient.get<ApiResponse<StatusEstatisticasResponse>>(ENDPOINTS.STATUS.ESTATISTICAS);
+    return response.success && response.data?.data ? response.data.data : null;
+  }
+};
+
+// ===========================
 // TEST SERVICE
+// ===========================
 export const testService = {
   async health(): Promise<HealthResponse> {
     try {
       console.log('[testService] Fazendo health check...');
       const response = await httpClient.get<HealthResponse>(ENDPOINTS.TEST.HEALTH);
-
       console.log('[testService] Resposta do health check:', response);
 
       if (response.success && response.data) {
         return response.data;
       } else {
-        // Se a requisição falhou, mas houve resposta, considerar DOWN
         return {
           status: 'DOWN',
           timestamp: new Date().toISOString(),
@@ -428,13 +359,11 @@ export const testService = {
     try {
       console.log('[testService] Obtendo informações da aplicação...');
       const response = await httpClient.get<AppInfoResponse>(ENDPOINTS.TEST.INFO);
-
       console.log('[testService] Resposta do info:', response);
 
       if (response.success && response.data) {
         return response.data;
       } else {
-        // Se a requisição falhou, retornar dados padrão
         return {
           name: 'ACLP Backend',
           version: 'Unknown',
@@ -460,7 +389,9 @@ export const testService = {
   }
 };
 
+// ===========================
 // UTILITY FUNCTIONS
+// ===========================
 
 // Função para configurar headers de autenticação
 export const configureAuthHeaders = (token: string) => {
@@ -476,6 +407,5 @@ export const clearAuthHeaders = () => {
 
 // Função para inicializar a API
 export const initializeBackendApi = () => {
-  // Configurar interceptors ou configurações iniciais se necessário
   console.log('Backend API initialized');
 };

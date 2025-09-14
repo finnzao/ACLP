@@ -3,8 +3,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { usePessoas } from '@/hooks/useBackendApi';
-import type { PessoaResponse, ListarPessoasResponse } from '@/types/backend';
+import { useCustodiados } from '@/hooks/useAPI';
+import type { CustodiadoResponse, ListarCustodiadosResponse } from '@/types/api';
 import type { Comparecimento } from '@/types';
 import DetalhesAcusadoModal from '@/components/DetalhesSubmetido';
 import EditarAcusadoModal from '@/components/EditarSubmetido';
@@ -30,13 +30,13 @@ export default function GeralPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Hook do backend
+  // Hook do backend - mudança importante aqui
   const { 
-    pessoas: pessoasBackend, 
+    custodiados: custodiadosBackend, 
     loading: loadingBackend, 
     error: errorBackend, 
-    refetch: refetchPessoas 
-  } = usePessoas();
+    refetch: refetchCustodiados 
+  } = useCustodiados();
 
   // Estados principais
   const [filtro, setFiltro] = useState('');
@@ -72,116 +72,116 @@ export default function GeralPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Converter dados do backend para formato esperado com tipagem correta
+  // Converter dados do backend para formato esperado
   const todosOsDados = useMemo(() => {
-    // Type guard para verificar se é ListarPessoasResponse
-    const isListarPessoasResponse = (data: any): data is ListarPessoasResponse => {
+    // Type guard para verificar se é ListarCustodiadosResponse
+    const isListarCustodiadosResponse = (data: any): data is ListarCustodiadosResponse => {
       return data && typeof data === 'object' && 'success' in data && 'data' in data;
     };
 
-    // Guard Clauses com tipagem correta
-    if (!pessoasBackend) {
-      console.warn('pessoasBackend não está disponível');
+    // Guard Clauses
+    if (!custodiadosBackend) {
+      console.warn('custodiadosBackend não está disponível');
       return [];
     }
 
     // Verificar se tem a estrutura esperada
-    if (!isListarPessoasResponse(pessoasBackend)) {
-      console.warn('pessoasBackend não tem a estrutura esperada:', pessoasBackend);
-      // Se for PessoaResponse[] diretamente, trabalhar com isso
-      if (Array.isArray(pessoasBackend)) {
-        return pessoasBackend.map((pessoa: PessoaResponse) => ({
-          id: pessoa.id,
-          nome: pessoa.nome,
-          cpf: pessoa.cpf || '',
-          rg: pessoa.rg || '',
-          contato: pessoa.contato,
-          processo: pessoa.processo,
-          vara: pessoa.vara,
-          comarca: pessoa.comarca,
-          decisao: pessoa.dataDecisao,
-          periodicidade: pessoa.periodicidade,
-          status: pessoa.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
-          primeiroComparecimento: pessoa.primeiroComparecimento,
-          ultimoComparecimento: pessoa.ultimoComparecimento,
-          proximoComparecimento: pessoa.proximoComparecimento,
-          endereco: pessoa.endereco ? {
-            cep: pessoa.endereco.cep,
-            logradouro: pessoa.endereco.logradouro,
-            numero: pessoa.endereco.numero,
-            complemento: pessoa.endereco.complemento,
-            bairro: pessoa.endereco.bairro,
-            cidade: pessoa.endereco.cidade,
-            estado: pessoa.endereco.estado
+    if (!isListarCustodiadosResponse(custodiadosBackend)) {
+      console.warn('custodiadosBackend não tem a estrutura esperada:', custodiadosBackend);
+      // Se for CustodiadoResponse[] diretamente, trabalhar com isso
+      if (Array.isArray(custodiadosBackend)) {
+        return custodiadosBackend.map((custodiado: CustodiadoResponse) => ({
+          id: custodiado.id,
+          nome: custodiado.nome,
+          cpf: custodiado.cpf || '',
+          rg: custodiado.rg || '',
+          contato: custodiado.contato,
+          processo: custodiado.processo,
+          vara: custodiado.vara,
+          comarca: custodiado.comarca,
+          decisao: custodiado.dataDecisao,
+          periodicidade: custodiado.periodicidade,
+          status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
+          primeiroComparecimento: custodiado.dataComparecimentoInicial,
+          ultimoComparecimento: custodiado.ultimoComparecimento,
+          proximoComparecimento: custodiado.proximoComparecimento,
+          endereco: custodiado.endereco ? {
+            cep: custodiado.endereco.cep,
+            logradouro: custodiado.endereco.logradouro,
+            numero: custodiado.endereco.numero,
+            complemento: custodiado.endereco.complemento,
+            bairro: custodiado.endereco.bairro,
+            cidade: custodiado.endereco.cidade,
+            estado: custodiado.endereco.estado
           } : undefined,
-          observacoes: pessoa.observacoes,
-          atrasado: pessoa.atrasado,
-          diasAtraso: pessoa.diasAtraso,
-          comparecimentoHoje: pessoa.comparecimentoHoje,
-          enderecoCompleto: pessoa.enderecoCompleto,
-          cidadeEstado: pessoa.cidadeEstado
+          observacoes: custodiado.observacoes,
+          atrasado: custodiado.atrasado,
+          diasAtraso: custodiado.diasAtraso,
+          comparecimentoHoje: custodiado.comparecimentoHoje,
+          enderecoCompleto: custodiado.enderecoCompleto,
+          cidadeEstado: custodiado.cidadeEstado
         }));
       }
       return [];
     }
 
-    if (!pessoasBackend.success) {
-      console.warn('Resposta da API não foi bem-sucedida:', pessoasBackend.message);
+    if (!custodiadosBackend.success) {
+      console.warn('Resposta da API não foi bem-sucedida:', custodiadosBackend.message);
       return [];
     }
 
-    if (!pessoasBackend.data) {
+    if (!custodiadosBackend.data) {
       console.warn('Dados não estão presentes na resposta');
       return [];
     }
 
-    if (!Array.isArray(pessoasBackend.data)) {
-      console.warn('Dados não são um array:', typeof pessoasBackend.data);
+    if (!Array.isArray(custodiadosBackend.data)) {
+      console.warn('Dados não são um array:', typeof custodiadosBackend.data);
       return [];
     }
 
-    if (pessoasBackend.data.length === 0) {
-      console.info('Nenhuma pessoa encontrada na resposta');
+    if (custodiadosBackend.data.length === 0) {
+      console.info('Nenhum custodiado encontrado na resposta');
       return [];
     }
 
-    console.info(`Processando ${pessoasBackend.data.length} pessoas`);
+    console.info(`Processando ${custodiadosBackend.data.length} custodiados`);
 
-    // Extrair pessoas após todas as validações
-    const pessoas = pessoasBackend.data;
+    // Extrair custodiados após todas as validações
+    const custodiados = custodiadosBackend.data;
 
-    return pessoas.map((pessoa: PessoaResponse) => ({
-      id: pessoa.id,
-      nome: pessoa.nome,
-      cpf: pessoa.cpf || '',
-      rg: pessoa.rg || '',
-      contato: pessoa.contato,
-      processo: pessoa.processo,
-      vara: pessoa.vara,
-      comarca: pessoa.comarca,
-      decisao: pessoa.dataDecisao,
-      periodicidade: pessoa.periodicidade,
-      status: pessoa.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
-      primeiroComparecimento: pessoa.primeiroComparecimento,
-      ultimoComparecimento: pessoa.ultimoComparecimento,
-      proximoComparecimento: pessoa.proximoComparecimento,
-      endereco: pessoa.endereco ? {
-        cep: pessoa.endereco.cep,
-        logradouro: pessoa.endereco.logradouro,
-        numero: pessoa.endereco.numero,
-        complemento: pessoa.endereco.complemento,
-        bairro: pessoa.endereco.bairro,
-        cidade: pessoa.endereco.cidade,
-        estado: pessoa.endereco.estado
+    return custodiados.map((custodiado: CustodiadoResponse) => ({
+      id: custodiado.id,
+      nome: custodiado.nome,
+      cpf: custodiado.cpf || '',
+      rg: custodiado.rg || '',
+      contato: custodiado.contato,
+      processo: custodiado.processo,
+      vara: custodiado.vara,
+      comarca: custodiado.comarca,
+      decisao: custodiado.dataDecisao,
+      periodicidade: custodiado.periodicidade,
+      status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
+      primeiroComparecimento: custodiado.dataComparecimentoInicial,
+      ultimoComparecimento: custodiado.ultimoComparecimento,
+      proximoComparecimento: custodiado.proximoComparecimento,
+      endereco: custodiado.endereco ? {
+        cep: custodiado.endereco.cep,
+        logradouro: custodiado.endereco.logradouro,
+        numero: custodiado.endereco.numero,
+        complemento: custodiado.endereco.complemento,
+        bairro: custodiado.endereco.bairro,
+        cidade: custodiado.endereco.cidade,
+        estado: custodiado.endereco.estado
       } : undefined,
-      observacoes: pessoa.observacoes,
-      atrasado: pessoa.atrasado,
-      diasAtraso: pessoa.diasAtraso,
-      comparecimentoHoje: pessoa.comparecimentoHoje,
-      enderecoCompleto: pessoa.enderecoCompleto,
-      cidadeEstado: pessoa.cidadeEstado
+      observacoes: custodiado.observacoes,
+      atrasado: custodiado.atrasado,
+      diasAtraso: custodiado.diasAtraso,
+      comparecimentoHoje: custodiado.comparecimentoHoje,
+      enderecoCompleto: custodiado.enderecoCompleto,
+      cidadeEstado: custodiado.cidadeEstado
     }));
-  }, [pessoasBackend]);
+  }, [custodiadosBackend]);
 
   // Configurar busca inicial a partir da URL
   useEffect(() => {
@@ -318,7 +318,7 @@ export default function GeralPage() {
   };
 
   const handleRefresh = async () => {
-    await refetchPessoas();
+    await refetchCustodiados();
   };
 
   const dadosFiltrados = useMemo(() => {
@@ -721,8 +721,8 @@ export default function GeralPage() {
           {/* Estatísticas Rápidas */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-primary">
-              <p className="text-sm text-text-muted">Total</p>
-              <p className="text-2xl font-bold text-primary">{totalFiltrados}</p>
+              <p className="text-sm text-text-muted">Total de Custodiados</p>
+              <p className="text-2xl font-bold text-primary-dark">{totalFiltrados}</p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-secondary">
               <p className="text-sm text-text-muted">Em Conformidade</p>
@@ -858,7 +858,7 @@ export default function GeralPage() {
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">
-                  Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'pessoa' : 'pessoas'})
+                  Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'custodiado' : 'custodiados'})
                   {totalFiltrados > 0 && (
                     <span className="text-sm text-gray-600 ml-2">
                       • Página {currentPage} de {totalPages}
@@ -920,7 +920,7 @@ export default function GeralPage() {
                           </span>
                         </td>
                         <td className="p-3 text-center text-sm">
-                          {new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR')}
+                          {item.ultimoComparecimento ? new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR') : '-'}
                         </td>
                         <td className="p-3 text-center">
                           <div className={`text-sm font-medium ${

@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
-import { useResumoSistema } from '@/hooks/useBackendApi';
+import { useResumoSistema } from '@/hooks/useAPI';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
