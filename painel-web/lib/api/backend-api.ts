@@ -216,7 +216,31 @@ export const comparecimentosService = {
       pessoasAtrasadas: []
     };
   },
-
+  async obterDadosTendencia(meses: number = 6): Promise<any[]> {
+    console.log('[comparecimentosService] Buscando dados de tendência...');
+    const response = await httpClient.get<ApiResponse<any[]>>(
+      buildUrl(ENDPOINTS.COMPARECIMENTOS.TENDENCIA, { meses })
+    );
+    
+    if (response.success && response.data?.data) {
+      return response.data.data;
+    }
+    
+    return [];
+  },
+  
+  async obterComparecimentosSemana(): Promise<any[]> {
+    console.log('[comparecimentosService] Buscando comparecimentos da semana...');
+    const response = await httpClient.get<ApiResponse<any[]>>(
+      ENDPOINTS.COMPARECIMENTOS.COMPARECIMENTOS_SEMANA
+    );
+    
+    if (response.success && response.data?.data) {
+      return response.data.data;
+    }
+    
+    return [];
+  },
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     const response = await httpClient.post<ApiResponse<ComparecimentoResponse>>(ENDPOINTS.COMPARECIMENTOS.CREATE, data);
     return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
