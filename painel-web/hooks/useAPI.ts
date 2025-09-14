@@ -25,116 +25,48 @@ import {
   AppInfoResponse,
   ResumoSistemaResponse
 } from '@/types/api';
-
-// ===========================
-// Hook para Custodiados
-// ===========================
+import MOCK_CUSTODIADOS from '@/db/usuarios_mock.json'
+// Hook para custodiados
 export function useCustodiados() {
   const [custodiados, setCustodiados] = useState<CustodiadoResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const carregarCustodiados = useCallback(async () => {
+  const fetchCustodiados = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await custodiadosService.listar();
-      setCustodiados(data);
+      console.log('[useCustodiados] Buscando custodiados...');
+
+      const response = await custodiadosService.listar();
+      console.log('[useCustodiados] Resposta recebida:', response);
+
+      if (response.success && Array.isArray(response.data)) {
+        setCustodiados(response.data);
+        console.log('[useCustodiados] Custodiados carregados:', response.data.length);
+      } else {
+        console.warn('[useCustodiados] API retornou erro, usando dados mock');
+        setError('Usando dados de exemplo (API não disponível)');
+        setCustodiados(MOCK_CUSTODIADOS);
+      }
     } catch (err) {
-      setError('Erro ao carregar custodiados');
-      console.error(err);
+      console.error('[useCustodiados] Erro na requisição, usando dados mock:', err);
+      setError('Conexão com API falhou, usando dados de exemplo');
+      setCustodiados(MOCK_CUSTODIADOS);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    carregarCustodiados();
-  }, [carregarCustodiados]);
-
-  const criarCustodiado = useCallback(async (data: CustodiadoDTO) => {
-    try {
-      console.log('[useCustodiados] Enviando dados para o backend:', data);
-      const result = await custodiadosService.criar(data);
-      console.log('[useCustodiados] Resposta do backend:', result);
-
-      if (result.success) {
-        await carregarCustodiados();
-        return { success: true, message: result.message || 'Custodiado criado com sucesso', data: result.data };
-      }
-      return { success: false, message: result.message || 'Erro ao criar custodiado' };
-    } catch (error) {
-      console.error('[useCustodiados] Erro ao criar custodiado:', error);
-      return { success: false, message: 'Erro interno do sistema' };
-    }
-  }, [carregarCustodiados]);
-
-  const atualizarCustodiado = useCallback(async (id: number, data: Partial<CustodiadoDTO>) => {
-    try {
-      const result = await custodiadosService.atualizar(id, data);
-      if (result.success) {
-        await carregarCustodiados();
-        return { success: true, message: 'Custodiado atualizado com sucesso' };
-      }
-      return { success: false, message: result.message || 'Erro ao atualizar custodiado' };
-    } catch (error) {
-      console.error('Erro ao atualizar custodiado:', error);
-      return { success: false, message: 'Erro interno do sistema' };
-    }
-  }, [carregarCustodiados]);
-
-  const excluirCustodiado = useCallback(async (id: number) => {
-    try {
-      const result = await custodiadosService.excluir(id);
-      if (result.success) {
-        await carregarCustodiados();
-        return { success: true, message: 'Custodiado excluído com sucesso' };
-      }
-      return { success: false, message: result.message || 'Erro ao excluir custodiado' };
-    } catch (error) {
-      console.error('Erro ao excluir custodiado:', error);
-      return { success: false, message: 'Erro interno do sistema' };
-    }
-  }, [carregarCustodiados]);
-
-  const buscarPorProcesso = useCallback(async (processo: string) => {
-    try {
-      return await custodiadosService.buscarPorProcesso(processo);
-    } catch (error) {
-      console.error('Erro ao buscar por processo:', error);
-      return null;
-    }
-  }, []);
-
-  const buscarPorStatus = useCallback(async (status: StatusComparecimento) => {
-    try {
-      return await custodiadosService.buscarPorStatus(status);
-    } catch (error) {
-      console.error('Erro ao buscar por status:', error);
-      return [];
-    }
-  }, []);
-
-  const buscarInadimplentes = useCallback(async () => {
-    try {
-      return await custodiadosService.buscarInadimplentes();
-    } catch (error) {
-      console.error('Erro ao buscar inadimplentes:', error);
-      return [];
-    }
+    fetchCustodiados();
   }, []);
 
   return {
     custodiados,
     loading,
     error,
-    criarCustodiado,
-    atualizarCustodiado,
-    excluirCustodiado,
-    buscarPorProcesso,
-    buscarPorStatus,
-    buscarInadimplentes,
-    refetch: carregarCustodiados
+    refetch: fetchCustodiados
   };
 }
 

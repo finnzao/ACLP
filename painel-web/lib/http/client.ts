@@ -1,6 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// lib/http/client.ts
-interface RequestConfig {
+// lib/http/client.ts - Cliente HTTP padronizado para comunicação com a API
+
+// ===========================
+// Interfaces e Tipos
+// ===========================
+
+export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: any;
@@ -8,13 +14,25 @@ interface RequestConfig {
   retries?: number;
 }
 
-interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
   success: boolean;
   status: number;
+  timestamp?: string;
 }
+
+interface ClientConfig {
+  baseURL?: string;
+  timeout?: number;
+  retries?: number;
+  headers?: Record<string, string>;
+}
+
+// ===========================
+// Classe do Cliente HTTP
+// ===========================
 
 class HttpClient {
   private baseURL: string;
@@ -22,17 +40,18 @@ class HttpClient {
   private timeout: number;
   private retries: number;
 
-  constructor() {
+  constructor(config?: ClientConfig) {
     // Configurar base URL baseado no ambiente
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+    this.baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
     
     this.defaultHeaders = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      ...config?.headers
     };
     
-    this.timeout = 30000; // 30 segundos
-    this.retries = 3;
+    this.timeout = config?.timeout || 30000; // 30 segundos
+    this.retries = config?.retries || 3;
 
     // Log da inicialização em desenvolvimento
     if (process.env.NODE_ENV === 'development') {
@@ -40,7 +59,10 @@ class HttpClient {
     }
   }
 
-  // Método para adicionar token de autenticação
+  // ===========================
+  // Métodos de Configuração
+  // ===========================
+
   setAuthToken(token: string) {
     this.defaultHeaders['Authorization'] = `Bearer ${token}`;
     
@@ -49,8 +71,7 @@ class HttpClient {
     }
   }
 
-  // Método para remover token de autenticação
-  removeAuthToken() {
+  clearAuth() {
     delete this.defaultHeaders['Authorization'];
     
     if (process.env.NODE_ENV === 'development') {
@@ -58,7 +79,6 @@ class HttpClient {
     }
   }
 
-  // Método para adicionar headers customizados
   setHeaders(headers: Record<string, string>) {
     this.defaultHeaders = { ...this.defaultHeaders, ...headers };
     
@@ -67,12 +87,30 @@ class HttpClient {
     }
   }
 
-  // Método para remover um header específico
   removeHeader(headerName: string) {
     delete this.defaultHeaders[headerName];
   }
 
-  // Método principal para fazer requisições
+  setBaseURL(baseURL: string) {
+    this.baseURL = baseURL;
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[HttpClient] Base URL atualizada para:', baseURL);
+    }
+  }
+
+  setTimeout(timeout: number) {
+    this.timeout = timeout;
+  }
+
+  setRetries(retries: number) {
+    this.retries = retries;
+  }
+
+  // ===========================
+  // Método Principal de Requisição
+  // ===========================
+
   private async makeRequest<T>(
     endpoint: string,
     config: RequestConfig = {}
@@ -115,9 +153,8 @@ class HttpClient {
     if (body && method !== 'GET') {
       if (body instanceof FormData) {
         // Para FormData, remover Content-Type para deixar o browser definir
-        delete requestConfig.headers;
-        requestConfig.headers = { ...requestHeaders };
-        delete (requestConfig.headers as any)['Content-Type'];
+        const { 'Content-Type': _, ...headersWithoutContentType } = requestHeaders;
+        requestConfig.headers = headersWithoutContentType;
         requestConfig.body = body;
       } else {
         requestConfig.body = typeof body === 'string' ? body : JSON.stringify(body);
@@ -135,16 +172,35 @@ class HttpClient {
         let responseData: any;
         const contentType = response.headers.get('content-type');
         
-        // Processar resposta baseado no Content-Type
-        if (contentType && contentType.includes('application/json')) {
-          try {
+        // ✅ CORREÇÃO MELHORADA: Processar resposta baseado no Content-Type
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            // É JSON, usar response.json() diretamente
             responseData = await response.json();
-          } catch (jsonError) {
-            // Se não conseguir fazer parse do JSON, usar texto
-            responseData = await response.text();
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[HttpClient] ✅ JSON parseado automaticamente`);
+            }
+          } else {
+            // Não é JSON, ler como texto
+            const textData = await response.text();
+            
+            // Tentar fazer parse como JSON mesmo assim (algumas APIs não setam Content-Type correto)
+            try {
+              responseData = JSON.parse(textData);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[HttpClient] ✅ JSON parseado manualmente de texto`);
+              }
+            } catch (jsonError) {
+              // Se não conseguir, usar como texto mesmo
+              responseData = textData;
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[HttpClient] ✅ Mantendo como texto`);
+              }
+            }
           }
-        } else {
-          responseData = await response.text();
+        } catch (readError) {
+          console.error('[HttpClient] ❌ Erro ao ler resposta:', readError);
+          responseData = null;
         }
 
         // Log da resposta em desenvolvimento
@@ -152,7 +208,11 @@ class HttpClient {
           console.log(`[HttpClient] Response ${response.status} for ${method} ${url}`, {
             status: response.status,
             statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
+            contentType,
+            dataType: typeof responseData,
+            isObject: typeof responseData === 'object',
+            isArray: Array.isArray(responseData),
+            hasSuccessField: responseData && typeof responseData === 'object' && 'success' in responseData,
             data: responseData
           });
         }
@@ -162,6 +222,8 @@ class HttpClient {
           success: response.ok,
           status: response.status,
           error: !response.ok ? this.extractErrorMessage(responseData) : undefined,
+          message: this.extractMessage(responseData),
+          timestamp: new Date().toISOString()
         };
 
         // Se não foi bem-sucedida e ainda temos tentativas, continue
@@ -198,28 +260,37 @@ class HttpClient {
       success: false,
       status: 0,
       error: errorMessage,
+      timestamp: new Date().toISOString()
     };
   }
 
-  // Método utilitário para delay
+  // ===========================
+  // Métodos Utilitários
+  // ===========================
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Extrair mensagem de erro da resposta
   private extractErrorMessage(data: any): string {
     if (typeof data === 'string') {
       return data;
     }
     
     if (data && typeof data === 'object') {
-      return data.message || data.error || data.detail || 'Erro na requisição';
+      return data.message || data.error || data.detail || data.errorMessage || 'Erro na requisição';
     }
     
     return 'Erro desconhecido';
   }
 
-  // Obter mensagem de erro amigável
+  private extractMessage(data: any): string | undefined {
+    if (data && typeof data === 'object') {
+      return data.message || data.msg;
+    }
+    return undefined;
+  }
+
   private getErrorMessage(error: Error | null): string {
     if (!error) return 'Erro desconhecido';
     
@@ -234,7 +305,6 @@ class HttpClient {
     return error.message;
   }
 
-  // Sanitizar headers para log (remover informações sensíveis)
   private sanitizeHeadersForLog(headers: Record<string, string>): Record<string, string> {
     const sanitized = { ...headers };
     
@@ -246,9 +316,24 @@ class HttpClient {
     return sanitized;
   }
 
-  // Métodos de conveniência
-  async get<T>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
-    return this.makeRequest<T>(endpoint, { ...config, method: 'GET' });
+  // ===========================
+  // Métodos de Conveniência
+  // ===========================
+
+  async get<T>(endpoint: string, params?: Record<string, any>, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+    // Adicionar parâmetros de query se fornecidos
+    let url = endpoint;
+    if (params && Object.keys(params).length > 0) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      url += `?${searchParams.toString()}`;
+    }
+    
+    return this.makeRequest<T>(url, { ...config, method: 'GET' });
   }
 
   async post<T>(endpoint: string, body?: any, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
@@ -267,7 +352,10 @@ class HttpClient {
     return this.makeRequest<T>(endpoint, { ...config, method: 'DELETE' });
   }
 
-  // Método para upload de arquivos
+  // ===========================
+  // Métodos Especiais
+  // ===========================
+
   async upload<T>(
     endpoint: string, 
     file: File | FormData, 
@@ -289,7 +377,6 @@ class HttpClient {
     });
   }
 
-  // Método para download de arquivos
   async download(endpoint: string, filename?: string): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -333,7 +420,10 @@ class HttpClient {
     }
   }
 
-  // Método para fazer requisições com interceptadores
+  // ===========================
+  // Métodos de Interceptação
+  // ===========================
+
   async requestWithInterceptors<T>(
     endpoint: string,
     config: RequestConfig = {},
@@ -358,26 +448,10 @@ class HttpClient {
     return response;
   }
 
-  // Configurar timeout global
-  setTimeout(timeout: number) {
-    this.timeout = timeout;
-  }
+  // ===========================
+  // Métodos de Configuração e Status
+  // ===========================
 
-  // Configurar número de tentativas global
-  setRetries(retries: number) {
-    this.retries = retries;
-  }
-
-  // Configurar base URL
-  setBaseURL(baseURL: string) {
-    this.baseURL = baseURL;
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[HttpClient] Base URL atualizada para:', baseURL);
-    }
-  }
-
-  // Obter configurações atuais
   getConfig() {
     return {
       baseURL: this.baseURL,
@@ -387,12 +461,11 @@ class HttpClient {
     };
   }
 
-  // Método para verificar saúde da API
   async healthCheck(): Promise<{ healthy: boolean; latency?: number; error?: string }> {
     const startTime = Date.now();
     
     try {
-      const response = await this.get('/test/health', { timeout: 5000, retries: 0 });
+      const response = await this.get('/health', undefined, { timeout: 5000, retries: 0 });
       const latency = Date.now() - startTime;
       
       return {
@@ -408,37 +481,91 @@ class HttpClient {
       };
     }
   }
+
+  // ===========================
+  // Método para Request Raw (sem parsing)
+  // ===========================
+
+  async requestRaw(endpoint: string, config: RequestConfig = {}): Promise<Response> {
+    const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
+    
+    const requestConfig: RequestInit = {
+      method: config.method || 'GET',
+      headers: { ...this.defaultHeaders, ...config.headers },
+      signal: AbortSignal.timeout(config.timeout || this.timeout)
+    };
+
+    if (config.body && config.method !== 'GET') {
+      if (config.body instanceof FormData) {
+        const { 'Content-Type': _, ...headersWithoutContentType } = requestConfig.headers as Record<string, string>;
+        requestConfig.headers = headersWithoutContentType;
+        requestConfig.body = config.body;
+      } else {
+        requestConfig.body = typeof config.body === 'string' ? config.body : JSON.stringify(config.body);
+      }
+    }
+
+    return await fetch(url, requestConfig);
+  }
 }
 
-// Instância singleton do cliente HTTP
-export const httpClient = new HttpClient();
+// ===========================
+// Instância Singleton e Exports
+// ===========================
+
+// Instância padrão do cliente
+export const apiClient = new HttpClient();
+
+// Instância customizável
+export const createHttpClient = (config?: ClientConfig) => new HttpClient(config);
 
 // Hook para usar o cliente HTTP em componentes React
 export const useHttpClient = () => {
-  return httpClient;
+  return apiClient;
 };
 
 // Função para configurar o cliente globalmente
-export const configureHttpClient = (config: {
-  baseURL?: string;
-  timeout?: number;
-  retries?: number;
-  headers?: Record<string, string>;
-}) => {
-  if (config.baseURL) httpClient.setBaseURL(config.baseURL);
-  if (config.timeout) httpClient.setTimeout(config.timeout);
-  if (config.retries) httpClient.setRetries(config.retries);
-  if (config.headers) httpClient.setHeaders(config.headers);
+export const configureHttpClient = (config: ClientConfig) => {
+  if (config.baseURL) apiClient.setBaseURL(config.baseURL);
+  if (config.timeout) apiClient.setTimeout(config.timeout);
+  if (config.retries) apiClient.setRetries(config.retries);
+  if (config.headers) apiClient.setHeaders(config.headers);
 };
 
 // Função para criar interceptadores globais
-export const setupInterceptors = () => {
-  // Exemplo: interceptador para refresh automático de token
-  const originalRequest = httpClient.requestWithInterceptors;
+export const setupGlobalInterceptors = () => {
+  // Interceptador de resposta para renovação de token
+  const originalRequest = apiClient.requestWithInterceptors;
   
-  // Você pode implementar interceptadores aqui
-  // Por exemplo, para renovar tokens automaticamente
+  // Exemplo de interceptador para tratamento global de erros
+  return (endpoint: string, config: RequestConfig = {}) => {
+    return originalRequest.call(apiClient, endpoint, config,
+      // Before request
+      (config) => {
+        // Adicionar timestamp a todas as requisições
+        return {
+          ...config,
+          headers: {
+            ...config.headers,
+            'X-Request-Time': new Date().toISOString()
+          }
+        };
+      },
+      // After response
+      (response) => {
+        // Log de erros globais
+        if (!response.success && response.status >= 500) {
+          console.error('[HttpClient] Erro do servidor:', response.error);
+        }
+        return response;
+      }
+    );
+  };
 };
 
-// Export do tipo para uso em outros lugares
-export type { ApiResponse, RequestConfig };
+// Aliases para compatibilidade
+export const httpClient = apiClient;
+export { HttpClient };
+
+// Export dos tipos
+export type { RequestConfig, ApiResponse, ClientConfig };

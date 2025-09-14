@@ -1,197 +1,276 @@
-// lib/api/services.ts - Serviços para comunicação com a API
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// lib/api/services.ts - Serviços atualizados usando o cliente padronizado
 
-import { httpClient } from '@/lib/http/client';
-import { ENDPOINTS, buildUrl } from '@/lib/config/endpoints';
-import {
-  // DTOs
-  SetupAdminDTO,
-  SolicitarCodigoDTO,
-  VerificarCodigoDTO,
-  ReenviarCodigoDTO,
+import { apiClient, ApiResponse } from './client';
+import type {
+  CustodiadoResponse,
+  ComparecimentoResponse,
+  UsuarioResponse,
   CustodiadoDTO,
   ComparecimentoDTO,
   UsuarioDTO,
-  
-  // Response Types
-  SetupStatusResponse,
-  VerificacaoStatusResponse,
-  CustodiadoResponse,
-  ListarCustodiadosResponse,
-  ComparecimentoResponse,
-  EstatisticasComparecimentoResponse,
-  HistoricoEnderecoResponse,
-  UsuarioResponse,
-  ApiResponse,
-  HealthResponse,
-  AppInfoResponse,
-  ResumoSistemaResponse,
-  StatusVerificacaoResponse,
-  StatusEstatisticasResponse,
-  
-  // Params
+  StatusComparecimento,
   PeriodoParams,
   BuscarParams,
-  
-  // Enums
-  StatusComparecimento,
-  TipoUsuario,
+  EstatisticasComparecimentoResponse,
+  ResumoSistemaResponse,
+  SetupStatusResponse,
+  SetupAdminDTO,
+  HealthResponse,
+  AppInfoResponse,
+  StatusVerificacaoResponse,
+  StatusEstatisticasResponse,
+  ListarCustodiadosResponse
 } from '@/types/api';
 
 // ===========================
-// SETUP SERVICE
+// Configuração Global
 // ===========================
-export const setupService = {
-  async getStatus(): Promise<SetupStatusResponse> {
-    const response = await httpClient.get<SetupStatusResponse>(ENDPOINTS.SETUP.STATUS);
-    return response.data || { configured: false, message: response.error || 'Erro', timestamp: new Date().toISOString() };
-  },
 
-  async createAdmin(data: SetupAdminDTO): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.SETUP.CREATE_ADMIN, data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
+export function initializeBackendApi() {
+  console.log('[Services] API inicializada');
+}
 
-  async getAudit(): Promise<ApiResponse> {
-    const response = await httpClient.get<ApiResponse>(ENDPOINTS.SETUP.AUDIT);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
+export function configureAuthHeaders(token: string) {
+  apiClient.setAuthToken(token);
+  console.log('[Services] Token de autenticação configurado');
+}
 
-  async reset(confirmToken: string): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.SETUP.RESET, { confirmToken });
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async health(): Promise<HealthResponse> {
-    const response = await httpClient.get<HealthResponse>(ENDPOINTS.SETUP.HEALTH);
-    return response.data || { status: 'DOWN', timestamp: new Date().toISOString() };
-  }
-};
+export function clearAuthHeaders() {
+  apiClient.clearAuth();
+  console.log('[Services] Token de autenticação removido');
+}
 
 // ===========================
-// EMAIL VERIFICATION SERVICE
+// Serviços de Custodiados
 // ===========================
-export const verificacaoService = {
-  async solicitarCodigo(data: SolicitarCodigoDTO): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.VERIFICACAO.SOLICITAR_CODIGO, data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
 
-  async verificarCodigo(data: VerificarCodigoDTO): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.VERIFICACAO.VERIFICAR_CODIGO, data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async getStatus(email: string): Promise<VerificacaoStatusResponse> {
-    const response = await httpClient.get<VerificacaoStatusResponse>(
-      buildUrl(ENDPOINTS.VERIFICACAO.STATUS, { email })
-    );
-    return response.data || { email, verified: false };
-  },
-
-  async reenviarCodigo(data: ReenviarCodigoDTO): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.VERIFICACAO.REENVIAR_CODIGO, data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async validarToken(email: string, token: string): Promise<ApiResponse> {
-    const response = await httpClient.post<ApiResponse>(ENDPOINTS.VERIFICACAO.VALIDAR_TOKEN, { email, token });
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async health(): Promise<HealthResponse> {
-    const response = await httpClient.get<HealthResponse>(ENDPOINTS.VERIFICACAO.HEALTH);
-    return response.data || { status: 'DOWN', timestamp: new Date().toISOString() };
-  }
-};
-
-// ===========================
-// CUSTODIADOS SERVICE
-// ===========================
 export const custodiadosService = {
   async listar(): Promise<ListarCustodiadosResponse> {
-    console.log('[custodiadosService] Listando custodiados...');
-    const response = await httpClient.get<ListarCustodiadosResponse>(ENDPOINTS.CUSTODIADOS.LIST);
-    console.log('[custodiadosService] Resposta da listagem:', response);
+    console.log('[CustodiadosService] Listando custodiados...');
+    const response = await apiClient.get<any>('/custodiados');
+    console.log('[CustodiadosService] Resposta bruta:', response);
 
-    if (response.success && response.data) {
-      return response.data;
+    // ✅ CORREÇÃO PRINCIPAL: Parse do JSON se necessário
+    let parsedData: any;
+    
+    try {
+      // Se response.data é string, fazer parse
+      if (typeof response.data === 'string') {
+        console.log('[CustodiadosService] 🔧 Fazendo parse da string JSON...');
+        parsedData = JSON.parse(response.data);
+        console.log('[CustodiadosService] ✅ JSON parseado:', parsedData);
+      } else {
+        // Se já é objeto, usar diretamente
+        parsedData = response.data;
+        console.log('[CustodiadosService] ✅ Data já é objeto:', parsedData);
+      }
+    } catch (parseError) {
+      console.error('[CustodiadosService] ❌ Erro no parse do JSON:', parseError);
+      return {
+        success: false,
+        message: 'Erro ao processar resposta do servidor',
+        data: []
+      };
     }
 
+    // ✅ Agora processar o objeto parseado
+    if (parsedData && parsedData.success && Array.isArray(parsedData.data)) {
+      console.log('[CustodiadosService] ✅ Estrutura correta encontrada:', parsedData.data.length);
+      return {
+        success: true,
+        message: parsedData.message || `${parsedData.data.length} custodiados carregados`,
+        data: parsedData.data
+      };
+    }
+
+    // ✅ FALLBACK: Tentar outras estruturas
+    if (Array.isArray(parsedData)) {
+      console.log('[CustodiadosService] ✅ Dados são array direto:', parsedData.length);
+      return {
+        success: true,
+        message: `${parsedData.length} custodiados carregados (array direto)`,
+        data: parsedData
+      };
+    }
+
+    // ✅ FALLBACK: Procurar array em qualquer propriedade
+    if (parsedData && typeof parsedData === 'object') {
+      for (const [key, value] of Object.entries(parsedData)) {
+        if (Array.isArray(value)) {
+          console.log('[CustodiadosService] ✅ Array encontrado em:', key, value.length);
+          return {
+            success: true,
+            message: `${value.length} custodiados carregados (${key})`,
+            data: value
+          };
+        }
+      }
+    }
+
+    // ❌ Nenhum formato reconhecido
+    console.error('[CustodiadosService] ❌ Nenhum array encontrado em:', parsedData);
     return {
       success: false,
-      message: response.error || 'Erro ao carregar custodiados',
+      message: 'Nenhum custodiado encontrado na resposta',
       data: []
     };
   },
 
-  async criar(data: CustodiadoDTO): Promise<ApiResponse<CustodiadoResponse>> {
-    console.log('[custodiadosService] Criando custodiado:', data);
-    const response = await httpClient.post<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.CREATE, data);
-    console.log('[custodiadosService] Resposta da criação:', response);
-
-    if (response.success && response.data) {
-      return response.data;
-    }
-
-    return {
-      success: false,
-      message: response.error || 'Erro ao criar custodiado',
-      timestamp: new Date().toISOString()
-    };
+  async buscarPorId(id: number): Promise<CustodiadoResponse | null> {
+    console.log(`[CustodiadosService] Buscando custodiado ID: ${id}`);
+    const response = await apiClient.get<CustodiadoResponse>(`/custodiados/${id}`);
+    return response.success ? response.data || null : null;
   },
 
-  async buscarPorId(id: number): Promise<CustodiadoResponse | null> {
-    const response = await httpClient.get<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.BY_ID(id));
-    return response.success && response.data?.data ? response.data.data : null;
+  async criar(data: CustodiadoDTO): Promise<ApiResponse<CustodiadoResponse>> {
+    console.log('[CustodiadosService] Criando custodiado:', data);
+    return await apiClient.post<CustodiadoResponse>('/custodiados', data);
   },
 
   async atualizar(id: number, data: Partial<CustodiadoDTO>): Promise<ApiResponse<CustodiadoResponse>> {
-    const response = await httpClient.put<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.UPDATE(id), data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
+    console.log(`[CustodiadosService] Atualizando custodiado ID: ${id}`, data);
+    return await apiClient.put<CustodiadoResponse>(`/custodiados/${id}`, data);
   },
 
-  async excluir(id: number): Promise<ApiResponse> {
-    const response = await httpClient.delete<ApiResponse>(ENDPOINTS.CUSTODIADOS.DELETE(id));
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
+  async excluir(id: number): Promise<ApiResponse<void>> {
+    console.log(`[CustodiadosService] Excluindo custodiado ID: ${id}`);
+    return await apiClient.delete<void>(`/custodiados/${id}`);
   },
 
   async buscarPorProcesso(processo: string): Promise<CustodiadoResponse | null> {
-    const response = await httpClient.get<ApiResponse<CustodiadoResponse>>(ENDPOINTS.CUSTODIADOS.BY_PROCESSO(processo));
-    return response.success && response.data?.data ? response.data.data : null;
+    console.log(`[CustodiadosService] Buscando por processo: ${processo}`);
+    const response = await apiClient.get<CustodiadoResponse>(`/custodiados/processo/${encodeURIComponent(processo)}`);
+    return response.success ? response.data || null : null;
   },
 
   async buscarPorStatus(status: StatusComparecimento): Promise<CustodiadoResponse[]> {
-    const response = await httpClient.get<ListarCustodiadosResponse>(ENDPOINTS.CUSTODIADOS.BY_STATUS(status));
-    return response.success && response.data?.data ? response.data.data : [];
+    console.log(`[CustodiadosService] Buscando por status: ${status}`);
+    const response = await apiClient.get<CustodiadoResponse[]>(`/custodiados/status/${status}`);
+    return response.success ? response.data || [] : [];
   },
 
   async buscarInadimplentes(): Promise<CustodiadoResponse[]> {
-    const response = await httpClient.get<ListarCustodiadosResponse>(ENDPOINTS.CUSTODIADOS.INADIMPLENTES);
-    return response.success && response.data?.data ? response.data.data : [];
+    console.log('[CustodiadosService] Buscando inadimplentes');
+    const response = await apiClient.get<CustodiadoResponse[]>('/custodiados/inadimplentes');
+    return response.success ? response.data || [] : [];
   },
 
   async buscar(params: BuscarParams): Promise<CustodiadoResponse[]> {
-    const response = await httpClient.get<ListarCustodiadosResponse>(
-      ENDPOINTS.CUSTODIADOS.BUSCAR(params.termo || '')
-    );
-    return response.success && response.data?.data ? response.data.data : [];
+    console.log('[CustodiadosService] Fazendo busca com parâmetros:', params);
+    const response = await apiClient.get<CustodiadoResponse[]>('/custodiados/buscar', params);
+    return response.success ? response.data || [] : [];
   }
 };
 
 // ===========================
-// COMPARECIMENTOS SERVICE
+// Serviços de Comparecimentos
 // ===========================
+
 export const comparecimentosService = {
-  async obterResumoSistema(): Promise<ResumoSistemaResponse> {
-    console.log('[comparecimentosService] Buscando resumo do sistema...');
-    const response = await httpClient.get<ApiResponse<ResumoSistemaResponse>>(ENDPOINTS.COMPARECIMENTOS.RESUMO_SISTEMA);
+  async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
+    console.log('[ComparecimentosService] Registrando comparecimento:', data);
+    return await apiClient.post<ComparecimentoResponse>('/comparecimentos', data);
+  },
 
-    if (response.success && response.data?.data) {
-      return response.data.data;
+  async buscarPorCustodiado(custodiadoId: number): Promise<ComparecimentoResponse[]> {
+    console.log(`[ComparecimentosService] Buscando comparecimentos do custodiado: ${custodiadoId}`);
+    const response = await apiClient.get<ComparecimentoResponse[]>(`/comparecimentos/custodiado/${custodiadoId}`);
+    return response.success ? response.data || [] : [];
+  },
+
+  async buscarPorPeriodo(params: PeriodoParams): Promise<ComparecimentoResponse[]> {
+    console.log('[ComparecimentosService] Buscando por período:', params);
+    const response = await apiClient.get<ComparecimentoResponse[]>('/comparecimentos/periodo', params);
+    return response.success ? response.data || [] : [];
+  },
+
+  async comparecimentosHoje(): Promise<ComparecimentoResponse[]> {
+    console.log('[ComparecimentosService] Buscando comparecimentos de hoje');
+    const response = await apiClient.get<ComparecimentoResponse[]>('/comparecimentos/hoje');
+    return response.success ? response.data || [] : [];
+  },
+
+  async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
+    console.log('[ComparecimentosService] Obtendo estatísticas:', params);
+    const response = await apiClient.get<EstatisticasComparecimentoResponse>('/comparecimentos/estatisticas', params);
+    
+    // Retorna dados padrão em caso de erro
+    if (!response.success) {
+      return {
+        totalComparecimentos: 0,
+        comparecimentosPresenciais: 0,
+        comparecimentosOnline: 0,
+        cadastrosIniciais: 0,
+        mudancasEndereco: 0,
+        percentualPresencial: 0,
+        percentualOnline: 0
+      };
     }
+    
+    return response.data || {
+      totalComparecimentos: 0,
+      comparecimentosPresenciais: 0,
+      comparecimentosOnline: 0,
+      cadastrosIniciais: 0,
+      mudancasEndereco: 0,
+      percentualPresencial: 0,
+      percentualOnline: 0
+    };
+  },
 
-    // Retorno padrão com estrutura completa
-    return {
+  async obterResumoSistema(): Promise<ResumoSistemaResponse> {
+    console.log('[ComparecimentosService] Obtendo resumo do sistema');
+    const response = await apiClient.get<any>('/comparecimentos/resumo/sistema');
+    
+    // ✅ CORREÇÃO: Parse do JSON se necessário (similar ao custodiadosService)
+    let parsedData: any;
+    
+    try {
+      if (typeof response.data === 'string') {
+        console.log('[ComparecimentosService] 🔧 Fazendo parse da string JSON...');
+        parsedData = JSON.parse(response.data);
+      } else {
+        parsedData = response.data;
+      }
+    } catch (parseError) {
+      console.error('[ComparecimentosService] ❌ Erro no parse do JSON:', parseError);
+      parsedData = null;
+    }
+    
+    // Retorna dados padrão em caso de erro
+    if (!response.success || !parsedData) {
+      return {
+        totalCustodiados: 0,
+        custodiadosEmConformidade: 0,
+        custodiadosInadimplentes: 0,
+        comparecimentosHoje: 0,
+        totalComparecimentos: 0,
+        comparecimentosEsteMes: 0,
+        totalMudancasEndereco: 0,
+        enderecosAtivos: 0,
+        custodiadosSemHistorico: 0,
+        custodiadosSemEnderecoAtivo: 0,
+        percentualConformidade: 0,
+        percentualInadimplencia: 0,
+        dataConsulta: new Date().toISOString(),
+        // Campos extras para o dashboard
+        totalPessoas: 0,
+        emConformidade: 0,
+        inadimplentes: 0,
+        atrasados: 0,
+        proximos7Dias: 0,
+        proximosComparecimentos: [],
+        alertasUrgentes: []
+      };
+    }
+    
+    // Se parsedData tem success e data, usar data
+    if (parsedData.success && parsedData.data) {
+      parsedData = parsedData.data;
+    }
+    
+    return parsedData || {
       totalCustodiados: 0,
       custodiadosEmConformidade: 0,
       custodiadosInadimplentes: 0,
@@ -205,207 +284,165 @@ export const comparecimentosService = {
       percentualConformidade: 0,
       percentualInadimplencia: 0,
       dataConsulta: new Date().toISOString(),
-      // Campos adicionais para o dashboard
       totalPessoas: 0,
       emConformidade: 0,
       inadimplentes: 0,
       atrasados: 0,
       proximos7Dias: 0,
       proximosComparecimentos: [],
-      alertasUrgentes: [],
-      pessoasAtrasadas: []
-    };
-  },
-
-  async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
-    const response = await httpClient.post<ApiResponse<ComparecimentoResponse>>(ENDPOINTS.COMPARECIMENTOS.CREATE, data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async buscarPorCustodiado(custodiadoId: number): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(
-      ENDPOINTS.COMPARECIMENTOS.BY_CUSTODIADO(custodiadoId)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async buscarPorPeriodo(params: PeriodoParams): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(
-      buildUrl(ENDPOINTS.COMPARECIMENTOS.BY_PERIODO, params)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async comparecimentosHoje(): Promise<ComparecimentoResponse[]> {
-    const response = await httpClient.get<ApiResponse<ComparecimentoResponse[]>>(ENDPOINTS.COMPARECIMENTOS.HOJE);
-    return response.success && response.data?.data ? response.data.data : [];
-  },
-
-  async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
-    const response = await httpClient.get<ApiResponse<EstatisticasComparecimentoResponse>>(
-      buildUrl(ENDPOINTS.COMPARECIMENTOS.ESTATISTICAS, params)
-    );
-    return response.success && response.data?.data ? response.data.data : {
-      totalComparecimentos: 0,
-      comparecimentosPresenciais: 0,
-      comparecimentosOnline: 0,
-      cadastrosIniciais: 0,
-      mudancasEndereco: 0,
-      percentualPresencial: 0,
-      percentualOnline: 0
+      alertasUrgentes: []
     };
   }
 };
 
 // ===========================
-// HISTÓRICO ENDEREÇOS SERVICE
+// Serviços de Usuários
 // ===========================
-export const historicoEnderecosService = {
-  async buscarPorCustodiado(custodiadoId: number): Promise<HistoricoEnderecoResponse[]> {
-    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse[]>>(
-      ENDPOINTS.HISTORICO_ENDERECOS.BY_PESSOA(custodiadoId)
-    );
-    return response.success && response.data?.data ? response.data.data : [];
-  },
 
-  async obterEnderecoAtivo(custodiadoId: number): Promise<HistoricoEnderecoResponse | null> {
-    const response = await httpClient.get<ApiResponse<HistoricoEnderecoResponse>>(
-      ENDPOINTS.HISTORICO_ENDERECOS.ENDERECO_ATIVO(custodiadoId)
-    );
-    return response.success && response.data?.data ? response.data.data : null;
-  }
-};
-
-// ===========================
-// USUÁRIOS SERVICE
-// ===========================
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
-    const response = await httpClient.get<ApiResponse<UsuarioResponse[]>>(ENDPOINTS.USUARIOS.LIST);
-    return response.success && response.data?.data ? response.data.data : [];
+    console.log('[UsuariosService] Listando usuários');
+    const response = await apiClient.get<UsuarioResponse[]>('/usuarios');
+    return response.success ? response.data || [] : [];
   },
 
   async criar(data: UsuarioDTO): Promise<ApiResponse<UsuarioResponse>> {
-    const response = await httpClient.post<ApiResponse<UsuarioResponse>>(ENDPOINTS.USUARIOS.CREATE, data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async buscarPorId(id: number): Promise<UsuarioResponse | null> {
-    const response = await httpClient.get<ApiResponse<UsuarioResponse>>(ENDPOINTS.USUARIOS.BY_ID(id));
-    return response.success && response.data?.data ? response.data.data : null;
+    console.log('[UsuariosService] Criando usuário:', data);
+    return await apiClient.post<UsuarioResponse>('/usuarios', data);
   },
 
   async atualizar(id: number, data: Partial<UsuarioDTO>): Promise<ApiResponse<UsuarioResponse>> {
-    const response = await httpClient.put<ApiResponse<UsuarioResponse>>(ENDPOINTS.USUARIOS.UPDATE(id), data);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async desativar(id: number): Promise<ApiResponse> {
-    const response = await httpClient.delete<ApiResponse>(ENDPOINTS.USUARIOS.DELETE(id));
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
-  },
-
-  async buscarPorTipo(tipo: TipoUsuario): Promise<UsuarioResponse[]> {
-    const response = await httpClient.get<ApiResponse<UsuarioResponse[]>>(ENDPOINTS.USUARIOS.BY_TIPO(tipo));
-    return response.success && response.data?.data ? response.data.data : [];
+    console.log(`[UsuariosService] Atualizando usuário ID: ${id}`, data);
+    return await apiClient.put<UsuarioResponse>(`/usuarios/${id}`, data);
   }
 };
 
 // ===========================
-// STATUS SERVICE
+// Serviços de Status
 // ===========================
+
 export const statusService = {
   async verificarInadimplentes(): Promise<ApiResponse<StatusVerificacaoResponse>> {
-    const response = await httpClient.post<ApiResponse<StatusVerificacaoResponse>>(ENDPOINTS.STATUS.VERIFICAR_INADIMPLENTES);
-    return response.data || { success: false, message: response.error, timestamp: new Date().toISOString() };
+    console.log('[StatusService] Verificando inadimplentes');
+    return await apiClient.post<StatusVerificacaoResponse>('/status/verificar-inadimplentes');
   },
 
   async obterEstatisticas(): Promise<StatusEstatisticasResponse | null> {
-    const response = await httpClient.get<ApiResponse<StatusEstatisticasResponse>>(ENDPOINTS.STATUS.ESTATISTICAS);
-    return response.success && response.data?.data ? response.data.data : null;
+    console.log('[StatusService] Obtendo estatísticas');
+    const response = await apiClient.get<StatusEstatisticasResponse>('/status/estatisticas');
+    return response.success ? response.data || null : null;
   }
 };
 
 // ===========================
-// TEST SERVICE
+// Serviços de Setup
 // ===========================
+
+export const setupService = {
+  async getStatus(): Promise<SetupStatusResponse> {
+    console.log('[SetupService] Verificando status do setup');
+    const response = await apiClient.get<SetupStatusResponse>('/setup/status');
+    
+    return response.data || {
+      setupRequired: true,
+      setupCompleted: false,
+      configured: false,
+      timestamp: new Date().toISOString()
+    };
+  },
+
+  async createAdmin(data: SetupAdminDTO): Promise<ApiResponse<any>> {
+    console.log('[SetupService] Criando administrador inicial');
+    return await apiClient.post('/setup/admin', data);
+  }
+};
+
+// ===========================
+// Serviços de Teste/Health
+// ===========================
+
 export const testService = {
   async health(): Promise<HealthResponse> {
+    console.log('[TestService] Verificando health');
+    
     try {
-      console.log('[testService] Fazendo health check...');
-      const response = await httpClient.get<HealthResponse>(ENDPOINTS.TEST.HEALTH);
-      console.log('[testService] Resposta do health check:', response);
-
-      if (response.success && response.data) {
-        return response.data;
-      } else {
+      // Tentar endpoint de custodiados para verificar se API está funcionando
+      const response = await apiClient.get<any>('/custodiados');
+      
+      if (response.success || response.status === 200) {
         return {
-          status: 'DOWN',
+          status: 'UP',
           timestamp: new Date().toISOString(),
-          details: { error: response.error || 'Health check failed' }
+          details: { message: 'API respondendo normalmente' }
         };
       }
     } catch (error) {
-      console.error('[testService] Erro no health check:', error);
-      return {
-        status: 'DOWN',
-        timestamp: new Date().toISOString(),
-        details: { error: 'Network error' }
-      };
+      console.error('[TestService] Erro no health check:', error);
     }
+    
+    // Fallback: tentar endpoint de info
+    try {
+      const response = await apiClient.get<any>('/status/info');
+      
+      if (response.success) {
+        return {
+          status: 'UP',
+          timestamp: response.data?.timestamp || new Date().toISOString(),
+          details: response.data
+        };
+      }
+    } catch (error) {
+      console.error('[TestService] Fallback health check falhou:', error);
+    }
+    
+    return {
+      status: 'DOWN',
+      timestamp: new Date().toISOString(),
+      details: { error: 'API não está respondendo' }
+    };
   },
 
   async info(): Promise<AppInfoResponse> {
+    console.log('[TestService] Obtendo info da aplicação');
+    
+    // Tentar endpoint de info do actuator primeiro
     try {
-      console.log('[testService] Obtendo informações da aplicação...');
-      const response = await httpClient.get<AppInfoResponse>(ENDPOINTS.TEST.INFO);
-      console.log('[testService] Resposta do info:', response);
-
+      const response = await apiClient.get<AppInfoResponse>('/actuator/info');
+      
       if (response.success && response.data) {
         return response.data;
-      } else {
+      }
+    } catch (error) {
+      console.log(`[TestService] Actuator/info não disponível, tentando status/info${error}`);
+    }
+    
+    // Se não funcionar, usar dados do status/info
+    try {
+      const statusResponse = await apiClient.get<any>('/status/info');
+      if (statusResponse.success) {
         return {
-          name: 'ACLP Backend',
-          version: 'Unknown',
-          description: 'Sistema de Controle de Liberdade Provisória',
-          environment: 'unknown',
-          buildTime: 'Unknown',
-          javaVersion: 'Unknown',
-          springBootVersion: 'Unknown'
+          name: 'Sistema de Controle de Comparecimento',
+          version: '1.0.0',
+          description: statusResponse.data?.descricao || 'Sistema de atualização automática de status',
+          environment: process.env.NODE_ENV || 'development',
+          buildTime: statusResponse.data?.timestamp || new Date().toISOString(),
+          javaVersion: 'N/A',
+          springBootVersion: 'N/A'
         };
       }
     } catch (error) {
-      console.error('[testService] Erro ao obter info:', error);
-      return {
-        name: 'ACLP Backend (Error)',
-        version: 'Unknown',
-        description: 'Sistema de Controle de Liberdade Provisória',
-        environment: 'unknown',
-        buildTime: 'Unknown',
-        javaVersion: 'Unknown',
-        springBootVersion: 'Unknown'
-      };
+      console.error('[TestService] Status/info também falhou:', error);
     }
+    
+    // Retorno padrão se tudo falhar
+    return {
+      name: 'Sistema de Controle de Comparecimento',
+      version: '1.0.0',
+      description: 'Sistema de Controle de Liberdade Provisória',
+      environment: process.env.NODE_ENV || 'development',
+      buildTime: new Date().toISOString(),
+      javaVersion: 'N/A',
+      springBootVersion: 'N/A'
+    };
   }
-};
-
-// ===========================
-// UTILITY FUNCTIONS
-// ===========================
-
-// Função para configurar headers de autenticação
-export const configureAuthHeaders = (token: string) => {
-  httpClient.setHeaders({
-    'Authorization': `Bearer ${token}`
-  });
-};
-
-// Função para remover headers de autenticação
-export const clearAuthHeaders = () => {
-  httpClient.removeAuthToken();
-};
-
-// Função para inicializar a API
-export const initializeBackendApi = () => {
-  console.log('Backend API initialized');
 };
