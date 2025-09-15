@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/api/services.ts - Serviços atualizados usando o cliente padronizado
 
-import { apiClient, ApiResponse } from './client';
+import { apiClient, ApiResponse } from '../http/client';
 import type {
   CustodiadoResponse,
   ComparecimentoResponse,

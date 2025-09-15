@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// lib/http/client.ts - Cliente HTTP padronizado para comunicação com a API
+// lib/api/client.ts - Cliente HTTP padronizado para comunicação com a API
 
 // ===========================
 // Interfaces e Tipos
@@ -270,6 +269,183 @@ class HttpClient {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Parse robusto de JSON que lida com múltiplos casos problemáticos
+   */
+  private parseRobustJSON(text: string): any {
+    if (!text || !text.trim()) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[HttpClient] 📄 Texto vazio, retornando null`);
+      }
+      return null;
+    }
+
+    const trimmedText = text.trim();
+    
+    // Estratégia 1: Parse simples
+    try {
+      const result = JSON.parse(trimmedText);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[HttpClient] ✅ JSON parseado normalmente`);
+      }
+      return result;
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[HttpClient] ⚠️ Parse simples falhou:`, error.message);
+      }
+    }
+
+    // Estratégia 2: Tentar extrair primeiro objeto JSON válido
+    try {
+      // Procurar pelo primeiro { ou [
+      const firstBrace = trimmedText.indexOf('{');
+      const firstBracket = trimmedText.indexOf('[');
+      
+      let startIndex = -1;
+      if (firstBrace !== -1 && firstBracket !== -1) {
+        startIndex = Math.min(firstBrace, firstBracket);
+      } else if (firstBrace !== -1) {
+        startIndex = firstBrace;
+      } else if (firstBracket !== -1) {
+        startIndex = firstBracket;
+      }
+
+      if (startIndex === -1) {
+        throw new Error('Nenhum objeto/array JSON encontrado');
+      }
+
+      // Encontrar o fim do primeiro objeto/array JSON válido
+      let braceCount = 0;
+      let bracketCount = 0;
+      let inString = false;
+      let escaped = false;
+      let endIndex = -1;
+      
+      const startChar = trimmedText[startIndex];
+      
+      for (let i = startIndex; i < trimmedText.length; i++) {
+        const char = trimmedText[i];
+        
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        
+        if (inString) {
+          continue;
+        }
+        
+        if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+        } else if (char === '[') {
+          bracketCount++;
+        } else if (char === ']') {
+          bracketCount--;
+        }
+        
+        // Se estamos balanceados e começamos com o caractere correto
+        if (startChar === '{' && braceCount === 0 && i > startIndex) {
+          endIndex = i;
+          break;
+        } else if (startChar === '[' && bracketCount === 0 && i > startIndex) {
+          endIndex = i;
+          break;
+        }
+      }
+
+      if (endIndex !== -1) {
+        const extractedJSON = trimmedText.substring(startIndex, endIndex + 1);
+        const result = JSON.parse(extractedJSON);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HttpClient] ✅ JSON extraído com sucesso (${startIndex}-${endIndex})`);
+          const remaining = trimmedText.substring(endIndex + 1).trim();
+          if (remaining) {
+            console.warn(`[HttpClient] ⚠️ Dados extras ignorados: "${remaining.substring(0, 100)}..."`);
+          }
+        }
+        
+        return result;
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[HttpClient] ⚠️ Extração de JSON falhou:`, error.message);
+      }
+    }
+
+    // Estratégia 3: Tentar limpar caracteres problemáticos
+    try {
+      // Remover possíveis BOM, caracteres de controle, etc.
+      const cleanText = trimmedText
+        .replace(/^\uFEFF/, '') // Remove BOM
+        .replace(/[\x00-\x1F\x7F]/g, '') // Remove caracteres de controle
+        .replace(/,\s*([}\]])/g, '$1'); // Remove vírgulas trailing
+      
+      // Tentar encontrar JSON válido no início
+      const jsonMatch = cleanText.match(/^(\{.*\}|\[.*\])/s);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[1]);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HttpClient] ✅ JSON limpo e parseado`);
+        }
+        return result;
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[HttpClient] ⚠️ Limpeza de JSON falhou:`, error.message);
+      }
+    }
+
+    // Estratégia 4: Verificar se é uma resposta com múltiplos JSONs
+    try {
+      const jsonObjects = [];
+      const lines = trimmedText.split('\n');
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine && (trimmedLine.startsWith('{') || trimmedLine.startsWith('['))) {
+          try {
+            const parsed = JSON.parse(trimmedLine);
+            jsonObjects.push(parsed);
+          } catch (e) {
+            // Linha não é JSON válido, ignorar
+          }
+        }
+      }
+      
+      if (jsonObjects.length > 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[HttpClient] ✅ ${jsonObjects.length} objetos JSON encontrados em linhas separadas`);
+        }
+        return jsonObjects.length === 1 ? jsonObjects[0] : jsonObjects;
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[HttpClient] ⚠️ Parse de múltiplos JSONs falhou:`, error.message);
+      }
+    }
+
+    // Última tentativa: retornar como texto
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[HttpClient] 📄 Todas as estratégias de parse falharam, retornando como texto`);
+      console.warn(`[HttpClient] 📄 Amostra do texto:`, trimmedText.substring(0, 200) + '...');
+    }
+    
+    return trimmedText;
   }
 
   private extractErrorMessage(data: any): string {
