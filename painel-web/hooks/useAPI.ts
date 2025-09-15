@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // hooks/useApi.ts - Hooks para interação com a API
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,10 +14,8 @@ import {
   CustodiadoResponse,
   ComparecimentoResponse,
   UsuarioResponse,
-  CustodiadoDTO,
   ComparecimentoDTO,
   UsuarioDTO,
-  StatusComparecimento,
   PeriodoParams,
   BuscarParams,
   EstatisticasComparecimentoResponse,
@@ -25,7 +24,6 @@ import {
   AppInfoResponse,
   ResumoSistemaResponse
 } from '@/types/api';
-import MOCK_CUSTODIADOS from '@/db/usuarios_mock.json'
 // Hook para custodiados
 export function useCustodiados() {
   const [custodiados, setCustodiados] = useState<CustodiadoResponse[]>([]);
@@ -47,12 +45,12 @@ export function useCustodiados() {
       } else {
         console.warn('[useCustodiados] API retornou erro, usando dados mock');
         setError('Usando dados de exemplo (API não disponível)');
-        setCustodiados(MOCK_CUSTODIADOS);
+        setCustodiados([]);
       }
     } catch (err) {
       console.error('[useCustodiados] Erro na requisição, usando dados mock:', err);
       setError('Conexão com API falhou, usando dados de exemplo');
-      setCustodiados(MOCK_CUSTODIADOS);
+      setCustodiados([]);
     } finally {
       setLoading(false);
     }
