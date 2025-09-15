@@ -13,19 +13,12 @@ import {
   Save,
   ArrowLeft,
   MapPin,
-  RefreshCw,
   UserCheck,
   ChevronDown,
   ChevronUp,
   Smartphone,
   Building,
-  Search,
-  Phone,
-  Home,
-  Camera,
-  AlertTriangle,
-  Eye,
-  EyeOff
+  Search
 } from 'lucide-react';
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
@@ -33,45 +26,25 @@ import { CustodiadoResponse, ComparecimentoDTO, TipoValidacao } from '@/types/ap
 import EnderecoForm from '@/components/EnderecoForm';
 import { useToastHelpers } from '@/components/Toast';
 import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
-import { registrarComparecimentoCompleto, atualizarEnderecoPessoa } from '@/lib/api/comparecimentos';
-import CadastroFacial from '@/components/CadastroFacial';
-import { verificarRosto } from '@/lib/api/facialRecognition';
-import { isCustomError, getErrorMessage, ErrorCodes } from '@/lib/utils/errorHandler';
+import { 
+  sanitizeFormData, 
+  validateBeforeSend, 
+  logFormDataForDebug 
+} from '@/lib/utils/enumValidation';
 
-// Utilitários de data
-const dateUtils = {
-  formatToBR: (date: string | Date): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString('pt-BR');
-  },
-  getCurrentDate: (): string => {
-    return new Date().toISOString().split('T')[0];
-  },
-  getCurrentTime: (): string => {
-    return new Date().toTimeString().slice(0, 5);
-  }
-};
-
-// Interface para o estado do formulário
-interface FormularioComparecimento {
-  dataComparecimento: string;
-  horaComparecimento: string;
-  tipoValidacao: TipoValidacao;
-  observacoes: string;
-  validadoPor: string;
-}
-
-interface AtualizacaoEndereco {
-  houveAlteracao: boolean;
-  endereco?: any;
-  motivoAlteracao?: string;
-}
+import { 
+  FormularioComparecimento, 
+  AtualizacaoEndereco, 
+  MobileSectionProps, 
+  EstadoPagina,
+  dateUtils 
+} from '@/types/comparecimento';
 
 export default function ConfirmarPresencaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const processo = searchParams.get('processo');
-  const { success, error, warning, info } = useToastHelpers();
+  const { success, error, warning } = useToastHelpers();
 
   // Hooks da API
   const { custodiados, loading: loadingCustodiados, error: errorCustodiados, refetch } = useCustodiados();
@@ -79,7 +52,7 @@ export default function ConfirmarPresencaPage() {
 
   // Estados principais
   const [pessoa, setPessoa] = useState<CustodiadoResponse | null>(null);
-  const [estado, setEstado] = useState<'inicial' | 'buscando' | 'confirmando' | 'sucesso' | 'erro'>('inicial');
+  const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
 
@@ -93,16 +66,10 @@ export default function ConfirmarPresencaPage() {
   });
 
   // Estados para atualização de endereço
-  const [mostrarAtualizacaoEndereco, setMostrarAtualizacaoEndereco] = useState(false);
   const [atualizacaoEndereco, setAtualizacaoEndereco] = useState<AtualizacaoEndereco>({
     houveAlteracao: false
   });
   const [enderecoRespondido, setEnderecoRespondido] = useState(false);
-
-  // Estados para reconhecimento facial
-  const [mostrarCadastroFacial, setMostrarCadastroFacial] = useState(false);
-  const [verificacaoFacialCompleta, setVerificacaoFacialCompleta] = useState(false);
-  const [usarReconhecimentoFacial, setUsarReconhecimentoFacial] = useState(false);
 
   // Estados mobile e UI
   const [isMobile, setIsMobile] = useState(false);
@@ -121,24 +88,6 @@ export default function ConfirmarPresencaPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Buscar pessoa quando o processo é fornecido na URL
-  useEffect(() => {
-    if (processo && custodiados.length > 0 && !pessoa) {
-      buscarPessoa(processo);
-    }
-  }, [processo, custodiados, pessoa]);
-
-  // Calcular próximo comparecimento quando bem-sucedido
-  useEffect(() => {
-    if (estado === 'sucesso' && pessoa) {
-      const proximaData = calcularProximoComparecimento(
-        formulario.dataComparecimento,
-        pessoa.periodicidade
-      );
-      setProximoComparecimento(dateUtils.formatToBR(proximaData));
-    }
-  }, [estado, pessoa, formulario.dataComparecimento]);
-
   // Buscar pessoa por processo
   const buscarPessoa = useCallback(async (numeroProcesso: string) => {
     if (!numeroProcesso.trim()) return;
@@ -153,10 +102,6 @@ export default function ConfirmarPresencaPage() {
 
       if (pessoaEncontrada) {
         setPessoa(pessoaEncontrada);
-        setFormulario(prev => ({
-          ...prev,
-          processo: pessoaEncontrada.processo
-        }));
         setEstado('inicial');
         setExpandedSection('dados-pessoais');
         success('Pessoa encontrada', `${pessoaEncontrada.nome} - ${pessoaEncontrada.processo}`);
@@ -172,6 +117,24 @@ export default function ConfirmarPresencaPage() {
       error('Erro na busca', 'Ocorreu um erro ao buscar a pessoa');
     }
   }, [custodiados, success, error]);
+
+  // Buscar pessoa quando o processo é fornecido na URL
+  useEffect(() => {
+    if (processo && custodiados.length > 0 && !pessoa) {
+      buscarPessoa(processo);
+    }
+  }, [processo, custodiados, pessoa, buscarPessoa]);
+
+  // Calcular próximo comparecimento quando bem-sucedido
+  useEffect(() => {
+    if (estado === 'sucesso' && pessoa) {
+      const proximaData = calcularProximoComparecimento(
+        formulario.dataComparecimento,
+        pessoa.periodicidade
+      );
+      setProximoComparecimento(dateUtils.formatToBR(proximaData));
+    }
+  }, [estado, pessoa, formulario.dataComparecimento]);
 
   // Manipular mudanças no formulário
   const handleInputChange = (field: keyof FormularioComparecimento, value: string) => {
@@ -190,51 +153,15 @@ export default function ConfirmarPresencaPage() {
     setEnderecoRespondido(true);
     
     if (houve) {
-      setMostrarAtualizacaoEndereco(true);
       setExpandedSection('endereco');
-    } else {
-      setMostrarAtualizacaoEndereco(false);
     }
   };
 
-  // Verificação facial
-  const iniciarVerificacaoFacial = async (imageBase64: string) => {
-    if (!pessoa) return;
-
-    try {
-      const resultado = await verificarRosto(pessoa.processo, imageBase64);
-      
-      if (resultado.success && resultado.verified) {
-        setVerificacaoFacialCompleta(true);
-        success('Verificação facial', `Identidade confirmada com ${resultado.confidence}% de confiança`);
-        return true;
-      } else {
-        error('Verificação facial', resultado.message || 'Falha na verificação');
-        return false;
-      }
-    } catch (err) {
-      if (isCustomError(err) && err.code === ErrorCodes.NO_REFERENCE_PHOTO) {
-        // Oferecer cadastro de foto
-        warning('Foto não cadastrada', 'Será necessário cadastrar uma foto de referência');
-        setMostrarCadastroFacial(true);
-        return false;
-      } else {
-        error('Erro na verificação', getErrorMessage(err));
-        return false;
-      }
-    }
-  };
-
-  // Confirmar comparecimento
+  // Confirmar comparecimento - CORRIGIDO COM VALIDAÇÃO
   const confirmarComparecimento = async () => {
     if (!pessoa) return;
 
-    // Validações
-    if (usarReconhecimentoFacial && !verificacaoFacialCompleta) {
-      error('Verificação pendente', 'Complete a verificação facial antes de confirmar');
-      return;
-    }
-
+    // Validações de UI
     if (!enderecoRespondido) {
       error('Informação pendente', 'Responda sobre a atualização de endereço');
       setExpandedSection('endereco');
@@ -244,15 +171,15 @@ export default function ConfirmarPresencaPage() {
     setEstado('confirmando');
 
     try {
-      // Preparar dados do comparecimento com valores corretos para o backend
-      const dadosComparecimento: ComparecimentoDTO = {
+      // ✅ CORREÇÃO: Preparar dados básicos
+      const dadosBasicos = {
         custodiadoId: pessoa.id,
         dataComparecimento: formulario.dataComparecimento,
         horaComparecimento: formulario.horaComparecimento,
-        tipoValidacao: formulario.tipoValidacao as any, // O backend espera string literal
+        tipoValidacao: formulario.tipoValidacao,
         observacoes: formulario.observacoes,
         validadoPor: formulario.validadoPor,
-        anexos: '', // Campo opcional
+        anexos: '',
         mudancaEndereco: atualizacaoEndereco.houveAlteracao,
         motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao || undefined,
         novoEndereco: atualizacaoEndereco.houveAlteracao ? {
@@ -266,7 +193,26 @@ export default function ConfirmarPresencaPage() {
         } : undefined
       };
 
-      console.log('Dados do comparecimento sendo enviados:', dadosComparecimento);
+      // ✅ Log para debug
+      logFormDataForDebug(dadosBasicos, 'Dados Originais');
+
+      // ✅ Sanitizar e validar dados
+      const dadosSanitizados = sanitizeFormData(dadosBasicos);
+      logFormDataForDebug(dadosSanitizados, 'Dados Sanitizados');
+
+      // ✅ Validar antes do envio
+      const validacao = validateBeforeSend(dadosSanitizados);
+      if (!validacao.isValid) {
+        setEstado('erro');
+        setMensagem(`Erro de validação: ${validacao.errors.join(', ')}`);
+        error('Dados inválidos', validacao.errors.join(', '));
+        return;
+      }
+
+      // ✅ Preparar DTO final
+      const dadosComparecimento: ComparecimentoDTO = dadosSanitizados;
+
+      console.log('[ConfirmarPresença] ✅ Dados finais sendo enviados:', dadosComparecimento);
 
       // Registrar comparecimento
       const resultado = await registrarComparecimento(dadosComparecimento);
@@ -277,18 +223,30 @@ export default function ConfirmarPresencaPage() {
         setMensagem(`Comparecimento confirmado com sucesso!${msgEndereco}`);
         success('Comparecimento registrado', resultado.message || 'Presença confirmada com sucesso');
       } else {
+        console.error('[ConfirmarPresença] ❌ Erro na resposta:', resultado);
         setEstado('erro');
         setMensagem(resultado.message || 'Erro ao confirmar comparecimento');
         error('Erro no registro', resultado.message || 'Falha ao registrar comparecimento');
       }
-    } catch (err: any) {
-      console.error('Erro ao confirmar comparecimento:', err);
+    } catch (err: unknown) {
+      console.error('[ConfirmarPresença] ❌ Erro na requisição:', err);
       setEstado('erro');
       
-      // Tratamento específico para erro de JSON malformado
-      if (err.code === 'JSON_INVALIDO' || err.error === 'Malformed JSON') {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      
+      // Tratamento específico para diferentes tipos de erro
+      if (errorMessage.includes('JSON_INVALIDO') || errorMessage.includes('Malformed JSON')) {
         setMensagem('Erro nos dados enviados. Verifique se todos os campos estão preenchidos corretamente.');
         error('Erro de validação', 'Dados inválidos. Verifique os campos obrigatórios.');
+      } else if (errorMessage.toLowerCase().includes('status')) {
+        setMensagem('Erro na validação do status. Entre em contato com o suporte.');
+        error('Erro de validação', 'Status inválido detectado');
+      } else if (errorMessage.toLowerCase().includes('estado')) {
+        setMensagem('Estado inválido. Use siglas como BA, SP, RJ, etc.');
+        error('Estado inválido', 'Use uma sigla válida de estado brasileiro');
+      } else if (errorMessage.toLowerCase().includes('tipo')) {
+        setMensagem('Tipo de validação inválido. Contate o suporte.');
+        error('Tipo inválido', 'Erro no tipo de validação');
       } else {
         setMensagem('Erro interno. Tente novamente.');
         error('Erro interno', 'Ocorreu um erro inesperado. Tente novamente.');
@@ -304,14 +262,7 @@ export default function ConfirmarPresencaPage() {
     children, 
     defaultExpanded = false,
     badge = null
-  }: { 
-    id: string; 
-    title: string; 
-    icon: React.ReactNode; 
-    children: React.ReactNode;
-    defaultExpanded?: boolean;
-    badge?: React.ReactNode;
-  }) => {
+  }: MobileSectionProps) => {
     const isExpanded = expandedSection === id || defaultExpanded;
     
     return (
@@ -530,52 +481,6 @@ export default function ConfirmarPresencaPage() {
                     </div>
                   </MobileSection>
 
-                  {/* Reconhecimento Facial */}
-                  <MobileSection
-                    id="facial"
-                    title="Verificação de Identidade"
-                    icon={<Camera className="w-5 h-5 text-purple-600" />}
-                    badge={
-                      verificacaoFacialCompleta ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                          Verificado
-                        </span>
-                      ) : null
-                    }
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-700">Usar reconhecimento facial</span>
-                        <button
-                          onClick={() => setUsarReconhecimentoFacial(!usarReconhecimentoFacial)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            usarReconhecimentoFacial ? 'bg-blue-600' : 'bg-gray-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              usarReconhecimentoFacial ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      
-                      {usarReconhecimentoFacial && !verificacaoFacialCompleta && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                          <p className="text-blue-800 text-sm mb-2">
-                            Tire uma foto para verificar a identidade
-                          </p>
-                          <button
-                            onClick={() => setMostrarCadastroFacial(true)}
-                            className="w-full bg-blue-500 text-white py-2 rounded text-sm"
-                          >
-                            Iniciar Verificação
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </MobileSection>
-
                   {/* Atualização de Endereço */}
                   <MobileSection
                     id="endereco"
@@ -785,7 +690,7 @@ export default function ConfirmarPresencaPage() {
               </button>
               <button
                 onClick={confirmarComparecimento}
-                disabled={loadingComparecimento || !enderecoRespondido || (usarReconhecimentoFacial && !verificacaoFacialCompleta)}
+                disabled={loadingComparecimento || !enderecoRespondido}
                 className="bg-green-500 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loadingComparecimento ? (
@@ -797,39 +702,6 @@ export default function ConfirmarPresencaPage() {
                   </>
                 )}
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* Modal de Cadastro Facial */}
-        {mostrarCadastroFacial && pessoa && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-4 border-b">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Verificação Facial</h3>
-                  <button
-                    onClick={() => setMostrarCadastroFacial(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              <div className="p-4">
-                <CadastroFacial
-                  processo={pessoa.processo}
-                  onSuccess={() => {
-                    setMostrarCadastroFacial(false);
-                    setVerificacaoFacialCompleta(true);
-                    success('Verificação completa', 'Identidade verificada com sucesso');
-                  }}
-                  onError={(error) => {
-                    setMostrarCadastroFacial(false);
-                    this.error('Erro na verificação', error);
-                  }}
-                />
-              </div>
             </div>
           </div>
         )}
@@ -927,7 +799,6 @@ export default function ConfirmarPresencaPage() {
                       setPessoa(null);
                       setBuscaProcesso('');
                       setEnderecoRespondido(false);
-                      setVerificacaoFacialCompleta(false);
                     }}
                     className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium"
                   >
@@ -1040,61 +911,6 @@ export default function ConfirmarPresencaPage() {
                         <p className="font-semibold mb-1">Próximo Comparecimento</p>
                         <p className="text-primary-light font-medium">{dateUtils.formatToBR(pessoa.proximoComparecimento)}</p>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Verificação Facial */}
-                  <div className="mb-8">
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <Camera className="w-6 h-6 text-purple-600" />
-                          <h3 className="text-lg font-semibold text-purple-900">Verificação de Identidade</h3>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-purple-700">Usar reconhecimento facial</span>
-                          <button
-                            onClick={() => setUsarReconhecimentoFacial(!usarReconhecimentoFacial)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                              usarReconhecimentoFacial ? 'bg-purple-600' : 'bg-gray-200'
-                            }`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                usarReconhecimentoFacial ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {usarReconhecimentoFacial && (
-                        <div className="space-y-4">
-                          {!verificacaoFacialCompleta ? (
-                            <div className="bg-purple-100 border border-purple-200 rounded-lg p-4">
-                              <p className="text-purple-800 mb-4">
-                                Tire uma foto da pessoa para verificar a identidade usando reconhecimento facial.
-                              </p>
-                              <button
-                                onClick={() => setMostrarCadastroFacial(true)}
-                                className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-all font-medium flex items-center gap-2"
-                              >
-                                <Camera className="w-5 h-5" />
-                                Iniciar Verificação Facial
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                              <div className="flex items-center gap-2">
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                                <p className="text-green-800 font-medium">
-                                  Identidade verificada com sucesso!
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1302,11 +1118,7 @@ export default function ConfirmarPresencaPage() {
                     
                     <button
                       onClick={confirmarComparecimento}
-                      disabled={
-                        loadingComparecimento || 
-                        !enderecoRespondido || 
-                        (usarReconhecimentoFacial && !verificacaoFacialCompleta)
-                      }
+                      disabled={loadingComparecimento || !enderecoRespondido}
                       className="px-8 py-3 rounded-lg transition-all font-medium flex items-center gap-2 shadow-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loadingComparecimento ? (
@@ -1319,42 +1131,6 @@ export default function ConfirmarPresencaPage() {
                   </div>
                 </>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Modal de Cadastro/Verificação Facial */}
-        {mostrarCadastroFacial && pessoa && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold">Verificação Facial</h3>
-                  <button
-                    onClick={() => setMostrarCadastroFacial(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <XCircle className="w-6 h-6" />
-                  </button>
-                </div>
-                <p className="text-gray-600 mt-2">
-                  Processo: {pessoa.processo} - {pessoa.nome}
-                </p>
-              </div>
-              <div className="p-6">
-                <CadastroFacial
-                  processo={pessoa.processo}
-                  onSuccess={() => {
-                    setMostrarCadastroFacial(false);
-                    setVerificacaoFacialCompleta(true);
-                    success('Verificação completa', 'Identidade verificada com sucesso');
-                  }}
-                  onError={(error) => {
-                    setMostrarCadastroFacial(false);
-                    error('Erro na verificação', error);
-                  }}
-                />
-              </div>
             </div>
           </div>
         )}
@@ -1386,10 +1162,6 @@ export default function ConfirmarPresencaPage() {
                 </li>
               </ul>
               <ul className="space-y-2 text-blue-800">
-                <li className="flex items-start">
-                  <span className="mr-2">📷</span>
-                  <span>Use verificação facial quando disponível</span>
-                </li>
                 <li className="flex items-start">
                   <span className="mr-2">⚠️</span>
                   <span>Esta ação atualiza automaticamente o status</span>

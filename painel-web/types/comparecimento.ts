@@ -1,4 +1,8 @@
+// types/comparecimento.ts (renomeado de .d.ts para .ts)
+
 import type { Periodicidade, StatusComparecimento } from './index';
+import { TipoValidacao } from './api';
+import { ReactNode } from 'react';
 
 export interface Endereco {
   cep: string;
@@ -164,3 +168,43 @@ export interface RelatorioComparecimento {
   geradoEm: string;
   geradoPor: string;
 }
+
+// ===========================
+// NOVAS INTERFACES ADICIONADAS
+// ===========================
+
+// Interface para o estado do formulário
+export interface FormularioComparecimento {
+  dataComparecimento: string;
+  horaComparecimento: string;
+  tipoValidacao: TipoValidacao;
+  observacoes: string;
+  validadoPor: string;
+}
+
+// Interface para seção móvel
+export interface MobileSectionProps {
+  id: string; 
+  title: string; 
+  icon: React.ReactNode; 
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+  badge?: React.ReactNode;
+}
+
+// Estados possíveis da página
+export type EstadoPagina = 'inicial' | 'buscando' | 'confirmando' | 'sucesso' | 'erro';
+
+// Utilitários de data
+export const dateUtils = {
+  formatToBR: (date: string | Date): string => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('pt-BR');
+  },
+  getCurrentDate: (): string => {
+    return new Date().toISOString().split('T')[0];
+  },
+  getCurrentTime: (): string => {
+    return new Date().toTimeString().slice(0, 5);
+  }
+};
