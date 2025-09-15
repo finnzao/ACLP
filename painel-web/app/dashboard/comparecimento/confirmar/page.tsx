@@ -26,18 +26,18 @@ import { CustodiadoResponse, ComparecimentoDTO, TipoValidacao } from '@/types/ap
 import EnderecoForm from '@/components/EnderecoForm';
 import { useToastHelpers } from '@/components/Toast';
 import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
-import { 
-  sanitizeFormData, 
-  validateBeforeSend, 
-  logFormDataForDebug 
+import {
+  sanitizeFormData,
+  validateBeforeSend,
+  logFormDataForDebug
 } from '@/lib/utils/enumValidation';
 
-import { 
-  FormularioComparecimento, 
-  AtualizacaoEndereco, 
-  MobileSectionProps, 
+import {
+  FormularioComparecimento,
+  AtualizacaoEndereco,
+  MobileSectionProps,
   EstadoPagina,
-  dateUtils 
+  dateUtils
 } from '@/types/comparecimento';
 
 export default function ConfirmarPresencaPage() {
@@ -81,10 +81,10 @@ export default function ConfirmarPresencaPage() {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -93,9 +93,9 @@ export default function ConfirmarPresencaPage() {
     if (!numeroProcesso.trim()) return;
 
     setEstado('buscando');
-    
+
     try {
-      const pessoaEncontrada = custodiados.find(p => 
+      const pessoaEncontrada = custodiados.find(p =>
         p.processo.toLowerCase().includes(numeroProcesso.toLowerCase()) ||
         p.nome.toLowerCase().includes(numeroProcesso.toLowerCase())
       );
@@ -136,6 +136,28 @@ export default function ConfirmarPresencaPage() {
     }
   }, [estado, pessoa, formulario.dataComparecimento]);
 
+
+  //formatar hora
+  const formatarHoraParaAPI = (hora: string): string => {
+    if (!hora) return '00:00:00';
+
+    // Se já está no formato HH:mm:ss, retorna como está
+    if (hora.match(/^\d{2}:\d{2}:\d{2}$/)) {
+      return hora;
+    }
+
+    // Se está no formato HH:mm, adiciona :00
+    if (hora.match(/^\d{2}:\d{2}$/)) {
+      return `${hora}:00`;
+    }
+
+    // Se está em outro formato, tenta converter
+    const [hours, minutes] = hora.split(':');
+    const h = hours?.padStart(2, '0') || '00';
+    const m = minutes?.padStart(2, '0') || '00';
+    return `${h}:${m}:00`;
+  };
+
   // Manipular mudanças no formulário
   const handleInputChange = (field: keyof FormularioComparecimento, value: string) => {
     setFormulario(prev => ({
@@ -145,17 +167,22 @@ export default function ConfirmarPresencaPage() {
   };
 
   // Manipular resposta sobre atualização de endereço
-  const handleRespostaAlteracaoEndereco = (houve: boolean) => {
-    setAtualizacaoEndereco(prev => ({
-      ...prev,
-      houveAlteracao: houve
-    }));
-    setEnderecoRespondido(true);
-    
-    if (houve) {
-      setExpandedSection('endereco');
-    }
-  };
+  const handleRespostaAlteracaoEndereco = useCallback((houve: boolean) => {
+    requestAnimationFrame(() => {
+      setAtualizacaoEndereco(prev => ({
+        ...prev,
+        houveAlteracao: houve
+      }));
+      setEnderecoRespondido(true);
+      
+      if (houve) {
+        // ✅ Pequeno delay para expansão suave
+        setTimeout(() => {
+          setExpandedSection('endereco');
+        }, 50);
+      }
+    });
+  }, []);
 
   // Confirmar comparecimento - CORRIGIDO COM VALIDAÇÃO
   const confirmarComparecimento = async () => {
@@ -171,11 +198,10 @@ export default function ConfirmarPresencaPage() {
     setEstado('confirmando');
 
     try {
-      // ✅ CORREÇÃO: Preparar dados básicos
       const dadosBasicos = {
         custodiadoId: pessoa.id,
         dataComparecimento: formulario.dataComparecimento,
-        horaComparecimento: formulario.horaComparecimento,
+        horaComparecimento: formatarHoraParaAPI(formulario.horaComparecimento),
         tipoValidacao: formulario.tipoValidacao,
         observacoes: formulario.observacoes,
         validadoPor: formulario.validadoPor,
@@ -213,6 +239,7 @@ export default function ConfirmarPresencaPage() {
       const dadosComparecimento: ComparecimentoDTO = dadosSanitizados;
 
       console.log('[ConfirmarPresença] ✅ Dados finais sendo enviados:', dadosComparecimento);
+      console.log('[ConfirmarPresença] ✅ Hora formatada:', dadosComparecimento.horaComparecimento);
 
       // Registrar comparecimento
       const resultado = await registrarComparecimento(dadosComparecimento);
@@ -231,13 +258,16 @@ export default function ConfirmarPresencaPage() {
     } catch (err: unknown) {
       console.error('[ConfirmarPresença] ❌ Erro na requisição:', err);
       setEstado('erro');
-      
+
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
-      
+
       // Tratamento específico para diferentes tipos de erro
       if (errorMessage.includes('JSON_INVALIDO') || errorMessage.includes('Malformed JSON')) {
         setMensagem('Erro nos dados enviados. Verifique se todos os campos estão preenchidos corretamente.');
         error('Erro de validação', 'Dados inválidos. Verifique os campos obrigatórios.');
+      } else if (errorMessage.toLowerCase().includes('hora') || errorMessage.toLowerCase().includes('time')) {
+        setMensagem('Erro no formato da hora. O sistema espera formato HH:mm:ss.');
+        error('Formato de hora inválido', 'Use o formato HH:mm:ss para hora (ex: 14:30:00)');
       } else if (errorMessage.toLowerCase().includes('status')) {
         setMensagem('Erro na validação do status. Entre em contato com o suporte.');
         error('Erro de validação', 'Status inválido detectado');
@@ -255,16 +285,16 @@ export default function ConfirmarPresencaPage() {
   };
 
   // Componente de seção móvel
-  const MobileSection = ({ 
-    id, 
-    title, 
-    icon, 
-    children, 
+  const MobileSection = ({
+    id,
+    title,
+    icon,
+    children,
     defaultExpanded = false,
     badge = null
   }: MobileSectionProps) => {
     const isExpanded = expandedSection === id || defaultExpanded;
-    
+
     return (
       <div className="bg-white rounded-lg shadow-sm mb-3 overflow-hidden">
         <button
@@ -283,7 +313,7 @@ export default function ConfirmarPresencaPage() {
           )}
         </button>
         {isExpanded && (
-          <div className="px-4 pb-4 animate-in slide-in-from-top-2">
+          <div className="px-4 pb-4 slide-in-from-top-2">
             {children}
           </div>
         )}
@@ -446,11 +476,10 @@ export default function ConfirmarPresencaPage() {
                     title="Dados da Pessoa"
                     icon={<User className="w-5 h-5 text-green-600" />}
                     badge={
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        pessoa.status === 'EM_CONFORMIDADE' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs ${pessoa.status === 'EM_CONFORMIDADE'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}>
                         {pessoa.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
                       </span>
                     }
@@ -506,45 +535,57 @@ export default function ConfirmarPresencaPage() {
                         <div className="grid grid-cols-2 gap-3">
                           <button
                             onClick={() => handleRespostaAlteracaoEndereco(true)}
-                            className="bg-yellow-500 text-white py-2 rounded text-sm font-medium"
+                            className="bg-yellow-500 text-white py-2 rounded text-sm font-medium transition-colors hover:bg-yellow-600"
+                            type="button"
                           >
                             Sim, mudou
                           </button>
                           <button
                             onClick={() => handleRespostaAlteracaoEndereco(false)}
-                            className="bg-green-500 text-white py-2 rounded text-sm font-medium"
+                            className="bg-green-500 text-white py-2 rounded text-sm font-medium transition-colors hover:bg-green-600"
+                            type="button"
                           >
                             Não mudou
                           </button>
                         </div>
                       </div>
                     ) : atualizacaoEndereco.houveAlteracao ? (
-                      <div className="space-y-4">
-                        <EnderecoForm
-                          endereco={atualizacaoEndereco.endereco || {}}
-                          onEnderecoChange={(endereco) => 
-                            setAtualizacaoEndereco(prev => ({
-                              ...prev,
-                              endereco
-                            }))
-                          }
-                          showTitle={false}
-                          required={true}
-                        />
+                      <div className="space-y-4" style={{ transform: 'translateZ(0)' }}>
+                        {/* ✅ CORREÇÃO: Container estável para o formulário */}
+                        <div key="endereco-form-stable" className="transition-none">
+                          <EnderecoForm
+                            endereco={atualizacaoEndereco.endereco || {}}
+                            onEnderecoChange={(endereco) => {
+                              // ✅ CORREÇÃO: Usar requestAnimationFrame para suavizar updates
+                              requestAnimationFrame(() => {
+                                setAtualizacaoEndereco(prev => ({
+                                  ...prev,
+                                  endereco
+                                }));
+                              });
+                            }}
+                            showTitle={false}
+                            required={true}
+                          />
+                        </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Motivo da mudança
                           </label>
                           <textarea
                             value={atualizacaoEndereco.motivoAlteracao || ''}
-                            onChange={(e) => 
-                              setAtualizacaoEndereco(prev => ({
-                                ...prev,
-                                motivoAlteracao: e.target.value
-                              }))
-                            }
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              clearTimeout(window.enderecoTimeout);
+                              window.enderecoTimeout = setTimeout(() => {
+                                setAtualizacaoEndereco(prev => ({
+                                  ...prev,
+                                  motivoAlteracao: value
+                                }));
+                              }, 150);
+                            }}
                             rows={2}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
                             placeholder="Ex: Mudança familiar, trabalho..."
                           />
                         </div>
@@ -553,7 +594,8 @@ export default function ConfirmarPresencaPage() {
                             setEnderecoRespondido(false);
                             setAtualizacaoEndereco({ houveAlteracao: false });
                           }}
-                          className="text-sm text-gray-600 underline"
+                          className="text-sm text-gray-600 underline hover:text-gray-800 transition-colors"
+                          type="button"
                         >
                           Alterar resposta
                         </button>
@@ -571,7 +613,8 @@ export default function ConfirmarPresencaPage() {
                             setEnderecoRespondido(false);
                             setAtualizacaoEndereco({ houveAlteracao: false });
                           }}
-                          className="text-xs text-green-600 underline mt-2"
+                          className="text-xs text-green-600 underline mt-2 hover:text-green-800 transition-colors"
+                          type="button"
                         >
                           Alterar resposta
                         </button>
@@ -594,22 +637,20 @@ export default function ConfirmarPresencaPage() {
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={() => handleInputChange('tipoValidacao', TipoValidacao.PRESENCIAL)}
-                            className={`p-3 rounded-lg border-2 transition-all ${
-                              formulario.tipoValidacao === TipoValidacao.PRESENCIAL
-                                ? 'border-primary bg-primary text-white'
-                                : 'border-gray-300 bg-white text-gray-700'
-                            }`}
+                            className={`p-3 rounded-lg border-2 transition-all ${formulario.tipoValidacao === TipoValidacao.PRESENCIAL
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-gray-300 bg-white text-gray-700'
+                              }`}
                           >
                             <Building className="w-4 h-4 mx-auto mb-1" />
                             <span className="text-xs font-medium">Presencial</span>
                           </button>
                           <button
                             onClick={() => handleInputChange('tipoValidacao', TipoValidacao.ONLINE)}
-                            className={`p-3 rounded-lg border-2 transition-all ${
-                              formulario.tipoValidacao === TipoValidacao.ONLINE
-                                ? 'border-primary bg-primary text-white'
-                                : 'border-gray-300 bg-white text-gray-700'
-                            }`}
+                            className={`p-3 rounded-lg border-2 transition-all ${formulario.tipoValidacao === TipoValidacao.ONLINE
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-gray-300 bg-white text-gray-700'
+                              }`}
                           >
                             <Smartphone className="w-4 h-4 mx-auto mb-1" />
                             <span className="text-xs font-medium">Virtual</span>
@@ -849,7 +890,7 @@ export default function ConfirmarPresencaPage() {
                       <Search className="w-6 h-6 text-blue-600" />
                       <h3 className="text-lg font-semibold text-blue-900">Buscar Pessoa</h3>
                     </div>
-                    
+
                     <div className="flex gap-4">
                       <input
                         type="text"
@@ -884,16 +925,15 @@ export default function ConfirmarPresencaPage() {
                         <p className="text-primary-light">Processo: {pessoa.processo}</p>
                       </div>
                       <div className="ml-auto">
-                        <span className={`px-4 py-2 rounded-full text-sm font-medium ${
-                          pessoa.status === 'EM_CONFORMIDADE' 
-                            ? 'bg-green-500 text-white' 
-                            : 'bg-red-500 text-white'
-                        }`}>
+                        <span className={`px-4 py-2 rounded-full text-sm font-medium ${pessoa.status === 'EM_CONFORMIDADE'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-red-500 text-white'
+                          }`}>
                           {pessoa.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="font-semibold mb-1">CPF</p>
@@ -916,9 +956,8 @@ export default function ConfirmarPresencaPage() {
 
                   {/* Atualização de Endereço */}
                   <div className="mb-8">
-                    <div className={`bg-orange-50 border border-orange-200 rounded-lg p-6 ${
-                      !enderecoRespondido ? 'ring-2 ring-orange-500 ring-offset-2' : ''
-                    }`}>
+                    <div className={`bg-orange-50 border border-orange-200 rounded-lg p-6 ${!enderecoRespondido ? 'ring-2 ring-orange-500 ring-offset-2' : ''
+                      }`}>
                       <div className="flex items-center gap-3 mb-4">
                         <MapPin className="w-6 h-6 text-orange-600" />
                         <h3 className="text-lg font-semibold text-orange-900">Atualização de Endereço</h3>
@@ -929,13 +968,13 @@ export default function ConfirmarPresencaPage() {
                           </span>
                         )}
                       </div>
-                      
+
                       {!enderecoRespondido ? (
                         <>
                           <p className="text-orange-800 mb-4">
                             Houve alguma mudança no endereço do custodiado desde o último comparecimento?
                           </p>
-                          
+
                           <div className="flex gap-4">
                             <button
                               onClick={() => handleRespostaAlteracaoEndereco(true)}
@@ -957,7 +996,7 @@ export default function ConfirmarPresencaPage() {
                         <div className="space-y-6">
                           <EnderecoForm
                             endereco={atualizacaoEndereco.endereco || {}}
-                            onEnderecoChange={(endereco) => 
+                            onEnderecoChange={(endereco) =>
                               setAtualizacaoEndereco(prev => ({
                                 ...prev,
                                 endereco
@@ -966,14 +1005,14 @@ export default function ConfirmarPresencaPage() {
                             showTitle={false}
                             required={true}
                           />
-                          
+
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               Motivo da Alteração (Opcional)
                             </label>
                             <textarea
                               value={atualizacaoEndereco.motivoAlteracao || ''}
-                              onChange={(e) => 
+                              onChange={(e) =>
                                 setAtualizacaoEndereco(prev => ({
                                   ...prev,
                                   motivoAlteracao: e.target.value
@@ -1115,7 +1154,7 @@ export default function ConfirmarPresencaPage() {
                     >
                       Cancelar
                     </button>
-                    
+
                     <button
                       onClick={confirmarComparecimento}
                       disabled={loadingComparecimento || !enderecoRespondido}

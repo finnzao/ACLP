@@ -130,4 +130,32 @@
     padding: 1rem;
     z-index: 30;
   }
+  .endereco-form-container {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    -webkit-transform: translate3d(0,0,0);
+  }
+  
+  .mobile-section-content {
+    will-change: auto;
+    transform: translateZ(0);
+  }
+  
+  .mobile-endereco-form {
+    contain: layout style;
+    isolation: isolate;
+  }
+  
+  .mobile-endereco-form input,
+  .mobile-endereco-form textarea,
+  .mobile-endereco-form select {
+    transition: none;
+    will-change: auto;
+  }
+  
+  .dynamic-content-mobile {
+    animation: none !important;
+    transition: opacity 0.1s ease-out;
+  }
 }
