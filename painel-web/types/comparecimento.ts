@@ -22,6 +22,7 @@ type AtLeastOneDocument =
 
 // Interface base sem CPF/RG
 interface ComparecimentoBase {
+  id?:string | number;
   nome: string;
   contato: string;
   processo: string;

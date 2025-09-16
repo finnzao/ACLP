@@ -41,27 +41,21 @@ export function clearAuthHeaders() {
   console.log('[Services] Token de autenticação removido');
 }
 
-// ===========================
 // Serviços de Custodiados
-// ===========================
 
 export const custodiadosService = {
   async listar(): Promise<ListarCustodiadosResponse> {
-    console.log('[CustodiadosService] Listando custodiados...');
     const response = await apiClient.get<any>('/custodiados');
     console.log('[CustodiadosService] Resposta bruta:', response);
 
-    // ✅ CORREÇÃO PRINCIPAL: Parse do JSON se necessário
+
     let parsedData: any;
     
     try {
-      // Se response.data é string, fazer parse
       if (typeof response.data === 'string') {
-        console.log('[CustodiadosService] 🔧 Fazendo parse da string JSON...');
         parsedData = JSON.parse(response.data);
-        console.log('[CustodiadosService] ✅ JSON parseado:', parsedData);
+        console.log('[CustodiadosService] JSON parseado:', parsedData);
       } else {
-        // Se já é objeto, usar diretamente
         parsedData = response.data;
         console.log('[CustodiadosService] ✅ Data já é objeto:', parsedData);
       }
@@ -74,7 +68,6 @@ export const custodiadosService = {
       };
     }
 
-    // ✅ Agora processar o objeto parseado
     if (parsedData && parsedData.success && Array.isArray(parsedData.data)) {
       console.log('[CustodiadosService] ✅ Estrutura correta encontrada:', parsedData.data.length);
       return {
@@ -84,7 +77,6 @@ export const custodiadosService = {
       };
     }
 
-    // ✅ FALLBACK: Tentar outras estruturas
     if (Array.isArray(parsedData)) {
       console.log('[CustodiadosService] ✅ Dados são array direto:', parsedData.length);
       return {
@@ -94,7 +86,6 @@ export const custodiadosService = {
       };
     }
 
-    // ✅ FALLBACK: Procurar array em qualquer propriedade
     if (parsedData && typeof parsedData === 'object') {
       for (const [key, value] of Object.entries(parsedData)) {
         if (Array.isArray(value)) {
@@ -108,7 +99,6 @@ export const custodiadosService = {
       }
     }
 
-    // ❌ Nenhum formato reconhecido
     console.error('[CustodiadosService] ❌ Nenhum array encontrado em:', parsedData);
     return {
       success: false,

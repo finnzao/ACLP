@@ -1,13 +1,18 @@
 'use client';
 
-import { X, UserCheck, Edit, FileText, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { X, UserCheck, Edit, FileText, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Comparecimento } from '@/types';
+import { custodiadosService } from '@/lib/api/services';
+import { STATUS_LABELS, STATUS_COLORS } from '@/constants/status';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Props {
   dados: Comparecimento;
   onClose: () => void;
   onEditar: (dados: Comparecimento) => void;
+  onExcluir?: (id: string | number) => void; // Callback opcional para atualizar lista após exclusão
 }
 
 const dateUtils = {
@@ -32,30 +37,68 @@ const dateUtils = {
   }
 };
 
-// Constantes de status
-const STATUS_LABELS = {
-  'em conformidade': 'Em Conformidade',
-  'inadimplente': 'Inadimplente'
-} as const;
-
-const STATUS_COLORS = {
-  'em conformidade': {
-    bg: 'bg-secondary',
-    text: 'text-white',
-    border: 'border-secondary'
-  },
-  'inadimplente': {
-    bg: 'bg-danger',
-    text: 'text-white', 
-    border: 'border-danger'
-  }
-} as const;
-
-export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Props) {
+export default function DetalhesSubmetidoModal({ dados, onClose, onEditar, onExcluir }: Props) {
   const router = useRouter();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const handleConfirmarPresenca = () => {
     router.push(`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(dados.processo)}`);
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      // Assumindo que dados tem um campo id do tipo number
+      const custodiadoId = typeof dados.id === 'string' ? parseInt(dados.id) : dados.id;
+      
+      if (!custodiadoId || isNaN(custodiadoId)) {
+        throw new Error('ID do custodiado inválido');
+      }
+
+      console.log('[DetalhesModal] Excluindo custodiado:', custodiadoId);
+      
+      // Chamar o serviço de exclusão
+      const resultado = await custodiadosService.excluir(custodiadoId);
+      
+      if (resultado.success) {
+        // Notificar sucesso (você pode adicionar um toast aqui)
+        console.log('[DetalhesModal] Exclusão bem-sucedida');
+        
+        // Chamar callback se fornecido (para atualizar lista no componente pai)
+        if (onExcluir) {
+          onExcluir(custodiadoId);
+        }
+        
+        // Pequeno delay para feedback visual
+        setTimeout(() => {
+          onClose();
+          // Opcional: redirecionar para lista
+          // router.push('/dashboard');
+        }, 500);
+        
+      } else {
+        throw new Error(resultado.message || 'Erro ao excluir registro');
+      }
+      
+    } catch (error) {
+      console.error('[DetalhesModal] Erro ao excluir:', error);
+      
+      let errorMessage = 'Erro ao excluir registro';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      setDeleteError(errorMessage);
+      
+      // Limpar erro após 5 segundos
+      setTimeout(() => setDeleteError(null), 5000);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const isComparecimentoHoje = dateUtils.isToday(dados.proximoComparecimento);
@@ -74,10 +117,21 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={isDeleting}
           >
             <X size={24} />
           </button>
         </div>
+
+        {/* Mensagem de erro na exclusão */}
+        {deleteError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <p className="text-sm text-red-700">{deleteError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Status e Alerta */}
         <div className="mb-6">
@@ -130,11 +184,11 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
             </div>
             <div>
               <span className="font-medium text-gray-700">CPF:</span>
-              <p className="text-gray-600 mt-1">{dados.cpf}</p>
+              <p className="text-gray-600 mt-1">{dados.cpf || 'Não informado'}</p>
             </div>
             <div>
               <span className="font-medium text-gray-700">RG:</span>
-              <p className="text-gray-600 mt-1">{dados.rg}</p>
+              <p className="text-gray-600 mt-1">{dados.rg || 'Não informado'}</p>
             </div>
             <div>
               <span className="font-medium text-gray-700">Contato:</span>
@@ -168,7 +222,11 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
             </div>
             <div>
               <span className="font-medium text-blue-700">Periodicidade:</span>
-              <p className="text-blue-600 mt-1 capitalize">{dados.periodicidade}</p>
+              <p className="text-blue-600 mt-1 capitalize">
+                {typeof dados.periodicidade === 'number' 
+                  ? `${dados.periodicidade} dias` 
+                  : dados.periodicidade}
+              </p>
             </div>
           </div>
         </div>
@@ -208,11 +266,12 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
           {/* Confirmar Presença - Destaque especial se for hoje ou estiver atrasado */}
           <button 
             onClick={handleConfirmarPresenca}
+            disabled={isDeleting}
             className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg ${
               isComparecimentoHoje || isComparecimentoAtrasado
                 ? 'bg-green-500 text-white hover:bg-green-600 animate-pulse'
                 : 'bg-secondary text-white hover:bg-green-600'
-            }`}
+            } ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <UserCheck className="w-5 h-5" />
             Validar Comparecimento
@@ -221,7 +280,10 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
           {/* Editar */}
           <button
             onClick={() => onEditar(dados)}
-            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark font-medium transition-all"
+            disabled={isDeleting}
+            className={`flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark font-medium transition-all ${
+              isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             <Edit className="w-5 h-5" />
             Editar Dados
@@ -229,17 +291,23 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
 
           {/* Excluir */}
           <button 
-            onClick={() => {
-              if (confirm('Tem certeza que deseja excluir este registro?')) {
-                // Implementar exclusão
-                console.log('Excluindo registro:', dados.processo);
-                onClose();
-              }
-            }}
-            className="flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 font-medium transition-all"
+            onClick={() => setShowConfirmDialog(true)}
+            disabled={isDeleting}
+            className={`flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 font-medium transition-all ${
+              isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
-            <X className="w-5 h-5" />
-            Excluir
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Excluindo...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-5 h-5" />
+                Excluir
+              </>
+            )}
           </button>
         </div>
 
@@ -248,8 +316,31 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar }: Pro
           <p className="text-xs text-gray-500">
             Registro atualizado em: {new Date().toLocaleString('pt-BR')}
           </p>
+          {dados.id && (
+            <p className="text-xs text-gray-400 mt-1">
+              ID: {dados.id}
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleConfirmDelete}
+        type="danger"
+        title="Confirmar Exclusão"
+        message={`Tem certeza que deseja excluir o registro de ${dados.nome}?`}
+        details={[
+          `Processo: ${dados.processo}`,
+          `CPF: ${dados.cpf || 'Não informado'}`,
+          `Status: ${STATUS_LABELS[dados.status]}`,
+          'Esta ação não pode ser desfeita!'
+        ]}
+        confirmText="Sim, Excluir"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions, useAudit } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
-import { useCustodiados } from '@/hooks/useBackendApi';
+import { useCustodiados } from '@/hooks/useAPI';
 import { 
   Lock, 
   AlertTriangle, 
@@ -15,7 +15,7 @@ import {
   Info,
   AlertCircle
 } from 'lucide-react';
-import { CustodiadoDTO, EstadoBrasil } from '@/types/backend';
+import { CustodiadoDTO, EstadoBrasil } from '@/types/api';
 
 // Componente de Alerta Melhorado
 interface AlertMessageProps {
