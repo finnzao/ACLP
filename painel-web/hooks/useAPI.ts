@@ -14,6 +14,7 @@ import {
   CustodiadoResponse,
   ComparecimentoResponse,
   UsuarioResponse,
+  CustodiadoDTO,
   ComparecimentoDTO,
   UsuarioDTO,
   PeriodoParams,
@@ -24,6 +25,7 @@ import {
   AppInfoResponse,
   ResumoSistemaResponse
 } from '@/types/api';
+
 // Hook para custodiados
 export function useCustodiados() {
   const [custodiados, setCustodiados] = useState<CustodiadoResponse[]>([]);
@@ -56,6 +58,168 @@ export function useCustodiados() {
     }
   };
 
+  // Criar Custodiado
+  const criarCustodiado = useCallback(async (data: CustodiadoDTO) => {
+    try {
+      setLoading(true);
+      console.log('[useCustodiados] Criando Custodiado:', data);
+      
+      const result = await custodiadosService.criar(data);
+      
+      if (result.success) {
+        // Atualizar lista automaticamente após criação
+        await fetchCustodiados();
+        return { 
+          success: true, 
+          message: result.message || 'Custodiado criada com sucesso',
+          data: result.data 
+        };
+      }
+      
+      return { 
+        success: false, 
+        message: result.message || 'Erro ao criar Custodiado' 
+      };
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao criar Custodiado:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Erro interno do sistema' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Atualizar Custodiado
+  const atualizarCustodiado = useCallback(async (id: number, data: Partial<CustodiadoDTO>) => {
+    try {
+      setLoading(true);
+      console.log(`[useCustodiados] Atualizando Custodiado ID: ${id}`, data);
+      
+      const result = await custodiadosService.atualizar(id, data);
+      
+      if (result.success) {
+        // Atualizar lista automaticamente após atualização
+        await fetchCustodiados();
+        return { 
+          success: true, 
+          message: result.message || 'Custodiado atualizada com sucesso',
+          data: result.data 
+        };
+      }
+      
+      return { 
+        success: false, 
+        message: result.message || 'Erro ao atualizar Custodiado' 
+      };
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao atualizar Custodiado:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Erro interno do sistema' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Excluir Custodiado
+  const excluirCustodiado = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+
+      const result = await custodiadosService.excluir(id);
+      
+      if (result.success) {
+        // Atualizar lista automaticamente após exclusão
+        await fetchCustodiados();
+        return { 
+          success: true, 
+          message: result.message || 'Custodiado excluída com sucesso' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        message: result.message || 'Erro ao excluir Custodiado' 
+      };
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao excluir Custodiado:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Erro interno do sistema' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Buscar Custodiado por ID
+  const buscarPorId = useCallback(async (id: number) => {
+    try {
+      console.log(`[useCustodiados] Buscando Custodiado ID: ${id}`);
+      const result = await custodiadosService.buscarPorId(id);
+      return result;
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao buscar Custodiado por ID:', error);
+      return null;
+    }
+  }, []);
+
+  // Buscar Custodiado por processo
+  const buscarPorProcesso = useCallback(async (processo: string) => {
+    try {
+      console.log(`[useCustodiados] Buscando Custodiado por processo: ${processo}`);
+      const result = await custodiadosService.buscarPorProcesso(processo);
+      return result;
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao buscar Custodiado por processo:', error);
+      return null;
+    }
+  }, []);
+
+  // Buscar inadimplentes
+  const buscarInadimplentes = useCallback(async () => {
+    try {
+      console.log('[useCustodiados] Buscando inadimplentes');
+      const result = await custodiadosService.buscarInadimplentes();
+      return result;
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao buscar inadimplentes:', error);
+      return [];
+    }
+  }, []);
+
+  // Buscar por status
+  const buscarPorStatus = useCallback(async (status: 'EM_CONFORMIDADE' | 'INADIMPLENTE') => {
+    try {
+      console.log(`[useCustodiados] Buscando por status: ${status}`);
+      const result = await custodiadosService.buscarPorStatus(status);
+      return result;
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro ao buscar por status:', error);
+      return [];
+    }
+  }, []);
+
+  // Busca geral com parâmetros
+  const buscar = useCallback(async (params: BuscarParams) => {
+    try {
+      console.log('[useCustodiados] Fazendo busca com parâmetros:', params);
+      const result = await custodiadosService.buscar(params);
+      return result;
+    } catch (error: any) {
+      console.error('[useCustodiados] Erro na busca:', error);
+      return [];
+    }
+  }, []);
+
+  // Forçar atualização da lista
+  const refetch = useCallback(() => {
+    return fetchCustodiados();
+  }, []);
+
   useEffect(() => {
     fetchCustodiados();
   }, []);
@@ -64,7 +228,18 @@ export function useCustodiados() {
     custodiados,
     loading,
     error,
-    refetch: fetchCustodiados
+    // Operações CRUD
+    criarCustodiado,
+    atualizarCustodiado,
+    excluirCustodiado,
+    // Buscas
+    buscarPorId,
+    buscarPorProcesso,
+    buscarInadimplentes,
+    buscarPorStatus,
+    buscar,
+    // Utilitários
+    refetch
   };
 }
 

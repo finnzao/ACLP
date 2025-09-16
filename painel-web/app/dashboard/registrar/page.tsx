@@ -100,7 +100,7 @@ function AlertMessage({ type, title, message, details, onClose, className = '' }
 
 // Componente principal de cadastro
 function OriginalRegistrarPage() {
-  const { criarPessoa } = useCustodiados();
+  const { criarCustodiado } = useCustodiados();
   const router = useRouter();
 
   // Estado do formulário usando o DTO do backend com campos de endereço na raiz
@@ -276,7 +276,7 @@ function OriginalRegistrarPage() {
 
       console.log('[Cadastro] Enviando dados para API:', dataToSend);
 
-      const result = await criarPessoa(dataToSend);
+      const result = await criarCustodiado(dataToSend);
       
       console.log('[Cadastro] Resposta da API:', result);
       

@@ -12,7 +12,7 @@ interface Props {
   dados: Comparecimento;
   onClose: () => void;
   onEditar: (dados: Comparecimento) => void;
-  onExcluir?: (id: string | number) => void; // Callback opcional para atualizar lista após exclusão
+  onExcluir?: (id: string | number) => void;
 }
 
 const dateUtils = {
