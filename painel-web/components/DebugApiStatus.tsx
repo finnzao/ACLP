@@ -32,7 +32,7 @@ export default function DebugApiStatus() {
       bairro: 'Centro',
       cidade: 'Salvador',
       estado: EstadoBrasil.BA, 
-      cpf: '123.456.789-01', // Formato válido
+      cpf: '256.766.020-82', // Formato válido
       observacoes: 'Teste de debug da API'
     };
 

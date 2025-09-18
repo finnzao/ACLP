@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissions, useAudit } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
@@ -102,6 +102,7 @@ function AlertMessage({ type, title, message, details, onClose, className = '' }
 function OriginalRegistrarPage() {
   const { criarCustodiado } = useCustodiados();
   const router = useRouter();
+  const { logAction } = useAudit();
 
   // Estado do formulário usando o DTO do backend com campos de endereço na raiz
   const [formData, setFormData] = useState<CustodiadoDTO>({
@@ -129,6 +130,7 @@ function OriginalRegistrarPage() {
   // Estados de controle
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Novo estado para prevenir múltiplos envios
   const [periodicidadeCustomizada, setPeriodicidadeCustomizada] = useState(false);
   const [diasCustomizados, setDiasCustomizados] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -232,6 +234,12 @@ function OriginalRegistrarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Prevenir múltiplos envios
+    if (isSubmitting) {
+      console.log('[Cadastro] Já está enviando, ignorando nova submissão');
+      return;
+    }
+    
     // Limpar mensagens anteriores
     setApiMessage(null);
     
@@ -247,6 +255,8 @@ function OriginalRegistrarPage() {
       return;
     }
 
+    // Marcar como enviando ANTES de fazer a requisição
+    setIsSubmitting(true);
     setLoading(true);
 
     try {
@@ -281,6 +291,13 @@ function OriginalRegistrarPage() {
       console.log('[Cadastro] Resposta da API:', result);
       
       if (result.success) {
+        // Log da ação de sucesso
+        logAction('create', 'custodiado', { 
+          processo: dataToSend.processo,
+          nome: dataToSend.nome,
+          success: true 
+        });
+
         setSuccess(true);
         setApiMessage({
           type: 'success',
@@ -296,6 +313,12 @@ function OriginalRegistrarPage() {
         // Processar mensagem de erro do backend
         const { message, details } = processBackendError(result.message || 'Erro desconhecido');
         
+        // Log da ação de erro
+        logAction('create_failed', 'custodiado', { 
+          processo: dataToSend.processo,
+          error: message 
+        });
+        
         setApiMessage({
           type: 'error',
           message,
@@ -304,6 +327,9 @@ function OriginalRegistrarPage() {
         
         // Scroll para o topo para ver a mensagem de erro
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Resetar o estado de submissão para permitir nova tentativa
+        setIsSubmitting(false);
       }
     } catch (error: unknown) {
       console.error('[Cadastro] Erro inesperado:', error);
@@ -349,6 +375,9 @@ function OriginalRegistrarPage() {
       });
       
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Resetar o estado de submissão para permitir nova tentativa
+      setIsSubmitting(false);
     } finally {
       setLoading(false);
     }
@@ -485,6 +514,7 @@ function OriginalRegistrarPage() {
                   errors.nome ? 'border-red-300 bg-red-50' : 'border-gray-300'
                 }`}
                 placeholder="Digite o nome completo"
+                disabled={isSubmitting}
               />
               {errors.nome && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
@@ -504,6 +534,7 @@ function OriginalRegistrarPage() {
                   errors.contato ? 'border-red-300 bg-red-50' : 'border-gray-300'
                 }`}
                 placeholder="(00) 00000-0000"
+                disabled={isSubmitting}
               />
               {errors.contato && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
@@ -535,6 +566,7 @@ function OriginalRegistrarPage() {
                   onChange={(e) => handleDocumentChange('cpf', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="000.000.000-00"
+                  disabled={isSubmitting}
                 />
               </div>
               <div>
@@ -545,6 +577,7 @@ function OriginalRegistrarPage() {
                   onChange={(e) => handleDocumentChange('rg', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="00.000.000-0"
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -568,6 +601,7 @@ function OriginalRegistrarPage() {
                     errors.cep ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="00000-000"
+                  disabled={isSubmitting}
                 />
                 {errors.cep && <p className="text-red-500 text-sm mt-1">{errors.cep}</p>}
               </div>
@@ -582,6 +616,7 @@ function OriginalRegistrarPage() {
                     errors.logradouro ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Rua, Avenida, etc."
+                  disabled={isSubmitting}
                 />
                 {errors.logradouro && <p className="text-red-500 text-sm mt-1">{errors.logradouro}</p>}
               </div>
@@ -594,6 +629,7 @@ function OriginalRegistrarPage() {
                   onChange={(e) => handleInputChange('numero', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="123"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -605,6 +641,7 @@ function OriginalRegistrarPage() {
                   onChange={(e) => handleInputChange('complemento', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Apto, Casa, etc."
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -618,6 +655,7 @@ function OriginalRegistrarPage() {
                     errors.bairro ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Nome do bairro"
+                  disabled={isSubmitting}
                 />
                 {errors.bairro && <p className="text-red-500 text-sm mt-1">{errors.bairro}</p>}
               </div>
@@ -632,6 +670,7 @@ function OriginalRegistrarPage() {
                     errors.cidade ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Nome da cidade"
+                  disabled={isSubmitting}
                 />
                 {errors.cidade && <p className="text-red-500 text-sm mt-1">{errors.cidade}</p>}
               </div>
@@ -642,6 +681,7 @@ function OriginalRegistrarPage() {
                   value={formData.estado}
                   onChange={(e) => handleInputChange('estado', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  disabled={isSubmitting}
                 >
                   {Object.values(EstadoBrasil).map(estado => (
                     <option key={estado} value={estado}>{estado}</option>
@@ -666,6 +706,7 @@ function OriginalRegistrarPage() {
                     errors.processo ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="0000000-00.0000.0.00.0000"
+                  disabled={isSubmitting}
                 />
                 {errors.processo && (
                   <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
@@ -685,6 +726,7 @@ function OriginalRegistrarPage() {
                     errors.vara ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Ex: 1ª Vara Criminal"
+                  disabled={isSubmitting}
                 />
                 {errors.vara && <p className="text-red-500 text-sm mt-1">{errors.vara}</p>}
               </div>
@@ -699,6 +741,7 @@ function OriginalRegistrarPage() {
                     errors.comarca ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Ex: Salvador"
+                  disabled={isSubmitting}
                 />
                 {errors.comarca && <p className="text-red-500 text-sm mt-1">{errors.comarca}</p>}
               </div>
@@ -712,6 +755,7 @@ function OriginalRegistrarPage() {
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
                     errors.dataDecisao ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
+                  disabled={isSubmitting}
                 />
                 {errors.dataDecisao && <p className="text-red-500 text-sm mt-1">{errors.dataDecisao}</p>}
               </div>
@@ -725,6 +769,7 @@ function OriginalRegistrarPage() {
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
                     errors.dataComparecimentoInicial ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
+                  disabled={isSubmitting}
                 />
                 {errors.dataComparecimentoInicial && <p className="text-red-500 text-sm mt-1">{errors.dataComparecimentoInicial}</p>}
               </div>
@@ -735,6 +780,7 @@ function OriginalRegistrarPage() {
                   value={periodicidadeCustomizada ? 'custom' : formData.periodicidade.toString()}
                   onChange={handlePeriodicidadeChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  disabled={isSubmitting}
                 >
                   <option value="7">Semanal (7 dias)</option>
                   <option value="15">Quinzenal (15 dias)</option>
@@ -759,6 +805,7 @@ function OriginalRegistrarPage() {
                   onChange={handleDiasCustomizadosChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Ex: 45"
+                  disabled={isSubmitting}
                 />
               </div>
             )}
@@ -773,6 +820,7 @@ function OriginalRegistrarPage() {
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="Observações adicionais sobre o caso..."
+              disabled={isSubmitting}
             />
           </div>
 
@@ -782,7 +830,7 @@ function OriginalRegistrarPage() {
               type="button"
               onClick={() => router.back()}
               className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-              disabled={loading}
+              disabled={loading || isSubmitting}
             >
               <ArrowLeft className="w-4 h-4" />
               Voltar
@@ -790,10 +838,10 @@ function OriginalRegistrarPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isSubmitting}
               className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
+              {loading || isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   Cadastrando...
@@ -817,35 +865,36 @@ export default function ProtectedRegistrarPage() {
   const { canCreatePeople, isAdmin } = usePermissions();
   const { logAction } = useAudit();
 
-  useEffect(() => {
-    logAction('page_access', 'registrar_pessoa', { 
-      hasPermission: canCreatePeople(),
+  const AccessDeniedContent = () => {
+    // Log apenas quando o componente de acesso negado é renderizado
+    logAction('page_access_denied', 'registrar_pessoa', { 
+      hasPermission: false,
       userType: isAdmin() ? 'admin' : 'usuario' 
     });
-  }, [canCreatePeople, isAdmin, logAction]);
 
-  const AccessDeniedContent = () => (
-    <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-6">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-red-100">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Lock className="w-10 h-10 text-red-600" />
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center border border-red-100">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Lock className="w-10 h-10 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-red-800 mb-3">Acesso Negado</h1>
+            <p className="text-red-700 font-medium mb-6">
+              Você não tem permissão para cadastrar novas pessoas.
+            </p>
+            <button
+              onClick={() => router.push('/dashboard/geral')}
+              className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Voltar ao Painel Geral
+            </button>
           </div>
-          <h1 className="text-2xl font-bold text-red-800 mb-3">Acesso Negado</h1>
-          <p className="text-red-700 font-medium mb-6">
-            Você não tem permissão para cadastrar novas pessoas.
-          </p>
-          <button
-            onClick={() => router.push('/dashboard/geral')}
-            className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark transition-colors font-medium flex items-center justify-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Voltar ao Painel Geral
-          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <PermissionGuard

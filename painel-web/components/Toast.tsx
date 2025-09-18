@@ -83,18 +83,18 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: (id: string) => 
   return (
     <div
       className={`
-        transform transition-all duration-300 ease-in-out
-        ${isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
-        max-w-sm w-full bg-white border rounded-lg shadow-lg pointer-events-auto
-        ${colors[toast.type]}
-      `}
+      transform transition-all duration-300 ease-in-out
+      ${isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
+      max-w-lg w-full bg-white border rounded-lg shadow-lg pointer-events-auto
+      ${colors[toast.type]}
+    `}
     >
       <div className="p-4">
         <div className="flex items-start">
           <div className="flex-shrink-0">
             <Icon className={`w-5 h-5 ${iconColors[toast.type]}`} />
           </div>
-          <div className="ml-3 w-0 flex-1">
+          <div className="ml-3 flex-1">
             <p className="text-sm font-medium">
               {toast.title}
             </p>
@@ -181,13 +181,13 @@ export function useToastHelpers() {
   return {
     success: (title: string, message: string, duration?: number) =>
       showToast({ type: 'success', title, message, duration }),
-    
+
     error: (title: string, message: string, duration?: number) =>
       showToast({ type: 'error', title, message, duration }),
-    
+
     warning: (title: string, message: string, duration?: number) =>
       showToast({ type: 'warning', title, message, duration }),
-    
+
     info: (title: string, message: string, duration?: number) =>
       showToast({ type: 'info', title, message, duration }),
 

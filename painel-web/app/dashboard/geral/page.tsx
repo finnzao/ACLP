@@ -9,13 +9,14 @@ import type { Comparecimento } from '@/types';
 import DetalhesAcusadoModal from '@/components/DetalhesSubmetido';
 import EditarAcusadoModal from '@/components/EditarSubmetido';
 import ExportButton from '@/components/ExportButton';
-import { 
-  Search, 
-  Filter, 
-  AlertTriangle, 
-  Clock, 
-  ChevronLeft, 
-  ChevronRight, 
+import { useToast } from '@/components/Toast';
+import {
+  Search,
+  Filter,
+  AlertTriangle,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
   X,
   Calendar,
   User,
@@ -30,12 +31,15 @@ export default function GeralPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+
+  const { showToast } = useToast();
+
   // Hook do backend - mudança importante aqui
-  const { 
-    custodiados: custodiadosBackend, 
-    loading: loadingBackend, 
-    error: errorBackend, 
-    refetch: refetchCustodiados 
+  const {
+    custodiados: custodiadosBackend,
+    loading: loadingBackend,
+    error: errorBackend,
+    refetch: refetchCustodiados
   } = useCustodiados();
 
   // Estados principais
@@ -60,15 +64,15 @@ export default function GeralPage() {
 
   // Verificar se está em mobile
   const [isMobile, setIsMobile] = useState(false);
-  
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -394,9 +398,8 @@ export default function GeralPage() {
 
     return (
       <div
-        className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${
-          atrasado ? 'border-l-red-500' : hoje ? 'border-l-yellow-500' : 'border-l-gray-300'
-        }`}
+        className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${atrasado ? 'border-l-red-500' : hoje ? 'border-l-yellow-500' : 'border-l-gray-300'
+          }`}
       >
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
@@ -409,9 +412,8 @@ export default function GeralPage() {
             </div>
           </div>
           {(atrasado || hoje) && (
-            <span className={`px-2 py-1 rounded text-xs font-bold ${
-              atrasado ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'
-            }`}>
+            <span className={`px-2 py-1 rounded text-xs font-bold ${atrasado ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'
+              }`}>
               {atrasado ? `${Math.abs(diasRestantes)}d atraso` : 'HOJE'}
             </span>
           )}
@@ -435,11 +437,10 @@ export default function GeralPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            item.status === 'inadimplente' 
-              ? 'bg-red-100 text-red-800' 
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'inadimplente'
+              ? 'bg-red-100 text-red-800'
               : 'bg-green-100 text-green-800'
-          }`}>
+            }`}>
             {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
           </span>
           <button
@@ -478,9 +479,8 @@ export default function GeralPage() {
                   </button>
                   <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-lg ${
-                      hasActiveFilters ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`p-2 rounded-lg ${hasActiveFilters ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'
+                      }`}
                   >
                     <SlidersHorizontal className="w-5 h-5" />
                   </button>
@@ -540,31 +540,28 @@ export default function GeralPage() {
                     <div className="grid grid-cols-3 gap-1">
                       <button
                         onClick={() => setFiltroStatus('todos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroStatus === 'todos'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'todos'
                             ? 'bg-primary text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         Todos
                       </button>
                       <button
                         onClick={() => setFiltroStatus('em conformidade')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroStatus === 'em conformidade'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'em conformidade'
                             ? 'bg-green-500 text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         Conformidade
                       </button>
                       <button
                         onClick={() => setFiltroStatus('inadimplente')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroStatus === 'inadimplente'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'inadimplente'
                             ? 'bg-red-500 text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         Inadimplente
                       </button>
@@ -577,41 +574,37 @@ export default function GeralPage() {
                     <div className="grid grid-cols-4 gap-1">
                       <button
                         onClick={() => setFiltroUrgencia('todos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroUrgencia === 'todos'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'todos'
                             ? 'bg-primary text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         Todos
                       </button>
                       <button
                         onClick={() => setFiltroUrgencia('hoje')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroUrgencia === 'hoje'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'hoje'
                             ? 'bg-yellow-500 text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         Hoje
                       </button>
                       <button
                         onClick={() => setFiltroUrgencia('atrasados')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroUrgencia === 'atrasados'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'atrasados'
                             ? 'bg-red-500 text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         Atraso
                       </button>
                       <button
                         onClick={() => setFiltroUrgencia('proximos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${
-                          filtroUrgencia === 'proximos'
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'proximos'
                             ? 'bg-blue-500 text-white'
                             : 'bg-white text-gray-600'
-                        }`}
+                          }`}
                       >
                         7 dias
                       </button>
@@ -898,9 +891,8 @@ export default function GeralPage() {
                     return (
                       <tr
                         key={item.id || index}
-                        className={`border-b border-border hover:bg-gray-50 transition-colors ${
-                          atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''
-                        }`}
+                        className={`border-b border-border hover:bg-gray-50 transition-colors ${atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''
+                          }`}
                       >
                         <td className="p-3">
                           <div>
@@ -913,9 +905,8 @@ export default function GeralPage() {
                           <p className="text-xs text-text-muted">{item.vara}</p>
                         </td>
                         <td className="p-3 text-center">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                            }`}>
                             {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
                           </span>
                         </td>
@@ -923,9 +914,8 @@ export default function GeralPage() {
                           {item.ultimoComparecimento ? new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR') : '-'}
                         </td>
                         <td className="p-3 text-center">
-                          <div className={`text-sm font-medium ${
-                            atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'
-                          }`}>
+                          <div className={`text-sm font-medium ${atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'
+                            }`}>
                             {new Date(item.proximoComparecimento).toLocaleDateString('pt-BR')}
                           </div>
                           <div className="text-xs text-text-muted">
@@ -1004,11 +994,10 @@ export default function GeralPage() {
                           <button
                             key={pageNum}
                             onClick={() => handlePageChange(pageNum)}
-                            className={`px-3 py-2 text-sm rounded-lg ${
-                              currentPage === pageNum
+                            className={`px-3 py-2 text-sm rounded-lg ${currentPage === pageNum
                                 ? 'bg-primary text-white'
                                 : 'bg-white border border-gray-300 hover:bg-gray-50'
-                            }`}
+                              }`}
                           >
                             {pageNum}
                           </button>
@@ -1069,6 +1058,16 @@ export default function GeralPage() {
           onEditar={(dados) => {
             setSelecionado(null);
             setEditando(dados);
+          }}
+          onExcluir={async () => {
+            setSelecionado(null);
+            showToast({
+              type: 'success',
+              title: 'Exclusão realizada',
+              message: 'O registro foi excluído com sucesso.',
+              duration: 3000
+            });
+            await refetchCustodiados();
           }}
         />
       )}
