@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCustodiados } from '@/hooks/useAPI';
 import type { CustodiadoResponse, ListarCustodiadosResponse } from '@/types/api';
 import type { Comparecimento } from '@/types';
-import DetalhesAcusadoModal from '@/components/DetalhesCustodiado';
-import EditarAcusadoModal from '@/components/EditarCustodiado';
+import DetalhesCustodiadoModal from '@/components/DetalhesCustodiado';
+import EditarCustodiadoModal from '@/components/EditarCustodiado';
 import ExportButton from '@/components/ExportButton';
 import { useToast } from '@/components/Toast';
 import {
@@ -1052,7 +1052,7 @@ export default function GeralPage() {
 
       {/* Modais */}
       {selecionado && (
-        <DetalhesAcusadoModal
+        <DetalhesCustodiadoModal
           dados={selecionado}
           onClose={() => setSelecionado(null)}
           onEditar={(dados) => {
@@ -1073,7 +1073,7 @@ export default function GeralPage() {
       )}
 
       {editando && (
-        <EditarAcusadoModal
+        <EditarCustodiadoModal
           dados={editando}
           onClose={() => setEditando(null)}
           onVoltar={() => {

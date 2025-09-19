@@ -29,80 +29,141 @@ interface ValidationErrors {
 export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave }: Props) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true); // Estado para carregamento inicial
   const [errors, setErrors] = useState<ValidationErrors>({});
   
-  // Garantir que o endereço existe com valores padrão se necessário
-  const enderecoInicial = dados.endereco || {
-    cep: '',
-    logradouro: '',
-    numero: '',
-    complemento: '',
-    bairro: '',
-    cidade: '',
-    estado: ''
-  };
-  
-  const [form, setForm] = useState<Comparecimento>({
+  // Estado inicial do formulário com valores formatados
+  const [form, setForm] = useState<Comparecimento>(() => ({
     ...dados,
     cpf: formatCPF(dados.cpf || ''),
     rg: formatRG(dados.rg || ''),
     processo: formatProcesso(dados.processo),
     contato: formatContato(dados.contato),
-    // Garantir que o endereço seja sempre um objeto válido
-    endereco: {
-      cep: formatCEP(enderecoInicial.cep || ''),
-      logradouro: enderecoInicial.logradouro || '',
-      numero: enderecoInicial.numero || '',
-      complemento: enderecoInicial.complemento || '',
-      bairro: enderecoInicial.bairro || '',
-      cidade: enderecoInicial.cidade || '',
-      estado: enderecoInicial.estado?.toUpperCase() || ''
-    },
-    // Garantir que periodicidade seja um número
     periodicidade: typeof dados.periodicidade === 'number' 
       ? dados.periodicidade 
-      : parseInt(String(dados.periodicidade)) || 30
-  });
+      : parseInt(String(dados.periodicidade)) || 30,
+    // Garantir estrutura de endereço
+    endereco: dados.endereco || {
+      cep: '',
+      logradouro: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: ''
+    }
+  }));
 
   // Estado para periodicidade personalizada
   const [periodicidadePersonalizada, setPeriodicidadePersonalizada] = useState(
-    typeof form.periodicidade === 'number' ? form.periodicidade : 30
+    typeof dados.periodicidade === 'number' ? dados.periodicidade : 30
   );
 
-  // Buscar dados completos do custodiado ao montar o componente
+  // Carregar dados completos ao abrir o modal
   useEffect(() => {
     const carregarDadosCompletos = async () => {
-      if (!dados.id) return;
+      if (!dados.id) {
+        setLoadingData(false);
+        return;
+      }
+      
+      setLoadingData(true);
       
       try {
         const custodiadoId = typeof dados.id === 'string' ? parseInt(dados.id) : dados.id;
+        console.log('[EditarCustodiado] Buscando dados completos para ID:', custodiadoId);
+        
         const custodiado = await custodiadosService.buscarPorId(custodiadoId);
         
         if (custodiado) {
-          // Atualizar o formulário com os dados completos incluindo endereço
-          setForm(prev => ({
-            ...prev,
-            endereco: {
-              cep: formatCEP(custodiado.endereco?.cep || ''),
-              logradouro: custodiado.endereco?.logradouro || '',
-              numero: custodiado.endereco?.numero || '',
-              complemento: custodiado.endereco?.complemento || '',
-              bairro: custodiado.endereco?.bairro || '',
-              cidade: custodiado.endereco?.cidade || '',
-              estado: custodiado.endereco?.estado?.toUpperCase() || ''
-            }
-          }));
+          console.log('[EditarCustodiado] Dados completos recebidos:', custodiado);
           
-          console.log('[EditarSubmetido] Dados completos carregados:', custodiado);
+          // Atualizar o formulário com os dados completos
+          setForm({
+            ...dados, // Mantém dados básicos
+            ...custodiado, // Sobrescreve com dados completos da API
+            // Formatar campos específicos
+            cpf: formatCPF(custodiado.cpf || dados.cpf || ''),
+            rg: formatRG(custodiado.rg || dados.rg || ''),
+            processo: formatProcesso(custodiado.processo || dados.processo),
+            contato: formatContato(custodiado.contato || dados.contato),
+            // Garantir que datas estejam no formato correto (YYYY-MM-DD)
+            decisao: formatDateForInput(custodiado.dataDecisao || dados.decisao),
+            dataComparecimentoInicial: formatDateForInput(
+              custodiado.dataComparecimentoInicial || dados.dataComparecimentoInicial || dados.primeiroComparecimento
+            ),
+            primeiroComparecimento: formatDateForInput(dados.primeiroComparecimento),
+            ultimoComparecimento: formatDateForInput(
+              custodiado.ultimoComparecimento || dados.ultimoComparecimento
+            ),
+            proximoComparecimento: formatDateForInput(
+              custodiado.proximoComparecimento || dados.proximoComparecimento
+            ),
+            // Processar periodicidade
+            periodicidade: typeof custodiado.periodicidade === 'number' 
+              ? custodiado.periodicidade 
+              : parseInt(String(custodiado.periodicidade)) || 30,
+            // Processar endereço
+            endereco: custodiado.endereco ? {
+              cep: formatCEP(custodiado.endereco.cep || ''),
+              logradouro: custodiado.endereco.logradouro || '',
+              numero: custodiado.endereco.numero || '',
+              complemento: custodiado.endereco.complemento || '',
+              bairro: custodiado.endereco.bairro || '',
+              cidade: custodiado.endereco.cidade || '',
+              estado: custodiado.endereco.estado?.toUpperCase() || ''
+            } : dados.endereco || {
+              cep: '',
+              logradouro: '',
+              numero: '',
+              complemento: '',
+              bairro: '',
+              cidade: '',
+              estado: ''
+            },
+            // Manter observações
+            observacoes: custodiado.observacoes || dados.observacoes || ''
+          });
+          
+          // Atualizar periodicidade personalizada
+          setPeriodicidadePersonalizada(
+            typeof custodiado.periodicidade === 'number' 
+              ? custodiado.periodicidade 
+              : 30
+          );
+          
+        } else {
+          console.warn('[EditarCustodiado] Nenhum dado retornado da API');
         }
       } catch (error) {
-        console.error('[EditarSubmetido] Erro ao buscar dados completos:', error);
-        // Se falhar, usar os dados já disponíveis
+        console.error('[EditarCustodiado] Erro ao buscar dados completos:', error);
+        showToast({
+          type: 'warning',
+          title: 'Aviso',
+          message: 'Alguns dados podem estar incompletos',
+          duration: 3000
+        });
+      } finally {
+        setLoadingData(false);
       }
     };
     
     carregarDadosCompletos();
-  }, [dados.id]);
+  }, [dados.id]); // Recarregar quando o ID mudar
+
+  // Função auxiliar para formatar data para input
+  function formatDateForInput(date: string | Date | null | undefined): string {
+    if (!date) return '';
+    
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      // Formato YYYY-MM-DD para input date
+      return dateObj.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('[EditarCustodiado] Erro ao formatar data:', date, error);
+      return '';
+    }
+  }
 
   // Validar formulário
   const validateForm = (): boolean => {
@@ -162,8 +223,6 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
       newErrors.periodicidade = 'Periodicidade deve ser maior que zero';
     } else if (periodicidadePersonalizada > 365) {
       newErrors.periodicidade = 'Periodicidade não pode ser maior que 365 dias';
-    } else if (!Number.isInteger(periodicidadePersonalizada)) {
-      newErrors.periodicidade = 'Periodicidade deve ser um número inteiro';
     }
 
     // Validação do status
@@ -180,7 +239,7 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
       newErrors.proximoComparecimento = 'Próximo comparecimento é obrigatório';
     }
 
-    // Validação de endereço (campos obrigatórios)
+    // Validação de endereço
     if (form.endereco) {
       if (!form.endereco.cep?.trim()) {
         newErrors.cep = 'CEP é obrigatório';
@@ -202,8 +261,6 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
 
       if (!form.endereco.estado?.trim()) {
         newErrors.estado = 'Estado é obrigatório';
-      } else if (form.endereco.estado.length !== 2) {
-        newErrors.estado = 'Estado deve ter 2 letras';
       }
     }
 
@@ -215,7 +272,7 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
 
-    // Limpar erro do campo quando o usuário começar a digitar
+    // Limpar erro do campo
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -294,7 +351,7 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
         });
       }
     } catch (error) {
-      console.error('[EditarSubmetido] Erro ao buscar CEP:', error);
+      console.error('[EditarCustodiado] Erro ao buscar CEP:', error);
     } finally {
       setLoading(false);
     }
@@ -350,7 +407,7 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
         periodicidade: periodicidadePersonalizada,
         dataComparecimentoInicial: form.dataComparecimentoInicial || form.decisao,
         observacoes: form.observacoes?.trim(),
-        // Campos de endereço - garantir que existem
+        // Campos de endereço
         cep: form.endereco?.cep?.replace(/\D/g, '') || '',
         logradouro: form.endereco?.logradouro?.trim() || '',
         numero: form.endereco?.numero?.trim() || '',
@@ -367,7 +424,7 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
         throw new Error('ID do custodiado inválido');
       }
 
-      console.log('[EditarSubmetido] Atualizando custodiado:', custodiadoId, dadosAtualizacao);
+      console.log('[EditarCustodiado] Atualizando custodiado:', custodiadoId, dadosAtualizacao);
 
       // Chamar API
       const resultado = await custodiadosService.atualizar(custodiadoId, dadosAtualizacao);
@@ -392,7 +449,7 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
         throw new Error(resultado.message || 'Erro ao atualizar dados');
       }
     } catch (error: any) {
-      console.error('[EditarSubmetido] Erro:', error);
+      console.error('[EditarCustodiado] Erro:', error);
       
       showToast({
         type: 'error',
@@ -405,6 +462,19 @@ export default function EditarSubmetidoModal({ dados, onClose, onVoltar, onSave 
     }
   }
 
+  // Mostrar loading enquanto carrega os dados
+  if (loadingData) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl">
+          <div className="flex flex-col items-center">
+            <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+            <p className="text-lg text-gray-600">Carregando dados completos...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
       <form

@@ -9,34 +9,6 @@ import { STATUS_LABELS, STATUS_COLORS } from '@/constants/status';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { formatCPF, formatRG, formatContato, formatCEP } from '@/lib/utils/formatting';
 
-// Estender tipo para incluir estrutura completa de endereço
-interface EnderecoCompleto {
-  id: number;
-  cep: string;
-  logradouro: string;
-  numero?: string;
-  complemento?: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  nomeEstado?: string;
-  regiaoEstado?: string;
-  dataInicio?: string;
-  dataFim?: string | null;
-  ativo?: boolean;
-  motivoAlteracao?: string;
-  validadoPor?: string;
-  enderecoCompleto?: string;
-  enderecoResumido?: string;
-  diasResidencia?: number;
-  periodoResidencia?: string;
-  criadoEm?: string;
-  atualizadoEm?: string | null;
-}
-
-interface DadosCompletosType extends Comparecimento {
-  endereco?: EnderecoCompleto;
-}
 
 interface Props {
   dados: Comparecimento;
@@ -68,13 +40,13 @@ const dateUtils = {
   }
 };
 
-export default function DetalhesSubmetidoModal({ dados, onClose, onEditar, onExcluir }: Props) {
+export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onExcluir }: Props) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [dadosCompletos, setDadosCompletos] = useState<DadosCompletosType>(dados);
+  const [dadosCompletos, setDadosCompletos] = useState<Comparecimento>(dados);
 
   // Carregar dados completos do custodiado incluindo endereço
   useEffect(() => {
@@ -112,7 +84,6 @@ export default function DetalhesSubmetidoModal({ dados, onClose, onEditar, onExc
   };
 
   const handleEditarClick = () => {
-    // Passar os dados completos incluindo endereço estruturado para o modal de edição
     onEditar(dadosCompletos);
   };
 
