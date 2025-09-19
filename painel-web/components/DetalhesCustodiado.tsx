@@ -1,8 +1,7 @@
-// painel-web/components/DetalhesSubmetido.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, UserCheck, Edit, FileText, AlertTriangle, Loader2, Trash2, MapPin, Phone, Calendar, Hash, Home, Clock, CheckCircle } from 'lucide-react';
+import { X, UserCheck, Edit, FileText, AlertTriangle, Loader2, Trash2, MapPin, Phone, Calendar, Hash, Clock, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Comparecimento } from '@/types';
 import { custodiadosService } from '@/lib/api/services';

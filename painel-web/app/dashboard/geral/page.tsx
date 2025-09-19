@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCustodiados } from '@/hooks/useAPI';
 import type { CustodiadoResponse, ListarCustodiadosResponse } from '@/types/api';
 import type { Comparecimento } from '@/types';
-import DetalhesAcusadoModal from '@/components/DetalhesSubmetido';
-import EditarAcusadoModal from '@/components/EditarSubmetido';
+import DetalhesAcusadoModal from '@/components/DetalhesCustodiado';
+import EditarAcusadoModal from '@/components/EditarCustodiado';
 import ExportButton from '@/components/ExportButton';
 import { useToast } from '@/components/Toast';
 import {

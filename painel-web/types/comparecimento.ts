@@ -5,6 +5,7 @@ import { TipoValidacao } from './api';
 import { ReactNode } from 'react';
 
 export interface Endereco {
+  id?: number;
   cep: string;
   logradouro: string;
   numero?: string;
@@ -12,6 +13,19 @@ export interface Endereco {
   bairro: string;
   cidade: string;
   estado: string;
+  nomeEstado?: string;
+  regiaoEstado?: string;
+  dataInicio?: string;
+  dataFim?: string | null;
+  ativo?: boolean;
+  motivoAlteracao?: string;
+  validadoPor?: string;
+  enderecoCompleto?: string;
+  enderecoResumido?: string;
+  diasResidencia?: number;
+  periodoResidencia?: string;
+  criadoEm?: string;
+  atualizadoEm?: string | null;
 }
 
 // Tipo utilitário para garantir que pelo menos um documento seja fornecido
