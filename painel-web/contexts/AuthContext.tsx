@@ -111,6 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     try {
       // Simular chamada à API
+      
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Verificar credenciais (simulação)

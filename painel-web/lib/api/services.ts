@@ -305,6 +305,14 @@ export const usuariosService = {
   }
 };
 
+
+
+export const authService = {
+  async login(email: string, password: string) {
+    return await apiClient.post<{ token: string; user: any }>('/auth/login', { email, password });
+  }
+};
+
 // ===========================
 // Serviços de Status
 // ===========================
