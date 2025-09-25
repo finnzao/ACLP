@@ -1,4 +1,3 @@
-// painel-web/hooks/useExport.ts
 import { useState, useCallback } from 'react';
 import { Comparecimento } from '@/types';
 import { exportFilteredData } from '@/lib/utils/excelExport';

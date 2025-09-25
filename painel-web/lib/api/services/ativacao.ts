@@ -1,6 +1,6 @@
-
-
-import { api } from '../backend-api';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { httpClient as api } from '@/lib/http/client';
 import { ApiResponse } from '@/types/api';
 
 // Tipos específicos para ativação
@@ -53,28 +53,43 @@ export const ativacaoService = {
   validarToken: async (token: string): Promise<ValidarTokenResponse> => {
     try {
       const response = await api.get<ValidarTokenResponse>(`/api/convites/validar/${token}`);
-      return response.data;
-    } catch (error: any) {
+      return response.data ?? { success: false, message: 'Erro desconhecido' };
+    } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao validar token:', error);
-      
+
       // Tratar erros específicos
-      if (error.response?.status === 404) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as any).response?.status === 404
+      ) {
         return {
           success: false,
           message: 'Token de ativação não encontrado ou inválido'
         };
       }
-      
-      if (error.response?.status === 410) {
+
+      if (
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as any).response?.status === 410
+      ) {
         return {
           success: false,
           message: 'Este convite já expirou'
         };
       }
-      
+
       return {
         success: false,
-        message: error.response?.data?.message || 'Erro ao validar token'
+        message:
+          (error &&
+            typeof error === 'object' &&
+            'response' in error &&
+            (error as any).response?.data?.message) ||
+          'Erro ao validar token'
       };
     }
   },
@@ -114,13 +129,18 @@ export const ativacaoService = {
         aceitouTermos: data.aceitouTermos
       });
 
-      return response.data;
-    } catch (error: any) {
+      return response.data ?? { success: false, message: 'Erro desconhecido' };
+    } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao ativar conta:', error);
-      
+
       return {
         success: false,
-        message: error.response?.data?.message || 'Erro ao ativar conta'
+        message:
+          (error &&
+            typeof error === 'object' &&
+            'response' in error &&
+            (error as any).response?.data?.message) ||
+          'Erro ao ativar conta'
       };
     }
   },
@@ -132,13 +152,18 @@ export const ativacaoService = {
   solicitarNovoConvite: async (data: SolicitarNovoConviteDTO): Promise<ApiResponse> => {
     try {
       const response = await api.post<ApiResponse>('/api/convites/solicitar-reenvio', data);
-      return response.data;
-    } catch (error: any) {
+      return response.data ?? { success: false, message: 'Erro desconhecido', timestamp: new Date().toISOString() };
+    } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao solicitar novo convite:', error);
-      
+
       return {
         success: false,
-        message: error.response?.data?.message || 'Erro ao solicitar novo convite',
+        message:
+          (error &&
+            typeof error === 'object' &&
+            'response' in error &&
+            (error as any).response?.data?.message) ||
+          'Erro ao solicitar novo convite',
         timestamp: new Date().toISOString()
       };
     }
@@ -155,8 +180,13 @@ export const ativacaoService = {
   }> => {
     try {
       const response = await api.get(`/api/convites/verificar/${encodeURIComponent(email)}`);
-      return response.data;
-    } catch (error) {
+      const data = response.data ?? { temConvite: false };
+      return {
+        temConvite: Boolean((data as any).temConvite),
+        status: (data as any).status,
+        expiraEm: (data as any).expiraEm
+      };
+    } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao verificar convite:', error);
       return { temConvite: false };
     }
@@ -169,13 +199,18 @@ export const ativacaoService = {
   cancelarConvite: async (tokenOuId: string): Promise<ApiResponse> => {
     try {
       const response = await api.delete<ApiResponse>(`/api/convites/${tokenOuId}`);
-      return response.data;
-    } catch (error: any) {
+      return response.data ?? { success: false, message: 'Erro desconhecido', timestamp: new Date().toISOString() };
+    } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao cancelar convite:', error);
-      
+
       return {
         success: false,
-        message: error.response?.data?.message || 'Erro ao cancelar convite',
+        message:
+          (error &&
+            typeof error === 'object' &&
+            'response' in error &&
+            (error as any).response?.data?.message) ||
+          'Erro ao cancelar convite',
         timestamp: new Date().toISOString()
       };
     }
@@ -192,14 +227,14 @@ export function useAtivacao() {
   const validarToken = useCallback(async (token: string) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await ativacaoService.validarToken(token);
-      
+
       if (!result.success) {
         setError(result.message);
       }
-      
+
       return result;
     } catch (err) {
       setError('Erro ao validar token');
@@ -212,14 +247,14 @@ export function useAtivacao() {
   const ativarConta = useCallback(async (data: AtivarContaDTO) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await ativacaoService.ativarConta(data);
-      
+
       if (!result.success) {
         setError(result.message);
       }
-      
+
       return result;
     } catch (err) {
       setError('Erro ao ativar conta');
