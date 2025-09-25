@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// lib/api/client.ts - Cliente HTTP padronizado para comunicação com a API
 
-// ===========================
 // Interfaces e Tipos
-// ===========================
 
 export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -29,9 +26,7 @@ interface ClientConfig {
   headers?: Record<string, string>;
 }
 
-// ===========================
 // Classe do Cliente HTTP
-// ===========================
 
 class HttpClient {
   private baseURL: string;
@@ -58,9 +53,9 @@ class HttpClient {
     }
   }
 
-  // ===========================
+
   // Métodos de Configuração
-  // ===========================
+
 
   setAuthToken(token: string) {
     this.defaultHeaders['Authorization'] = `Bearer ${token}`;
@@ -106,9 +101,9 @@ class HttpClient {
     this.retries = retries;
   }
 
-  // ===========================
+
   // Método Principal de Requisição
-  // ===========================
+
 
   private async makeRequest<T>(
     endpoint: string,
@@ -263,9 +258,9 @@ class HttpClient {
     };
   }
 
-  // ===========================
+
   // Métodos Utilitários
-  // ===========================
+
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -492,9 +487,9 @@ class HttpClient {
     return sanitized;
   }
 
-  // ===========================
+
   // Métodos de Conveniência
-  // ===========================
+
 
   async get<T>(endpoint: string, params?: Record<string, any>, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
     // Adicionar parâmetros de query se fornecidos
@@ -528,9 +523,9 @@ class HttpClient {
     return this.makeRequest<T>(endpoint, { ...config, method: 'DELETE' });
   }
 
-  // ===========================
+
   // Métodos Especiais
-  // ===========================
+
 
   async upload<T>(
     endpoint: string, 
@@ -596,9 +591,9 @@ class HttpClient {
     }
   }
 
-  // ===========================
+
   // Métodos de Interceptação
-  // ===========================
+
 
   async requestWithInterceptors<T>(
     endpoint: string,
@@ -624,9 +619,9 @@ class HttpClient {
     return response;
   }
 
-  // ===========================
+
   // Métodos de Configuração e Status
-  // ===========================
+
 
   getConfig() {
     return {
@@ -658,9 +653,9 @@ class HttpClient {
     }
   }
 
-  // ===========================
+
   // Método para Request Raw (sem parsing)
-  // ===========================
+
 
   async requestRaw(endpoint: string, config: RequestConfig = {}): Promise<Response> {
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
@@ -685,9 +680,7 @@ class HttpClient {
   }
 }
 
-// ===========================
 // Instância Singleton e Exports
-// ===========================
 
 // Instância padrão do cliente
 export const apiClient = new HttpClient();

@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// types/api.ts - Tipos unificados para a API do backend
 
-// ===========================
 // Enums
-// ===========================
 
 export enum StatusComparecimento {
   EM_CONFORMIDADE = 'EM_CONFORMIDADE',
@@ -30,9 +27,8 @@ export enum EstadoBrasil {
   SE = 'SE', TO = 'TO'
 }
 
-// ===========================
+
 // DTOs - Data Transfer Objects
-// ===========================
 
 // Endereço (usado em vários DTOs)
 export interface EnderecoDTO {
@@ -118,9 +114,9 @@ export interface ReenviarCodigoDTO {
   email: string;
 }
 
-// ===========================
+
 // Response Types
-// ===========================
+
 
 // Resposta base da API
 export interface ApiResponse<T = any> {
@@ -292,9 +288,9 @@ export interface AppInfoResponse {
   springBootVersion: string;
 }
 
-// ===========================
+
 // Parâmetros de Consulta
-// ===========================
+
 
 export interface PeriodoParams {
   inicio?: string;
@@ -314,9 +310,9 @@ export interface PaginationParams {
   direction?: 'ASC' | 'DESC';
 }
 
-// ===========================
+
 // Status Response
-// ===========================
+
 
 export interface StatusVerificacaoResponse {
   pessoasMarcadas: number;

@@ -16,54 +16,441 @@ import {
   Shield, 
   Users, 
   Database, 
-  FileText,
   Lock,
   Eye,
   EyeOff,
   Save,
-  UserPlus,
-  AlertCircle,
   Crown,
-  ChevronRight,
-  Smartphone,
   Mail,
   Phone,
-  Key,
-  BellRing,
-  Monitor,
   LogOut,
   Check,
-  MapPin,
-  Building,
-  Plus,
-  Trash2,
-  Edit
+  Edit,
+  Send,
+  Clock,
+  X,
+  RefreshCw,
+  UserCheck,
+  Info,
+  CheckCircle,
+  XCircle,
+  Loader2
 } from 'lucide-react';
+import { useToast } from '@/components/Toast';
 
-// Interfaces para Comarca e Vara
-interface Vara {
+// Interface para convite de usuário
+interface ConviteUsuario {
   id: string;
   nome: string;
-  numero: string;
-  especialidade: string;
-  ativa: boolean;
+  email: string;
+  tipo: 'ADMIN' | 'USUARIO';
+  departamento?: string;
+  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO' | 'CANCELADO';
+  criadoPor: string;
+  criadoEm: string;
+  expiraEm: string;
+  aceiteEm?: string;
 }
 
-interface Comarca {
+// Interface para usuário ativo
+interface UsuarioAtivo {
   id: string;
   nome: string;
-  cidade: string;
-  estado: string;
-  varas: Vara[];
-  ativa: boolean;
-  criadaEm: Date;
+  email: string;
+  tipo: 'ADMIN' | 'USUARIO';
+  departamento?: string;
+  telefone?: string;
+  ativo: boolean;
+  criadoEm: string;
+  ultimoLogin?: string;
 }
+
+// Componente de validação de senha
+const PasswordStrengthIndicator = ({ password }: { password: string }) => {
+  const calculateStrength = () => {
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    return Math.min(5, strength);
+  };
+
+  const strength = calculateStrength();
+  const strengthLabels = ['Muito Fraca', 'Fraca', 'Razoável', 'Boa', 'Forte', 'Muito Forte'];
+  const strengthColors = [
+    'bg-red-500',
+    'bg-orange-500',
+    'bg-yellow-500',
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-green-600'
+  ];
+
+  if (!password) return null;
+
+  return (
+    <div className="mt-2">
+      <div className="flex gap-1 mb-1">
+        {[...Array(5)].map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors ${
+              i < strength ? strengthColors[strength] : 'bg-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+      <p className={`text-xs ${strength < 3 ? 'text-red-600' : 'text-green-600'}`}>
+        Força da senha: {strengthLabels[strength]}
+      </p>
+    </div>
+  );
+};
+
+// Modal de convite de usuário
+const ModalConviteUsuario = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: (data: any) => void;
+}) => {
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    tipo: 'USUARIO' as 'ADMIN' | 'USUARIO',
+    departamento: ''
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.nome.trim()) {
+      newErrors.nome = 'Nome é obrigatório';
+    }
+    
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!isValidEmail(formData.email)) {
+      newErrors.email = 'Email inválido';
+    } else if (!formData.email.endsWith('@tjba.jus.br')) {
+      newErrors.email = 'Use o email institucional (@tjba.jus.br)';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onConfirm(formData);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Send className="w-5 h-5 text-blue-600" />
+            Convidar Novo Usuário
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nome Completo <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.nome}
+              onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
+              className={`w-full px-3 py-2 border rounded-lg ${
+                errors.nome ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="João da Silva"
+            />
+            {errors.nome && <p className="text-red-500 text-xs mt-1">{errors.nome}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email Institucional <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              className={`w-full px-3 py-2 border rounded-lg ${
+                errors.email ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="joao.silva@tjba.jus.br"
+            />
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            <p className="text-gray-500 text-xs mt-1">Use o email @tjba.jus.br</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo de Usuário <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.tipo}
+              onChange={(e) => setFormData(prev => ({ 
+                ...prev, 
+                tipo: e.target.value as 'ADMIN' | 'USUARIO' 
+              }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="USUARIO">Usuário Padrão</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
+            <p className="text-gray-500 text-xs mt-1">
+              {formData.tipo === 'ADMIN' 
+                ? 'Acesso completo ao sistema' 
+                : 'Acesso para registro de comparecimentos'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Departamento
+            </label>
+            <input
+              type="text"
+              value={formData.departamento}
+              onChange={(e) => setFormData(prev => ({ ...prev, departamento: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Central de Comparecimentos"
+            />
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+          <div className="flex items-start gap-2">
+            <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">Como funciona o convite?</p>
+              <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                <li>• O usuário receberá um email com link de ativação</li>
+                <li>• O link expira em 72 horas</li>
+                <li>• O usuário definirá sua própria senha</li>
+                <li>• Você pode reenviar ou cancelar o convite se necessário</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            Enviar Convite
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Lista de convites pendentes
+const ListaConvitesPendentes = ({ 
+  convites, 
+  onReenviar, 
+  onCancelar 
+}: { 
+  convites: ConviteUsuario[]; 
+  onReenviar: (id: string) => void;
+  onCancelar: (id: string) => void;
+}) => {
+  const getStatusBadge = (status: ConviteUsuario['status']) => {
+    const badges = {
+      PENDENTE: 'bg-yellow-100 text-yellow-800',
+      ACEITO: 'bg-green-100 text-green-800',
+      EXPIRADO: 'bg-red-100 text-red-800',
+      CANCELADO: 'bg-gray-100 text-gray-800'
+    };
+    return badges[status];
+  };
+
+  const getStatusIcon = (status: ConviteUsuario['status']) => {
+    switch(status) {
+      case 'PENDENTE': return <Clock className="w-3 h-3" />;
+      case 'ACEITO': return <CheckCircle className="w-3 h-3" />;
+      case 'EXPIRADO': return <XCircle className="w-3 h-3" />;
+      case 'CANCELADO': return <X className="w-3 h-3" />;
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {convites.map(convite => (
+        <div key={convite.id} className="border border-gray-200 rounded-lg p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h4 className="font-medium text-gray-800">{convite.nome}</h4>
+              <p className="text-sm text-gray-600">{convite.email}</p>
+              <div className="flex items-center gap-3 mt-2">
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(convite.status)}`}>
+                  {getStatusIcon(convite.status)}
+                  {convite.status}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {convite.tipo === 'ADMIN' ? 'Administrador' : 'Usuário'}
+                </span>
+                {convite.departamento && (
+                  <span className="text-xs text-gray-500">
+                    {convite.departamento}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Enviado em {new Date(convite.criadoEm).toLocaleDateString('pt-BR')}
+                {convite.status === 'PENDENTE' && (
+                  <span className="text-orange-600 ml-2">
+                    • Expira em {new Date(convite.expiraEm).toLocaleDateString('pt-BR')}
+                  </span>
+                )}
+              </p>
+            </div>
+            
+            {convite.status === 'PENDENTE' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onReenviar(convite.id)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Reenviar convite"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onCancelar(convite.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Cancelar convite"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Lista de usuários ativos
+const ListaUsuariosAtivos = ({ 
+  usuarios, 
+  onEditar, 
+  onDesativar 
+}: { 
+  usuarios: UsuarioAtivo[]; 
+  onEditar: (id: string) => void;
+  onDesativar: (id: string) => void;
+}) => {
+  return (
+    <div className="space-y-3">
+      {usuarios.map(usuario => (
+        <div key={usuario.id} className="border border-gray-200 rounded-lg p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                usuario.tipo === 'ADMIN' ? 'bg-yellow-100' : 'bg-gray-100'
+              }`}>
+                {usuario.tipo === 'ADMIN' ? (
+                  <Crown className="w-5 h-5 text-yellow-600" />
+                ) : (
+                  <User className="w-5 h-5 text-gray-600" />
+                )}
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-800">{usuario.nome}</h4>
+                <p className="text-sm text-gray-600">{usuario.email}</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs text-gray-500">
+                    {usuario.tipo === 'ADMIN' ? 'Administrador' : 'Usuário'}
+                  </span>
+                  {usuario.departamento && (
+                    <span className="text-xs text-gray-500">
+                      {usuario.departamento}
+                    </span>
+                  )}
+                  {usuario.telefone && (
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <Phone className="w-3 h-3" />
+                      {usuario.telefone}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {usuario.ultimoLogin ? (
+                    <>Último acesso: {new Date(usuario.ultimoLogin).toLocaleString('pt-BR')}</>
+                  ) : (
+                    'Nunca acessou'
+                  )}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                usuario.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+                {usuario.ativo ? 'Ativo' : 'Inativo'}
+              </span>
+              
+              <button
+                onClick={() => onEditar(usuario.id)}
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Editar usuário"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              
+              {usuario.ativo && (
+                <button
+                  onClick={() => onDesativar(usuario.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Desativar usuário"
+                >
+                  <Lock className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const tabs = [
   { id: 'perfil', label: 'Perfil', icon: User },
+  { id: 'seguranca', label: 'Segurança', icon: Lock },
   { id: 'notificacoes', label: 'Notificações', icon: Bell },
-  { id: 'sistema', label: 'Sistema', icon: Settings, requiresAdmin: true },
   { id: 'usuarios', label: 'Usuários', icon: Users, requiresAdmin: true },
+  { id: 'sistema', label: 'Sistema', icon: Settings, requiresAdmin: true },
   { id: 'backup', label: 'Backup & Logs', icon: Database, requiresAdmin: true }
 ] as const;
 
@@ -72,70 +459,38 @@ type TabId = typeof tabs[number]['id'];
 export default function ConfiguracoesPage() {
   const { user, updateUser, logout } = useAuth();
   const { isAdmin, hasPermission } = usePermissions();
+  const { showToast } = useToast();
   
   const [activeTab, setActiveTab] = useState<TabId>('perfil');
   const [isMobile, setIsMobile] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   
-  // Estados do perfil do usuário
+  // Estados do perfil
   const [nomeUsuario, setNomeUsuario] = useState(user?.nome || '');
   const [emailUsuario, setEmailUsuario] = useState(user?.email || '');
   const [telefoneUsuario, setTelefoneUsuario] = useState(user?.telefone || '');
-  const [erroEmailUsuario, setErroEmailUsuario] = useState('');
+  const [departamentoUsuario, setDepartamentoUsuario] = useState(user?.departamento || '');
+  
+  // Estados de segurança
+  const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [mostrarSenha, setMostrarSenha] = useState(false);
-
+  const [mostrarSenhaAtual, setMostrarSenhaAtual] = useState(false);
+  const [mostrarNovaSenha, setMostrarNovaSenha] = useState(false);
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
+  
+  // Estados de usuários
+  const [showModalConvite, setShowModalConvite] = useState(false);
+  const [convitesPendentes, setConvitesPendentes] = useState<ConviteUsuario[]>([]);
+  const [usuariosAtivos, setUsuariosAtivos] = useState<UsuarioAtivo[]>([]);
+  const [abaUsuarios, setAbaUsuarios] = useState<'ativos' | 'convites'>('ativos');
+  
   // Estados das notificações
-  const [novoEmail, setNovoEmail] = useState('');
-  const [novoDias, setNovoDias] = useState<number>(3);
-  const [erroEmail, setErroEmail] = useState('');
-  const [editando, setEditando] = useState<number | null>(null);
-  const [editandoEmail, setEditandoEmail] = useState('');
-  const [editandoDias, setEditandoDias] = useState<number>(3);
-  const [erroEdicao, setErroEdicao] = useState('');
-
   const [notificacoes, setNotificacoes] = useState<NotificacaoConfig[]>([
     { email: 'supervisao@email.com', dias: 3 }
   ]);
-
-  // Estados para Comarcas e Varas
-  const [comarcas, setComarcas] = useState<Comarca[]>([
-    {
-      id: '1',
-      nome: 'Comarca de Salvador',
-      cidade: 'Salvador',
-      estado: 'BA',
-      ativa: true,
-      criadaEm: new Date(),
-      varas: [
-        { id: '1', nome: '1ª Vara de Execuções Penais', numero: '001', especialidade: 'Criminal', ativa: true },
-        { id: '2', nome: '2ª Vara de Execuções Penais', numero: '002', especialidade: 'Criminal', ativa: true }
-      ]
-    }
-  ]);
-
-  // Estados do formulário unificado
-  const [formularioComarca, setFormularioComarca] = useState({
-    nome: '',
-    cidade: '',
-    estado: '',
-    varas: [{ nome: '', numero: '', especialidade: '' }] as Array<{ nome: string; numero: string; especialidade: string }>
-  });
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-
-  // Configurações do usuário (removidas preferências, mantido apenas notificações)
-  const [configuracoes, setConfiguracoes] = useState({
-    notificacoes: user?.configuracoes?.notificacoes || {
-      sistema: true,
-    },
-    interface: user?.configuracoes?.interface || {
-      tema: 'light' as const,
-      itensPerPage: 20,
-      idioma: 'pt-BR' as const,
-    },
-  });
-
+  
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -147,7 +502,215 @@ export default function ConfiguracoesPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Verificar se o usuário pode ver determinadas abas
+  // Carregar dados de usuários
+  useEffect(() => {
+    if (activeTab === 'usuarios' && isAdmin()) {
+      carregarUsuarios();
+      carregarConvites();
+    }
+  }, [activeTab, isAdmin]);
+
+  const carregarUsuarios = async () => {
+    try {
+      // Chamar API para buscar usuários
+      // const response = await api.get('/usuarios');
+      // setUsuariosAtivos(response.data);
+      
+      // Dados mock para demonstração
+      setUsuariosAtivos([
+        {
+          id: '1',
+          nome: 'João Silva',
+          email: 'joao.silva@tjba.jus.br',
+          tipo: 'ADMIN',
+          departamento: 'Central de Comparecimentos',
+          telefone: '(71) 9999-9999',
+          ativo: true,
+          criadoEm: '2024-01-01',
+          ultimoLogin: new Date().toISOString()
+        }
+      ]);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+    }
+  };
+
+  const carregarConvites = async () => {
+    try {
+      // Chamar API para buscar convites
+      // const response = await api.get('/convites');
+      // setConvitesPendentes(response.data);
+      
+      // Dados mock para demonstração
+      setConvitesPendentes([
+        {
+          id: '1',
+          nome: 'Maria Santos',
+          email: 'maria.santos@tjba.jus.br',
+          tipo: 'USUARIO',
+          departamento: 'Atendimento',
+          status: 'PENDENTE',
+          criadoPor: 'João Silva',
+          criadoEm: new Date(Date.now() - 86400000).toISOString(),
+          expiraEm: new Date(Date.now() + 172800000).toISOString()
+        }
+      ]);
+    } catch (error) {
+      console.error('Erro ao carregar convites:', error);
+    }
+  };
+
+  const handleEnviarConvite = async (data: any) => {
+    setLoading(true);
+    try {
+      // Chamar API para enviar convite
+      // await api.post('/convites', data);
+      
+      showToast({
+        type: 'success',
+        title: 'Convite Enviado',
+        message: `Convite enviado para ${data.email}`,
+        duration: 5000
+      });
+      
+      setShowModalConvite(false);
+      carregarConvites();
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'Erro ao enviar convite',
+        message: 'Não foi possível enviar o convite',
+        duration: 5000
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReenviarConvite = async (id: string) => {
+    try {
+      // Chamar API para reenviar convite
+      // await api.post(`/convites/${id}/reenviar`);
+      
+      showToast({
+        type: 'success',
+        title: 'Convite Reenviado',
+        message: 'O convite foi reenviado com sucesso',
+        duration: 3000
+      });
+      
+      carregarConvites();
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Não foi possível reenviar o convite',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleCancelarConvite = async (id: string) => {
+    if (!confirm('Tem certeza que deseja cancelar este convite?')) return;
+    
+    try {
+      // Chamar API para cancelar convite
+      // await api.delete(`/convites/${id}`);
+      
+      showToast({
+        type: 'success',
+        title: 'Convite Cancelado',
+        message: 'O convite foi cancelado com sucesso',
+        duration: 3000
+      });
+      
+      carregarConvites();
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Não foi possível cancelar o convite',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleAlterarSenha = async () => {
+    // Validações
+    if (!senhaAtual) {
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Digite sua senha atual',
+        duration: 3000
+      });
+      return;
+    }
+    
+    if (novaSenha.length < 8) {
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'A nova senha deve ter pelo menos 8 caracteres',
+        duration: 3000
+      });
+      return;
+    }
+    
+    if (novaSenha !== confirmarSenha) {
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'As senhas não coincidem',
+        duration: 3000
+      });
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Chamar API para alterar senha
+      // await api.post('/usuarios/alterar-senha', {
+      //   senhaAtual,
+      //   novaSenha
+      // });
+      
+      showToast({
+        type: 'success',
+        title: 'Senha Alterada',
+        message: 'Sua senha foi alterada com sucesso',
+        duration: 3000
+      });
+      
+      // Limpar campos
+      setSenhaAtual('');
+      setNovaSenha('');
+      setConfirmarSenha('');
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Senha atual incorreta',
+        duration: 3000
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = () => {
+    updateUser({
+      nome: nomeUsuario,
+      email: emailUsuario,
+      telefone: telefoneUsuario,
+      departamento: departamentoUsuario
+    });
+    
+    setShowSaveSuccess(true);
+    setTimeout(() => setShowSaveSuccess(false), 3000);
+  };
+
+  // Verificar permissões das abas
   const canViewTab = (tabId: TabId): boolean => {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return false;
@@ -156,216 +719,10 @@ export default function ConfiguracoesPage() {
       return isAdmin();
     }
     
-    switch (tabId) {
-      case 'perfil':
-      case 'notificacoes':
-        return true;
-      default:
-        return false;
-    }
+    return true;
   };
 
-  // Filtrar abas disponíveis
   const availableTabs = tabs.filter(tab => canViewTab(tab.id));
-
-  // Funções de notificação
-  function adicionarEmail() {
-    const emailFormatado = formatEmail(novoEmail);
-    if (!isValidEmail(emailFormatado)) {
-      setErroEmail('E-mail inválido.');
-      return;
-    }
-    setErroEmail('');
-
-    if (!notificacoes.some(n => n.email === emailFormatado)) {
-      setNotificacoes(prev => [...prev, { email: emailFormatado, dias: novoDias }]);
-      setNovoEmail('');
-      setNovoDias(3);
-    } else {
-      setErroEmail('E-mail já adicionado.');
-    }
-  }
-
-  function removerEmail(index: number) {
-    setNotificacoes(prev => prev.filter((_, i) => i !== index));
-    if (editando === index) {
-      setEditando(null);
-    }
-  }
-
-  function iniciarEdicao(index: number) {
-    setEditando(index);
-    setEditandoEmail(notificacoes[index].email);
-    setEditandoDias(notificacoes[index].dias);
-    setErroEdicao('');
-  }
-
-  function salvarEdicao(index: number) {
-    const emailFormatado = formatEmail(editandoEmail);
-    if (!isValidEmail(emailFormatado)) {
-      setErroEdicao('E-mail inválido.');
-      return;
-    }
-    setErroEdicao('');
-
-    setNotificacoes(prev =>
-      prev.map((item, i) => (i === index ? { email: emailFormatado, dias: editandoDias } : item))
-    );
-    setEditando(null);
-    setEditandoEmail('');
-    setEditandoDias(3);
-  }
-
-  // Funções de Comarca e Vara
-  const adicionarVaraFormulario = () => {
-    setFormularioComarca(prev => ({
-      ...prev,
-      varas: [...prev.varas, { nome: '', numero: '', especialidade: '' }]
-    }));
-  };
-
-  const removerVaraFormulario = (index: number) => {
-    if (formularioComarca.varas.length > 1) {
-      setFormularioComarca(prev => ({
-        ...prev,
-        varas: prev.varas.filter((_, i) => i !== index)
-      }));
-    }
-  };
-
-  const atualizarVaraFormulario = (index: number, campo: string, valor: string) => {
-    setFormularioComarca(prev => ({
-      ...prev,
-      varas: prev.varas.map((vara, i) => 
-        i === index ? { ...vara, [campo]: valor } : vara
-      )
-    }));
-  };
-
-  const salvarComarca = () => {
-    // Validações
-    if (!formularioComarca.nome || !formularioComarca.cidade || !formularioComarca.estado) {
-      alert('Preencha todos os campos da comarca');
-      return;
-    }
-
-    const varasInvalidas = formularioComarca.varas.some(vara => 
-      !vara.nome || !vara.numero || !vara.especialidade
-    );
-
-    if (varasInvalidas) {
-      alert('Preencha todos os campos das varas');
-      return;
-    }
-
-    // Criar varas com IDs únicos
-    const varas: Vara[] = formularioComarca.varas.map((vara, index) => ({
-      id: `${Date.now()}-${index}`,
-      nome: vara.nome,
-      numero: vara.numero,
-      especialidade: vara.especialidade,
-      ativa: true
-    }));
-
-    // Criar comarca
-    const comarca: Comarca = {
-      id: Date.now().toString(),
-      nome: formularioComarca.nome,
-      cidade: formularioComarca.cidade,
-      estado: formularioComarca.estado.toUpperCase(),
-      varas,
-      ativa: true,
-      criadaEm: new Date()
-    };
-
-    setComarcas(prev => [...prev, comarca]);
-    setFormularioComarca({
-      nome: '',
-      cidade: '',
-      estado: '',
-      varas: [{ nome: '', numero: '', especialidade: '' }]
-    });
-    setMostrarFormulario(false);
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
-  };
-
-  const cancelarFormulario = () => {
-    setFormularioComarca({
-      nome: '',
-      cidade: '',
-      estado: '',
-      varas: [{ nome: '', numero: '', especialidade: '' }]
-    });
-    setMostrarFormulario(false);
-  };
-
-  const removerComarca = (comarcaId: string) => {
-    if (confirm('Tem certeza que deseja remover esta comarca? Esta ação não pode ser desfeita.')) {
-      setComarcas(prev => prev.filter(comarca => comarca.id !== comarcaId));
-      setShowSaveSuccess(true);
-      setTimeout(() => setShowSaveSuccess(false), 3000);
-    }
-  };
-
-  function handleEmailUsuarioChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const email = e.target.value;
-    setEmailUsuario(email);
-    setErroEmailUsuario(isValidEmail(email) ? '' : 'E-mail inválido.');
-  }
-
-  const handleSaveProfile = () => {
-    if (erroEmailUsuario) {
-      alert('Corrija os erros antes de salvar');
-      return;
-    }
-
-    updateUser({
-      nome: nomeUsuario,
-      email: emailUsuario,
-      telefone: telefoneUsuario,
-      configuracoes
-    });
-
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
-  };
-
-  const handleSaveSettings = () => {
-    updateUser({ configuracoes });
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
-  };
-
-  // Mobile Settings Item Component
-  const MobileSettingItem = ({ 
-    icon, 
-    title, 
-    subtitle, 
-    onClick, 
-    showArrow = true,
-    rightElement 
-  }: { 
-    icon: React.ReactNode; 
-    title: string; 
-    subtitle?: string; 
-    onClick?: () => void;
-    showArrow?: boolean;
-    rightElement?: React.ReactNode;
-  }) => (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors"
-    >
-      <div className="flex-shrink-0">{icon}</div>
-      <div className="flex-1 text-left">
-        <p className="font-medium text-gray-800">{title}</p>
-        {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
-      </div>
-      {rightElement}
-      {showArrow && <ChevronRight className="w-5 h-5 text-gray-400" />}
-    </button>
-  );
 
   // Mobile Layout
   if (isMobile) {
@@ -387,14 +744,6 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
         </div>
-
-        {/* Success Message */}
-        {showSaveSuccess && (
-          <div className="fixed top-20 left-4 right-4 bg-green-500 text-white p-3 rounded-lg shadow-lg z-30 flex items-center gap-2 animate-in slide-in-from-top-2">
-            <Check className="w-5 h-5" />
-            <span className="font-medium">Salvo com sucesso!</span>
-          </div>
-        )}
 
         {/* Tab Navigation - Mobile */}
         <div className="bg-white mb-4">
@@ -419,422 +768,10 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
 
-        {/* Content */}
-        <div className="pb-20">
-          {/* Perfil Tab */}
-          {activeTab === 'perfil' && (
-            <div className="space-y-4">
-              {/* Informações Pessoais */}
-              <div className="bg-white rounded-lg shadow-sm">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold text-gray-800">Informações Pessoais</h3>
-                </div>
-                <div className="p-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nome Completo
-                    </label>
-                    <input
-                      type="text"
-                      value={nomeUsuario}
-                      onChange={e => setNomeUsuario(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      E-mail
-                    </label>
-                    <input
-                      type="email"
-                      value={emailUsuario}
-                      onChange={handleEmailUsuarioChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                    {erroEmailUsuario && (
-                      <p className="text-red-500 text-xs mt-1">{erroEmailUsuario}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Telefone
-                    </label>
-                    <input
-                      type="text"
-                      value={telefoneUsuario}
-                      onChange={e => setTelefoneUsuario(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      placeholder="(00) 00000-0000"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Segurança */}
-              <div className="bg-white rounded-lg shadow-sm">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold text-gray-800">Segurança</h3>
-                </div>
-                <div className="divide-y">
-                  <MobileSettingItem
-                    icon={<Key className="w-5 h-5 text-gray-600" />}
-                    title="Alterar Senha"
-                    subtitle="Última alteração: nunca"
-                    onClick={() => {/* Abrir modal de senha */}}
-                  />
-                  <MobileSettingItem
-                    icon={<Smartphone className="w-5 h-5 text-gray-600" />}
-                    title="Autenticação em Dois Fatores"
-                    subtitle="Desativado"
-                    rightElement={
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        Em breve
-                      </span>
-                    }
-                    showArrow={false}
-                  />
-                </div>
-              </div>
-
-              {/* Notificações do Sistema */}
-              <div className="bg-white rounded-lg shadow-sm">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold text-gray-800">Notificações</h3>
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Monitor className="w-5 h-5 text-gray-600" />
-                      <span className="text-sm">Notificações do sistema</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={configuracoes.notificacoes.sistema}
-                      onChange={e => setConfiguracoes(prev => ({
-                        ...prev,
-                        notificacoes: { ...prev.notificacoes, sistema: e.target.checked }
-                      }))}
-                      className="rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <div className="p-4">
-                <button
-                  onClick={handleSaveProfile}
-                  className="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-primary-dark transition-colors"
-                >
-                  Salvar Alterações
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Notificações Tab */}
-          {activeTab === 'notificacoes' && (
-            <div className="space-y-4">
-              <PermissionGuard resource="sistema" action="configurar">
-                <div className="bg-white rounded-lg shadow-sm">
-                  <div className="p-4 border-b">
-                    <h3 className="font-semibold text-gray-800">Notificações de Prazo</h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Configure e-mails para receber alertas
-                    </p>
-                  </div>
-                  
-                  <div className="p-4">
-                    {/* Add Email Form */}
-                    <div className="space-y-3 mb-4">
-                      <input
-                        type="email"
-                        value={novoEmail}
-                        onChange={(e) => setNovoEmail(e.target.value)}
-                        placeholder="E-mail para notificação"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          value={novoDias}
-                          onChange={(e) => setNovoDias(Number(e.target.value))}
-                          placeholder="Dias"
-                          className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
-                        <button
-                          onClick={adicionarEmail}
-                          className="flex-1 bg-secondary text-white py-2 rounded-lg text-sm font-medium"
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-                      {erroEmail && (
-                        <p className="text-red-500 text-xs">{erroEmail}</p>
-                      )}
-                    </div>
-
-                    {/* Email List */}
-                    <div className="space-y-2">
-                      {notificacoes.map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                          <div>
-                            <p className="font-medium text-sm">{item.email}</p>
-                            <p className="text-xs text-gray-500">
-                              Notificar {item.dias} dias antes
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => removerEmail(i)}
-                            className="text-red-500 text-sm"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={handleSaveSettings}
-                      className="w-full mt-4 bg-primary text-white py-2 rounded-lg text-sm font-medium"
-                    >
-                      Salvar Notificações
-                    </button>
-                  </div>
-                </div>
-              </PermissionGuard>
-            </div>
-          )}
-
-          {/* Sistema Tab - Comarcas e Varas */}
-          {activeTab === 'sistema' && isAdmin() && (
-            <AdminArea>
-              <div className="space-y-4">
-                {/* Adicionar Nova Comarca */}
-                <div className="bg-white rounded-lg shadow-sm">
-                  <div className="p-4 border-b">
-                    <h3 className="font-semibold text-gray-800">Nova Comarca</h3>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <input
-                      type="text"
-                      value={novaComarca.nome}
-                      onChange={(e) => setNovaComarca(prev => ({ ...prev, nome: e.target.value }))}
-                      placeholder="Nome da Comarca"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={novaComarca.cidade}
-                        onChange={(e) => setNovaComarca(prev => ({ ...prev, cidade: e.target.value }))}
-                        placeholder="Cidade"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={novaComarca.estado}
-                        onChange={(e) => setNovaComarca(prev => ({ ...prev, estado: e.target.value }))}
-                        placeholder="UF"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        maxLength={2}
-                      />
-                    </div>
-                    <button
-                      onClick={adicionarComarca}
-                      className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm font-medium"
-                    >
-                      Criar Comarca
-                    </button>
-                  </div>
-                </div>
-
-                {/* Lista de Comarcas */}
-                {comarcas.map((comarca) => (
-                  <div key={comarca.id} className="bg-white rounded-lg shadow-sm">
-                    <div className="p-4 border-b">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-gray-800">{comarca.nome}</h3>
-                          <p className="text-sm text-gray-600">{comarca.cidade} - {comarca.estado}</p>
-                        </div>
-                        <button
-                          onClick={() => removerComarca(comarca.id)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4">
-                      {/* Adicionar Nova Vara */}
-                      {comarcaSelecionada === comarca.id ? (
-                        <div className="space-y-3 mb-4 p-3 bg-gray-50 rounded-lg">
-                          <input
-                            type="text"
-                            value={novaVara.nome}
-                            onChange={(e) => setNovaVara(prev => ({ ...prev, nome: e.target.value }))}
-                            placeholder="Nome da Vara"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value={novaVara.numero}
-                              onChange={(e) => setNovaVara(prev => ({ ...prev, numero: e.target.value }))}
-                              placeholder="Número"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            />
-                            <input
-                              type="text"
-                              value={novaVara.especialidade}
-                              onChange={(e) => setNovaVara(prev => ({ ...prev, especialidade: e.target.value }))}
-                              placeholder="Especialidade"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => adicionarVara(comarca.id)}
-                              className="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-medium"
-                            >
-                              Salvar Vara
-                            </button>
-                            <button
-                              onClick={() => {
-                                setComarcaSelecionada(null);
-                                setNovaVara({ nome: '', numero: '', especialidade: '' });
-                              }}
-                              className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setComarcaSelecionada(comarca.id)}
-                          className="w-full bg-green-100 text-green-700 py-2 rounded-lg text-sm font-medium mb-4 flex items-center justify-center gap-2"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Adicionar Vara
-                        </button>
-                      )}
-
-                      {/* Lista de Varas */}
-                      <div className="space-y-2">
-                        {comarca.varas.map((vara) => (
-                          <div key={vara.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <p className="font-medium text-sm">{vara.nome}</p>
-                              <p className="text-xs text-gray-500">
-                                Nº {vara.numero} • {vara.especialidade}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => removerVara(comarca.id, vara.id)}
-                              className="text-red-500 text-sm p-1"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </AdminArea>
-          )}
-
-          {activeTab === 'usuarios' && isAdmin() && (
-            <AdminArea>
-              <div className="bg-white rounded-lg shadow-sm">
-                <div className="p-4 border-b flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-800">Usuários</h3>
-                  <button className="bg-primary text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1">
-                    <UserPlus className="w-4 h-4" />
-                    Novo
-                  </button>
-                </div>
-                <div className="divide-y">
-                  <MobileSettingItem
-                    icon={
-                      <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                        <Crown className="w-5 h-5 text-yellow-600" />
-                      </div>
-                    }
-                    title="João Silva"
-                    subtitle="admin@tjba.com.br"
-                    rightElement={
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                        Ativo
-                      </span>
-                    }
-                  />
-                  <MobileSettingItem
-                    icon={
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-gray-600" />
-                      </div>
-                    }
-                    title="Maria Santos"
-                    subtitle="usuario@tjba.com.br"
-                    rightElement={
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                        Ativo
-                      </span>
-                    }
-                  />
-                </div>
-              </div>
-            </AdminArea>
-          )}
-
-          {activeTab === 'backup' && isAdmin() && (
-            <AdminArea>
-              <div className="space-y-4">
-                <div className="bg-white rounded-lg shadow-sm p-4">
-                  <h3 className="font-semibold text-gray-800 mb-3">Backup</h3>
-                  <div className="space-y-2">
-                    <button className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm">
-                      Gerar Backup Manual
-                    </button>
-                    <button className="w-full bg-green-500 text-white py-2 rounded-lg text-sm">
-                      Download Último Backup
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-lg shadow-sm p-4">
-                  <h3 className="font-semibold text-gray-800 mb-3">Logs do Sistema</h3>
-                  <div className="space-y-2">
-                    <button className="w-full bg-purple-500 text-white py-2 rounded-lg text-sm">
-                      Visualizar Logs
-                    </button>
-                    <button className="w-full bg-orange-500 text-white py-2 rounded-lg text-sm">
-                      Exportar Logs
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </AdminArea>
-          )}
-        </div>
-
-        {/* Logout Button - Fixed Bottom */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 py-3 text-red-600 font-medium hover:bg-red-50 rounded-lg transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            Sair da Conta
-          </button>
+        {/* Content Mobile */}
+        <div className="pb-20 px-4">
+          {/* Conteúdo das abas */}
+          {/* ... implementar conteúdo mobile das abas ... */}
         </div>
       </div>
     );
@@ -843,6 +780,7 @@ export default function ConfiguracoesPage() {
   // Desktop Layout
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-primary mb-2">Configurações</h2>
@@ -860,7 +798,7 @@ export default function ConfiguracoesPage() {
           onClick={logout}
           className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
         >
-          <Lock className="w-4 h-4" />
+          <LogOut className="w-4 h-4" />
           Sair
         </button>
       </div>
@@ -873,6 +811,7 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
+      {/* Tab Navigation */}
       <div className="flex gap-4 mb-8 border-b border-border pb-2 overflow-x-auto">
         {availableTabs.map((tab) => (
           <button
@@ -892,10 +831,10 @@ export default function ConfiguracoesPage() {
         ))}
       </div>
 
-      {/* Perfil do Usuário */}
+      {/* Perfil Tab */}
       {activeTab === 'perfil' && (
         <div className="space-y-6">
-          <section className="bg-white p-6 rounded-xl shadow space-y-4">
+          <section className="bg-white p-6 rounded-xl shadow">
             <div className="flex items-center gap-3 mb-4">
               <User className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-medium text-primary-dark">Informações Pessoais</h3>
@@ -909,462 +848,232 @@ export default function ConfiguracoesPage() {
                 placeholder="Nome completo" 
               />
               <InputGroup
-                label="E-mail"
+                label="Email"
                 type="email"
                 value={emailUsuario}
-                onChange={handleEmailUsuarioChange}
-                placeholder="E-mail"
-                error={erroEmailUsuario}
+                onChange={e => setEmailUsuario(e.target.value)}
+                placeholder="Email"
               />
-            </div>
-            
-            <InputGroup 
-              label="Telefone"
-              value={telefoneUsuario} 
-              onChange={e => setTelefoneUsuario(e.target.value)} 
-              placeholder="(00) 00000-0000" 
-            />
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="w-4 h-4 text-blue-600" />
-                <span className="font-medium text-blue-800">Informações do Perfil</span>
-              </div>
-              <div className="text-sm text-blue-700 space-y-1">
-                <p><strong>Tipo de Usuário:</strong> {isAdmin() ? 'Administrador' : 'Usuário'}</p>
-                <p><strong>Departamento:</strong> {user?.departamento || 'Não informado'}</p>
-                <p><strong>Último Login:</strong> {user?.ultimoLogin ? new Date(user.ultimoLogin).toLocaleString('pt-BR') : 'Nunca'}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-white p-6 rounded-xl shadow space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <Lock className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-medium text-primary-dark">Segurança</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <InputGroup 
-                  label="Nova Senha"
-                  type={mostrarSenha ? "text" : "password"} 
-                  value={novaSenha} 
-                  onChange={e => setNovaSenha(e.target.value)} 
-                  placeholder="Digite a nova senha" 
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarSenha(!mostrarSenha)}
-                  className="absolute right-3 top-8 text-gray-400 hover:text-gray-600"
-                >
-                  {mostrarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              
               <InputGroup 
-                label="Confirmar Nova Senha"
-                type={mostrarSenha ? "text" : "password"} 
-                value={confirmarSenha} 
-                onChange={e => setConfirmarSenha(e.target.value)} 
-                placeholder="Confirme a nova senha" 
+                label="Telefone"
+                value={telefoneUsuario} 
+                onChange={e => setTelefoneUsuario(e.target.value)} 
+                placeholder="(00) 00000-0000" 
+              />
+              <InputGroup 
+                label="Departamento"
+                value={departamentoUsuario} 
+                onChange={e => setDepartamentoUsuario(e.target.value)} 
+                placeholder="Departamento" 
               />
             </div>
-
-            {novaSenha && confirmarSenha && novaSenha !== confirmarSenha && (
-              <p className="text-red-500 text-sm">As senhas não coincidem</p>
-            )}
-          </section>
-
-          <section className="bg-white p-6 rounded-xl shadow space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <Settings className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-medium text-primary-dark">Notificações</h3>
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={configuracoes.notificacoes.sistema}
-                  onChange={e => setConfiguracoes(prev => ({
-                    ...prev,
-                    notificacoes: { ...prev.notificacoes, sistema: e.target.checked }
-                  }))}
-                  className="rounded"
-                />
-                <span className="text-sm">Notificações do sistema</span>
-              </label>
+            
+            <div className="flex justify-end mt-6">
+              <button 
+                onClick={handleSaveProfile}
+                className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Salvar Alterações
+              </button>
             </div>
           </section>
-
-          <div className="flex justify-end">
-            <button 
-              onClick={handleSaveProfile}
-              className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              Salvar Perfil
-            </button>
-          </div>
         </div>
       )}
 
-      {/* Notificações */}
-      {activeTab === 'notificacoes' && (
-        <section className="bg-white p-6 rounded-xl shadow space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bell className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-medium text-primary-dark">Notificações de Prazo</h3>
+      {/* Segurança Tab */}
+      {activeTab === 'seguranca' && (
+        <div className="space-y-6">
+          <section className="bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <Lock className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-medium text-primary-dark">Alterar Senha</h3>
             </div>
-            <PermissionIndicator resource="sistema" action="configurar" />
-          </div>
-
-          <PermissionGuard resource="sistema" action="configurar">
-            <label className="block font-medium mb-1">Adicionar nova notificação</label>
-            <div className="flex gap-2 mb-4">
-              <div className="flex-1">
-                <InputGroup
-                  type="email"
-                  value={novoEmail}
-                  onChange={(e) => setNovoEmail(e.target.value)}
-                  placeholder="E-mail"
-                  error={erroEmail}
-                />
-              </div>
-              <InputGroup
-                type="number"
-                value={novoDias}
-                onChange={(e) => setNovoDias(Number(e.target.value))}
-                placeholder="Dias"
-                className="w-28"
-              />
-              <button
-                type="button"
-                onClick={adicionarEmail}
-                className="bg-secondary text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
-              >
-                Adicionar
-              </button>
-            </div>
-
-            <ul className="space-y-2 text-sm">
-              {notificacoes.map((item, i) => (
-                <NotificacaoItem
-                  key={i}
-                  email={item.email}
-                  dias={item.dias}
-                  editando={editando === i}
-                  editandoEmail={editandoEmail}
-                  editandoDias={editandoDias}
-                  error={editando === i ? erroEdicao : ''}
-                  onChangeEmail={(e) => setEditandoEmail(e.target.value)}
-                  onChangeDias={(e) => setEditandoDias(Number(e.target.value))}
-                  onSalvar={() => salvarEdicao(i)}
-                  onEditar={() => iniciarEdicao(i)}
-                  onRemover={() => removerEmail(i)}
-                />
-              ))}
-            </ul>
-
-            <button 
-              onClick={handleSaveSettings}
-              className="bg-primary text-white px-5 py-2 rounded hover:bg-primary-dark flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              Salvar Notificações
-            </button>
-          </PermissionGuard>
-        </section>
-      )}
-
-      {/* Sistema - Comarcas e Varas */}
-      {activeTab === 'sistema' && (
-        <AdminArea>
-          <div className="space-y-6">
-            <section className="bg-white p-6 rounded-xl shadow">
-              <h3 className="text-lg font-medium text-primary-dark mb-4 flex items-center gap-2">
-                <Building className="w-5 h-5" />
-                Gestão de Comarcas e Varas
-              </h3>
-              
-              {/* Formulário Unificado para Comarca e Varas */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-medium text-blue-900">Gestão de Comarcas e Varas</h4>
+            
+            <div className="max-w-md space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Senha Atual <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={mostrarSenhaAtual ? "text" : "password"} 
+                    value={senhaAtual} 
+                    onChange={e => setSenhaAtual(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Digite sua senha atual"
+                  />
                   <button
-                    onClick={() => setMostrarFormulario(!mostrarFormulario)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+                    type="button"
+                    onClick={() => setMostrarSenhaAtual(!mostrarSenhaAtual)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
                   >
-                    <Plus className="w-4 h-4" />
-                    {mostrarFormulario ? 'Cancelar' : 'Nova Comarca'}
+                    {mostrarSenhaAtual ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-
-                {mostrarFormulario && (
-                  <div className="space-y-4">
-                    {/* Dados da Comarca */}
-                    <div className="bg-white rounded-lg p-4">
-                      <h5 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
-                        <Building className="w-4 h-4" />
-                        Dados da Comarca
-                      </h5>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <InputGroup
-                          label="Nome da Comarca"
-                          value={formularioComarca.nome}
-                          onChange={(e) => setFormularioComarca(prev => ({ ...prev, nome: e.target.value }))}
-                          placeholder="Ex: Comarca de Salvador"
-                        />
-                        <InputGroup
-                          label="Cidade"
-                          value={formularioComarca.cidade}
-                          onChange={(e) => setFormularioComarca(prev => ({ ...prev, cidade: e.target.value }))}
-                          placeholder="Salvador"
-                        />
-                        <InputGroup
-                          label="Estado (UF)"
-                          value={formularioComarca.estado}
-                          onChange={(e) => setFormularioComarca(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))}
-                          placeholder="BA"
-                          maxLength={2}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Varas */}
-                    <div className="bg-white rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h5 className="font-medium text-gray-800 flex items-center gap-2">
-                          ⚖️ Varas ({formularioComarca.varas.length})
-                        </h5>
-                        <button
-                          onClick={adicionarVaraFormulario}
-                          className="bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-1 text-sm"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Adicionar Vara
-                        </button>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        {formularioComarca.varas.map((vara, index) => (
-                          <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end p-3 bg-gray-50 rounded-lg border">
-                            <InputGroup
-                              label="Nome da Vara"
-                              value={vara.nome}
-                              onChange={(e) => atualizarVaraFormulario(index, 'nome', e.target.value)}
-                              placeholder="1ª Vara de Execuções Penais"
-                            />
-                            <InputGroup
-                              label="Número"
-                              value={vara.numero}
-                              onChange={(e) => atualizarVaraFormulario(index, 'numero', e.target.value)}
-                              placeholder="001"
-                            />
-                            <InputGroup
-                              label="Especialidade"
-                              value={vara.especialidade}
-                              onChange={(e) => atualizarVaraFormulario(index, 'especialidade', e.target.value)}
-                              placeholder="Criminal"
-                            />
-                            <div className="flex justify-end">
-                              {formularioComarca.varas.length > 1 && (
-                                <button
-                                  onClick={() => removerVaraFormulario(index)}
-                                  className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                  title="Remover vara"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Botões de Ação */}
-                    <div className="flex gap-3">
-                      <button
-                        onClick={salvarComarca}
-                        className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-                      >
-                        <Save className="w-4 h-4" />
-                        Salvar Comarca
-                      </button>
-                      <button
-                        onClick={cancelarFormulario}
-                        className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nova Senha <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={mostrarNovaSenha ? "text" : "password"} 
+                    value={novaSenha} 
+                    onChange={e => setNovaSenha(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Digite a nova senha"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarNovaSenha(!mostrarNovaSenha)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  >
+                    {mostrarNovaSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <PasswordStrengthIndicator password={novaSenha} />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirmar Nova Senha <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={mostrarConfirmarSenha ? "text" : "password"} 
+                    value={confirmarSenha} 
+                    onChange={e => setConfirmarSenha(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Confirme a nova senha"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  >
+                    {mostrarConfirmarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {confirmarSenha && novaSenha !== confirmarSenha && (
+                  <p className="text-red-500 text-sm mt-1">As senhas não coincidem</p>
                 )}
               </div>
 
-              {/* Lista de Comarcas Existentes */}
-              <div className="space-y-4">
-                {comarcas.map((comarca) => (
-                  <div key={comarca.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 p-4 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            {comarca.nome}
-                          </h4>
-                          <p className="text-sm text-gray-600">{comarca.cidade} - {comarca.estado}</p>
-                          <p className="text-xs text-gray-500">
-                            {comarca.varas.length} vara(s) • Criada em {comarca.criadaEm.toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => removerComarca(comarca.id)}
-                          className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                          title="Remover comarca"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="p-4">
-                      {comarca.varas.length > 0 ? (
-                        <div className="space-y-2">
-                          <h5 className="font-medium text-gray-700 text-sm mb-3">Varas Cadastradas</h5>
-                          {comarca.varas.map((vara) => (
-                            <div key={vara.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <div>
-                                <p className="font-medium text-sm">{vara.nome}</p>
-                                <p className="text-xs text-gray-500">
-                                  Número: {vara.numero} • Especialidade: {vara.especialidade}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                                  Ativa
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 text-sm text-center py-4">
-                          Nenhuma vara cadastrada para esta comarca
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-blue-800">Requisitos de senha:</p>
+                <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                  <li className={novaSenha.length >= 8 ? 'text-green-600' : ''}>
+                    • Mínimo de 8 caracteres
+                  </li>
+                  <li className={/[a-z]/.test(novaSenha) && /[A-Z]/.test(novaSenha) ? 'text-green-600' : ''}>
+                    • Letras maiúsculas e minúsculas
+                  </li>
+                  <li className={/[0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
+                    • Pelo menos um número
+                  </li>
+                  <li className={/[^a-zA-Z0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
+                    • Pelo menos um caractere especial
+                  </li>
+                </ul>
               </div>
 
-              {comarcas.length === 0 && (
-                <div className="text-center py-8">
-                  <Building className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Nenhuma comarca cadastrada</p>
-                  <p className="text-gray-400 text-sm">Adicione uma comarca para começar</p>
-                </div>
+              <button 
+                onClick={handleAlterarSenha}
+                disabled={loading || !senhaAtual || !novaSenha || novaSenha !== confirmarSenha}
+                className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Alterando...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    Alterar Senha
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Usuários Tab */}
+      {activeTab === 'usuarios' && isAdmin() && (
+        <AdminArea>
+          <div className="space-y-6">
+            <section className="bg-white p-6 rounded-xl shadow">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-medium text-primary-dark">Gerenciar Usuários</h3>
+                <button
+                  onClick={() => setShowModalConvite(true)}
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Convidar Usuário
+                </button>
+              </div>
+
+              {/* Tabs de Usuários */}
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => setAbaUsuarios('ativos')}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition',
+                    abaUsuarios === 'ativos'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4" />
+                    Usuários Ativos ({usuariosAtivos.length})
+                  </div>
+                </button>
+                <button
+                  onClick={() => setAbaUsuarios('convites')}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition',
+                    abaUsuarios === 'convites'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Convites Pendentes ({convitesPendentes.filter(c => c.status === 'PENDENTE').length})
+                  </div>
+                </button>
+              </div>
+
+              {/* Conteúdo das abas */}
+              {abaUsuarios === 'ativos' ? (
+                <ListaUsuariosAtivos
+                  usuarios={usuariosAtivos}
+                  onEditar={(id) => console.log('Editar:', id)}
+                  onDesativar={(id) => console.log('Desativar:', id)}
+                />
+              ) : (
+                <ListaConvitesPendentes
+                  convites={convitesPendentes}
+                  onReenviar={handleReenviarConvite}
+                  onCancelar={handleCancelarConvite}
+                />
               )}
             </section>
           </div>
         </AdminArea>
       )}
 
-      {/* Usuários */}
-      {activeTab === 'usuarios' && (
-        <AdminArea>
-          <div className="space-y-6">
-            <section className="bg-white p-6 rounded-xl shadow">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-primary-dark">Gerenciar Usuários</h3>
-                <button className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark flex items-center gap-2">
-                  <UserPlus className="w-4 h-4" />
-                  Novo Usuário
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Crown className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">João Silva</p>
-                      <p className="text-sm text-gray-600">admin@tjba.com.br • Administrador</p>
-                    </div>
-                  </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Ativo</span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Maria Santos</p>
-                      <p className="text-sm text-gray-600">usuario@tjba.com.br • Usuário</p>
-                    </div>
-                  </div>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Ativo</span>
-                </div>
-              </div>
-            </section>
-          </div>
-        </AdminArea>
-      )}
-
-      {/* Backup & Logs */}
-      {activeTab === 'backup' && (
-        <AdminArea>
-          <div className="space-y-6">
-            <section className="bg-white p-6 rounded-xl shadow">
-              <h3 className="text-lg font-medium text-primary-dark mb-4">Backup e Logs</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-medium mb-3">Backup</h4>
-                  <div className="space-y-3">
-                    <button className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-                      Gerar Backup Manual
-                    </button>
-                    <button className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600">
-                      Download Último Backup
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium mb-3">Logs do Sistema</h4>
-                  <div className="space-y-3">
-                    <button className="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600">
-                      <FileText className="w-4 h-4 inline mr-2" />
-                      Visualizar Logs
-                    </button>
-                    <button className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600">
-                      Exportar Logs
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        </AdminArea>
-      )}
-
-      {/* Aviso para usuários sem permissão */}
-      {!availableTabs.some(tab => tab.id === activeTab) && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-          <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Acesso Restrito</h3>
-          <p className="text-yellow-700">
-            Você não tem permissão para acessar esta seção. Entre em contato com um administrador se precisar de acesso.
-          </p>
-        </div>
-      )}
+      {/* Modal de Convite */}
+      <ModalConviteUsuario
+        isOpen={showModalConvite}
+        onClose={() => setShowModalConvite(false)}
+        onConfirm={handleEnviarConvite}
+      />
     </div>
   );
 }
