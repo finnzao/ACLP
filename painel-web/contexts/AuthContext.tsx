@@ -2,70 +2,13 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, UserPermissions, AuthContextType, UserRole, ROLE_PERMISSIONS } from '@/types/user';
+import { authService, configureAuthHeaders, clearAuthHeaders } from '@/lib/api/services';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
 }
-
-// Usuários fictícios para desenvolvimento
-const MOCK_USERS: User[] = [
-  {
-    id: '1',
-    nome: 'João Silva',
-    email: 'admin@tjba.com.br',
-    role: 'admin',
-    departamento: 'Central de Comparecimentos',
-    telefone: '(71) 9999-9999',
-    ativo: true,
-    criadoEm: '2024-01-01T00:00:00.000Z',
-    ultimoLogin: new Date().toISOString(),
-    configuracoes: {
-      notificacoes: {
-        email: true,
-        sistema: true,
-        prazoVencimento: true,
-      },
-      interface: {
-        tema: 'light',
-        itensPerPage: 20,
-        idioma: 'pt-BR',
-      },
-      privacidade: {
-        mostrarEmail: true,
-        mostrarTelefone: false,
-      },
-    },
-  },
-  {
-    id: '2',
-    nome: 'Maria Santos',
-    email: 'usuario@tjba.com.br',
-    role: 'usuario',
-    departamento: 'Atendimento',
-    telefone: '(71) 8888-8888',
-    ativo: true,
-    criadoEm: '2024-01-15T00:00:00.000Z',
-    ultimoLogin: new Date().toISOString(),
-    configuracoes: {
-      notificacoes: {
-        email: true,
-        sistema: false,
-        prazoVencimento: true,
-      },
-      interface: {
-        tema: 'light',
-        itensPerPage: 10,
-        idioma: 'pt-BR',
-      },
-      privacidade: {
-        mostrarEmail: false,
-        mostrarTelefone: false,
-      },
-    },
-  },
-];
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
@@ -76,27 +19,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const token = localStorage.getItem('auth-token');
-        const savedUser = localStorage.getItem('auth-user');
+        const accessToken = localStorage.getItem('access-token');
+        const refreshToken = localStorage.getItem('refresh-token');
         
-        console.log('Loading user - Token:', token, 'SavedUser:', savedUser);
+        console.log('[AuthProvider] Verificando tokens salvos...');
         
-        if (token && savedUser) {
-          const userData = JSON.parse(savedUser);
-          setUser(userData);
-          setPermissions(ROLE_PERMISSIONS[userData.role as UserRole]);
+        if (accessToken && refreshToken) {
+          // Configurar token no cliente HTTP
+          configureAuthHeaders(accessToken);
           
-          // Garantir que o cookie também está definido
-          document.cookie = `auth-token=${token}; path=/; max-age=86400`;
+          // Validar token
+          const validationResult = await authService.validateToken();
           
-          console.log('User loaded successfully:', userData);
+          if (validationResult.success && validationResult.data?.valid) {
+            // Token válido, carregar perfil do usuário
+            const profileResult = await authService.getProfile();
+            
+            if (profileResult.success && profileResult.data) {
+              const userData = profileResult.data;
+              
+              // Mapear tipo do backend para role do frontend
+              const role: UserRole = userData.tipo === 'ADMIN' ? 'admin' : 'usuario';
+              
+              const userMapped: User = {
+                id: String(userData.id),
+                nome: userData.nome,
+                email: userData.email,
+                role,
+                departamento: userData.departamento,
+                telefone: userData.telefone,
+                ativo: userData.ativo,
+                criadoEm: userData.criadoEm,
+                ultimoLogin: userData.ultimoLogin
+              };
+              
+              setUser(userMapped);
+              setPermissions(ROLE_PERMISSIONS[role]);
+              
+              console.log('[AuthProvider] Usuário carregado:', userMapped.nome);
+            }
+          } else {
+            // Token inválido, tentar refresh
+            console.log('[AuthProvider] Token inválido, tentando refresh...');
+            await tryRefreshToken(refreshToken);
+          }
         }
       } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
+        console.error('[AuthProvider] Erro ao carregar usuário:', error);
         // Limpar dados corrompidos
-        localStorage.removeItem('auth-token');
-        localStorage.removeItem('auth-user');
-        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        handleLogout();
       } finally {
         setIsLoading(false);
       }
@@ -105,101 +76,184 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadUser();
   }, []);
 
+  // Tentar renovar token
+  const tryRefreshToken = async (refreshToken: string) => {
+    try {
+      const result = await authService.refreshToken({ refreshToken });
+      
+      if (result.success && result.data) {
+        const { accessToken, refreshToken: newRefreshToken, usuario } = result.data;
+        
+        // Salvar novos tokens
+        localStorage.setItem('access-token', accessToken);
+        localStorage.setItem('refresh-token', newRefreshToken);
+        
+        // Configurar novo token
+        configureAuthHeaders(accessToken);
+        
+        // Mapear usuário
+        const role: UserRole = usuario.tipo === 'ADMIN' ? 'admin' : 'usuario';
+        const userMapped: User = {
+          id: String(usuario.id),
+          nome: usuario.nome,
+          email: usuario.email,
+          role,
+          departamento: usuario.departamento,
+          telefone: usuario.telefone,
+          ativo: true,
+          criadoEm: new Date().toISOString(),
+          ultimoLogin: usuario.ultimoLogin
+        };
+        
+        setUser(userMapped);
+        setPermissions(ROLE_PERMISSIONS[role]);
+        
+        console.log('[AuthProvider] Token renovado com sucesso');
+      } else {
+        throw new Error('Falha ao renovar token');
+      }
+    } catch (error) {
+      console.error('[AuthProvider] Erro ao renovar token:', error);
+      handleLogout();
+    }
+  };
+
+  // Login
   const login = async (email: string, password: string): Promise<boolean> => {
-    console.log('Attempting login with:', email, password);
+    console.log('[AuthProvider] Tentando login para:', email);
     setIsLoading(true);
     
     try {
-      // Simular chamada à API
+      const result = await authService.login({
+        email,
+        senha: password,
+        rememberMe: true
+      });
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Verificar credenciais (simulação)
-      const foundUser = MOCK_USERS.find(u => u.email === email);
-      
-      if (!foundUser) {
-        console.log('User not found for email:', email);
-        return false;
+      if (result.success && result.data) {
+        const { accessToken, refreshToken, usuario } = result.data;
+        
+        // Salvar tokens
+        localStorage.setItem('access-token', accessToken);
+        localStorage.setItem('refresh-token', refreshToken);
+        
+        // Configurar token no cliente HTTP
+        configureAuthHeaders(accessToken);
+        
+        // Mapear usuário
+        const role: UserRole = usuario.tipo === 'ADMIN' ? 'admin' : 'usuario';
+        const userMapped: User = {
+          id: String(usuario.id),
+          nome: usuario.nome,
+          email: usuario.email,
+          role,
+          departamento: usuario.departamento,
+          telefone: usuario.telefone,
+          ativo: true,
+          criadoEm: new Date().toISOString(),
+          ultimoLogin: usuario.ultimoLogin
+        };
+        
+        setUser(userMapped);
+        setPermissions(ROLE_PERMISSIONS[role]);
+        
+        console.log('[AuthProvider] Login bem-sucedido:', userMapped.nome);
+        return true;
       }
       
-      // Verificar senha (em produção seria hash)
-      const validPasswords = {
-        'admin@tjba.com.br': '123',
-        'usuario@tjba.com.br': '123'
-      };
+      console.error('[AuthProvider] Falha no login:', result.message);
+      return false;
       
-      if (validPasswords[email as keyof typeof validPasswords] !== password) {
-        console.log('Invalid password for email:', email);
-        return false;
-      }
-      
-      // Atualizar último login
-      const updatedUser = {
-        ...foundUser,
-        ultimoLogin: new Date().toISOString()
-      };
-      
-      console.log('Login successful, setting user:', updatedUser);
-      
-      // Salvar no estado e localStorage
-      setUser(updatedUser);
-      setPermissions(ROLE_PERMISSIONS[updatedUser.role]);
-      
-      localStorage.setItem('auth-token', 'fake-jwt-token');
-      // Também definir cookie para o middleware
-      document.cookie = 'auth-token=fake-jwt-token; path=/; max-age=86400';
-      localStorage.setItem('auth-user', JSON.stringify(updatedUser));
-      
-      console.log('User data saved to localStorage');
-      
-      return true;
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('[AuthProvider] Erro no login:', error);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    console.log('Logging out user');
+  // Logout
+  const logout = async () => {
+    console.log('[AuthProvider] Realizando logout...');
+    
+    try {
+      const refreshToken = localStorage.getItem('refresh-token');
+      
+      if (refreshToken) {
+        await authService.logout({ refreshToken });
+      }
+    } catch (error) {
+      console.error('[AuthProvider] Erro no logout:', error);
+    } finally {
+      handleLogout();
+    }
+  };
+
+  // Limpar estado de autenticação
+  const handleLogout = () => {
     setUser(null);
     setPermissions(null);
-    localStorage.removeItem('auth-token');
-    localStorage.removeItem('auth-user');
     
-    // Remover cookies
-    document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    // Limpar storage
+    localStorage.removeItem('access-token');
+    localStorage.removeItem('refresh-token');
+    
+    // Limpar headers
+    clearAuthHeaders();
     
     // Redirecionar para login
-    window.location.href = '/login';
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
   };
 
-  const updateUser = (userData: Partial<User>) => {
+  // Atualizar usuário
+  const updateUser = async (userData: Partial<User>) => {
     if (!user) return;
     
-    const updatedUser = { ...user, ...userData };
-    setUser(updatedUser);
-    localStorage.setItem('auth-user', JSON.stringify(updatedUser));
+    try {
+      // Atualizar no backend
+      const result = await authService.getProfile();
+      
+      if (result.success && result.data) {
+        const updatedData = result.data;
+        const role: UserRole = updatedData.tipo === 'ADMIN' ? 'admin' : 'usuario';
+        
+        const updatedUser: User = {
+          ...user,
+          nome: updatedData.nome,
+          email: updatedData.email,
+          departamento: updatedData.departamento,
+          telefone: updatedData.telefone,
+          role
+        };
+        
+        setUser(updatedUser);
+        setPermissions(ROLE_PERMISSIONS[role]);
+        
+        console.log('[AuthProvider] Usuário atualizado');
+      }
+    } catch (error) {
+      console.error('[AuthProvider] Erro ao atualizar usuário:', error);
+    }
   };
 
-  const hasPermission = (
-    resource: string, 
-    action: string
-  ): boolean => {
+  // Verificar permissão
+  const hasPermission = (resource: string, action: string): boolean => {
     if (!permissions || !user) return false;
     
-    const resourcePermissions = (permissions as never)[resource];
+    const resourcePermissions = (permissions as any)[resource];
     if (!resourcePermissions) return false;
     
     return resourcePermissions[action] === true;
   };
 
+  // Verificar se é admin
   const isAdmin = (): boolean => {
     return user?.role === 'admin';
   };
 
+  // Verificar se é usuário
   const isUsuario = (): boolean => {
     return user?.role === 'usuario';
   };
@@ -212,7 +266,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     updateUser,
-    hasPermission: hasPermission,
+    hasPermission,
     isAdmin,
     isUsuario,
   };
@@ -232,7 +286,7 @@ export function useAuth(): AuthContextType {
   return context;
 }
 
-// Hook para verificar permissões específicas
+// Hooks adicionais
 export function usePermissions() {
   const { permissions, hasPermission, isAdmin, isUsuario } = useAuth();
   
@@ -241,7 +295,6 @@ export function usePermissions() {
     hasPermission,
     isAdmin,
     isUsuario,
-    // Helpers específicos
     canCreatePeople: () => hasPermission('pessoas', 'cadastrar'),
     canEditPeople: () => hasPermission('pessoas', 'editar'),
     canDeletePeople: () => hasPermission('pessoas', 'excluir'),
@@ -252,40 +305,4 @@ export function usePermissions() {
     canManageUsers: () => hasPermission('sistema', 'gerenciarUsuarios'),
     canManageBiometric: () => hasPermission('biometria', 'gerenciar'),
   };
-}
-
-// Hook para auditoria de ações
-export function useAudit() {
-  const { user } = useAuth();
-  
-  const logAction = (action: string, resource: string, details?: unknown) => {
-    if (!user) return;
-    
-    const auditLog = {
-      userId: user.id,
-      userName: user.nome,
-      action,
-      resource,
-      details,
-      timestamp: new Date().toISOString(),
-      ip: 'unknown', // Em produção, capturar IP real
-      userAgent: navigator.userAgent
-    };
-    
-    // Em produção, enviar para API
-    console.log('Audit Log:', auditLog);
-    
-    // Salvar localmente para debug
-    const existingLogs = JSON.parse(localStorage.getItem('audit-logs') || '[]');
-    existingLogs.push(auditLog);
-    
-    // Manter apenas os últimos 100 logs
-    if (existingLogs.length > 100) {
-      existingLogs.splice(0, existingLogs.length - 100);
-    }
-    
-    localStorage.setItem('audit-logs', JSON.stringify(existingLogs));
-  };
-  
-  return { logAction };
 }
