@@ -161,7 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return true;
       }
       
-      console.error('[AuthProvider] Falha no login:', result.message);
+      console.log('[AuthProvider] Falha no login:', result.message);
       return false;
       
     } catch (error) {

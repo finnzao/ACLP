@@ -471,71 +471,254 @@ export const convitesService = {
 export const authService = {
   /**
    * Realizar login
+   * POST /api/auth/login
    */
   async login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     console.log('[AuthService] Realizando login para:', data.email);
-    return await apiClient.post<LoginResponse>('/auth/login', data);
+    try {
+      const response = await apiClient.post<LoginResponse>('/auth/login', data);
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro no login:', error);
+      // Se o erro for 401, pode ser credenciais inválidas
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          message: error.response?.data?.message || 'Email ou senha incorretos',
+          error: error.response?.data
+        };
+      }
+      throw error;
+    }
   },
 
   /**
    * Realizar logout
+   * POST /api/auth/logout
    */
-  async logout(data: LogoutRequest): Promise<ApiResponse<void>> {
+  async logout(data?: LogoutRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Realizando logout');
-    return await apiClient.post<void>('/auth/logout', data);
+    try {
+      // O logout precisa do token no header Authorization
+      const response = await apiClient.post<void>('/auth/logout', data || {});
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro no logout:', error);
+      // Logout sempre deve ter sucesso do ponto de vista do cliente
+      return { success: true };
+    }
   },
 
   /**
    * Renovar token de acesso
+   * POST /api/auth/refresh
    */
   async refreshToken(data: RefreshTokenRequest): Promise<ApiResponse<LoginResponse>> {
     console.log('[AuthService] Renovando token');
-    return await apiClient.post<LoginResponse>('/auth/refresh', data);
+    try {
+      const response = await apiClient.post<LoginResponse>('/auth/refresh', data);
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao renovar token:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao renovar token',
+        error: error.response?.data
+      };
+    }
   },
 
   /**
    * Validar token atual
+   * GET /api/auth/validate
    */
   async validateToken(): Promise<ApiResponse<{
     valid: boolean;
-    email: string;
-    expiration: string;
-    authorities: string[];
+    email?: string;
+    expiration?: string;
+    authorities?: string[];
+    message?: string;
   }>> {
     console.log('[AuthService] Validando token');
-    return await apiClient.get('/auth/validate');
+    try {
+      const response = await apiClient.get('/auth/validate');
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao validar token:', error);
+      return {
+        success: false,
+        data: { valid: false, message: 'Token inválido' }
+      };
+    }
   },
 
   /**
    * Alterar senha (usuário autenticado)
+   * POST /api/auth/change-password
    */
   async alterarSenha(data: AlterarSenhaRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Alterando senha');
-    return await apiClient.post<void>('/auth/password/change', data);
+    try {
+      const response = await apiClient.post<void>('/auth/change-password', data);
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao alterar senha:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao alterar senha',
+        error: error.response?.data
+      };
+    }
   },
 
   /**
    * Solicitar reset de senha
+   * POST /api/auth/forgot-password
    */
   async solicitarResetSenha(data: ResetSenhaRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Solicitando reset de senha para:', data.email);
-    return await apiClient.post<void>('/auth/password/reset-request', data);
+    try {
+      const response = await apiClient.post<void>('/auth/forgot-password', data);
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao solicitar reset:', error);
+      // Sempre retornar sucesso para não revelar se email existe
+      return {
+        success: true,
+        message: 'Se o email estiver cadastrado, você receberá instruções para recuperação'
+      };
+    }
   },
 
   /**
    * Confirmar reset de senha
+   * POST /api/auth/reset-password
    */
   async confirmarResetSenha(data: ConfirmarResetRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Confirmando reset de senha');
-    return await apiClient.post<void>('/auth/password/reset-confirm', data);
+    try {
+      const response = await apiClient.post<void>('/auth/reset-password', data);
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao confirmar reset:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Token inválido ou expirado',
+        error: error.response?.data
+      };
+    }
   },
 
   /**
    * Obter usuário atual (perfil)
+   * GET /api/auth/me (CORRIGIDO - era /usuarios/me)
    */
   async getProfile(): Promise<ApiResponse<UsuarioResponse>> {
     console.log('[AuthService] Obtendo perfil do usuário');
-    return await apiClient.get<UsuarioResponse>('/usuarios/me');
+    try {
+      const response = await apiClient.get<any>('/auth/me');
+      
+      // O backend retorna um formato diferente, vamos adaptar
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: response.data.data || response.data
+        };
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao obter perfil:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao obter perfil',
+        error: error.response?.data
+      };
+    }
+  },
+
+  /**
+   * Obter informações da sessão atual
+   * GET /api/auth/session
+   */
+  async getSessionInfo(): Promise<ApiResponse<{
+    sessionId: string;
+    userEmail: string;
+    ipAddress: string;
+    userAgent: string;
+    loginTime: string;
+    lastActivity: string;
+    expiresAt: string;
+  }>> {
+    console.log('[AuthService] Obtendo informações da sessão');
+    try {
+      const response = await apiClient.get('/auth/session');
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao obter sessão:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao obter sessão'
+      };
+    }
+  },
+
+  /**
+   * Listar todas as sessões do usuário
+   * GET /api/auth/sessions
+   */
+  async getUserSessions(): Promise<ApiResponse<any[]>> {
+    console.log('[AuthService] Listando sessões do usuário');
+    try {
+      const response = await apiClient.get('/auth/sessions');
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao listar sessões:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao listar sessões',
+        data: []
+      };
+    }
+  },
+
+  /**
+   * Invalidar sessão específica
+   * DELETE /api/auth/sessions/{sessionId}
+   */
+  async invalidateSession(sessionId: string): Promise<ApiResponse<void>> {
+    console.log('[AuthService] Invalidando sessão:', sessionId);
+    try {
+      const response = await apiClient.delete(`/auth/sessions/${sessionId}`);
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao invalidar sessão:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Erro ao invalidar sessão'
+      };
+    }
+  },
+
+  /**
+   * Verificar se sistema requer setup inicial
+   * GET /api/auth/check-setup
+   */
+  async checkSetup(): Promise<ApiResponse<{
+    setupRequired: boolean;
+    message: string;
+  }>> {
+    console.log('[AuthService] Verificando setup');
+    try {
+      const response = await apiClient.get('/auth/check-setup');
+      return response;
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao verificar setup:', error);
+      return {
+        success: false,
+        data: { setupRequired: false, message: 'Erro ao verificar setup' }
+      };
+    }
   }
 };
 

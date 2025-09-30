@@ -161,7 +161,7 @@ export default function ConfiguracoesPerfilSeguranca() {
     const result = await alterarSenha({
       senhaAtual,
       novaSenha,
-      confirmaSenha
+      confirmarSenha
     });
 
     if (result.success) {
