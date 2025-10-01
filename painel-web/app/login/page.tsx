@@ -19,11 +19,10 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  // Redirecionar se já estiver logado
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      console.log('[LoginPage] Usuário autenticado, redirecionando...');
-      router.push('/dashboard');
+      console.log('[LoginPage] Usuário já autenticado, redirecionando imediatamente...');
+      router.replace('/dashboard');
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -66,24 +65,23 @@ export default function LoginPage() {
       const success = await login(email, password);
       
       if (success) {
-        console.log('[LoginPage] Login bem-sucedido, redirecionando...');
+        console.log('[LoginPage] Login bem-sucedido!');
         
-        // Pequeno delay para garantir que o estado seja atualizado
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 100);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        console.log('[LoginPage] Redirecionando para dashboard...');
+        window.location.href = '/dashboard';
       } else {
         setError('E-mail ou senha inválidos. Verifique suas credenciais.');
+        setLoading(false);
       }
     } catch (error) {
       console.error('[LoginPage] Erro no login:', error);
       setError('Erro ao conectar com o servidor. Tente novamente.');
-    } finally {
       setLoading(false);
     }
   };
 
-  // Mostrar loading enquanto verifica autenticação
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light">
@@ -95,18 +93,27 @@ export default function LoginPage() {
     );
   }
 
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light">
+        <div className="text-center">
+          <Loader2 className="animate-spin h-16 w-16 text-primary mx-auto mb-4" />
+          <p className="text-primary font-medium">Redirecionando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light font-sans px-4">
       <div className="relative w-[400px] min-h-[700px] bg-gradient-to-br from-primary-dark to-primary rounded-xl shadow-2xl overflow-hidden">
         
-        {/* Background decorativo */}
         <span className="absolute bg-primary h-[520px] w-[520px] top-[-50px] right-[120px] rounded-tr-[72px] rotate-45"></span>
         <span className="absolute bg-primary-light h-[220px] w-[220px] top-[-172px] right-0 rounded-[32px] rotate-45"></span>
         <span className="absolute bg-accent-blue h-[540px] w-[190px] top-[-24px] right-0 rounded-[32px] rotate-45"></span>
         <span className="absolute bg-primary h-[400px] w-[200px] top-[420px] right-[50px] rounded-[60px] rotate-45"></span>
 
         <div className="relative z-10 h-full flex flex-col justify-center items-center px-6 py-8">
-          {/* Header */}
           <div className="text-center mb-6">
             <h1 className="text-white text-2xl font-bold drop-shadow-sm">SCC</h1>
             <h3 className="text-white text-sm opacity-80 font-medium">Sistema de Controle de Comparecimento</h3>
@@ -121,9 +128,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Formulário */}
           <form onSubmit={handleSubmit} className="w-full space-y-6">
-            {/* Mensagem de erro */}
             {error && (
               <div className="bg-red-500 text-white px-4 py-3 text-sm rounded flex items-center gap-2 shadow animate-in slide-in-from-top-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -131,7 +136,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Campo de e-mail */}
             <div className="relative">
               <FaUser className="absolute top-3 left-3 text-primary-light" />
               <input
@@ -148,7 +152,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Campo de senha */}
             <div className="relative">
               <FaLock className="absolute top-3 left-3 text-primary-light" />
               <input
@@ -174,7 +177,6 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Lembrar-me */}
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-white/80 text-sm cursor-pointer">
                 <input
@@ -190,7 +192,6 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  // TODO: Implementar recuperação de senha
                   alert('Funcionalidade em desenvolvimento');
                 }}
                 className="text-white/80 text-sm hover:text-white transition-colors"
@@ -200,7 +201,6 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Botão de login */}
             <button
               type="submit"
               disabled={loading}
@@ -217,7 +217,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Informações adicionais */}
           <div className="mt-8 w-full">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
               <h4 className="text-white font-medium mb-2 text-sm">Acesso ao Sistema</h4>
@@ -234,7 +233,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Informações de segurança */}
           <div className="mt-6 text-center">
             <p className="text-white/60 text-xs">
               Sistema protegido por autenticação JWT

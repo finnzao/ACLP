@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, UserPermissions, AuthContextType, UserRole, ROLE_PERMISSIONS } from '@/types/user';
-import { authService, configureAuthHeaders, clearAuthHeaders } from '@/lib/api/services';
+import { authService, configureAuthHeaders, clearAuthHeaders } from '@/lib/api/authService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -15,68 +15,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [permissions, setPermissions] = useState<UserPermissions | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Carregar usuário do localStorage na inicialização
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const accessToken = localStorage.getItem('access-token');
-        const refreshToken = localStorage.getItem('refresh-token');
+  const loadUserFromStorage = useCallback(async () => {
+    try {
+      const accessToken = authService.getAccessToken();
+      const refreshToken = authService.getRefreshToken();
+      
+      console.log('[AuthProvider] Verificando tokens salvos...');
+      
+      if (accessToken && refreshToken) {
+        configureAuthHeaders(accessToken);
         
-        console.log('[AuthProvider] Verificando tokens salvos...');
+        const validationResult = await authService.validateToken();
         
-        if (accessToken && refreshToken) {
-          // Configurar token no cliente HTTP
-          configureAuthHeaders(accessToken);
+        if (validationResult.success && validationResult.data?.valid) {
+          const profileResult = await authService.getProfile();
           
-          // Validar token
-          const validationResult = await authService.validateToken();
-          
-          if (validationResult.success && validationResult.data?.valid) {
-            // Token válido, carregar perfil do usuário
-            const profileResult = await authService.getProfile();
+          if (profileResult.success && profileResult.data) {
+            const userData = profileResult.data;
+            const role: UserRole = userData.tipo === 'ADMIN' ? 'admin' : 'usuario';
             
-            if (profileResult.success && profileResult.data) {
-              const userData = profileResult.data;
-              
-              // Mapear tipo do backend para role do frontend
-              const role: UserRole = userData.tipo === 'ADMIN' ? 'admin' : 'usuario';
-              
-              const userMapped: User = {
-                id: String(userData.id),
-                nome: userData.nome,
-                email: userData.email,
-                role,
-                departamento: userData.departamento,
-                telefone: userData.telefone,
-                ativo: userData.ativo,
-                criadoEm: userData.criadoEm,
-                ultimoLogin: userData.ultimoLogin
-              };
-              
-              setUser(userMapped);
-              setPermissions(ROLE_PERMISSIONS[role]);
-              
-              console.log('[AuthProvider] Usuário carregado:', userMapped.nome);
-            }
-          } else {
-            // Token inválido, tentar refresh
-            console.log('[AuthProvider] Token inválido, tentando refresh...');
-            await tryRefreshToken(refreshToken);
+            const userMapped: User = {
+              id: String(userData.id),
+              nome: userData.nome,
+              email: userData.email,
+              role,
+              departamento: userData.departamento,
+              telefone: userData.telefone,
+              ativo: userData.ativo,
+              criadoEm: userData.criadoEm,
+              ultimoLogin: userData.ultimoLogin
+            };
+            
+            setUser(userMapped);
+            setPermissions(ROLE_PERMISSIONS[role]);
+            
+            console.log('[AuthProvider] Usuário carregado:', userMapped.nome);
           }
+        } else {
+          console.log('[AuthProvider] Token inválido, tentando refresh...');
+          await tryRefreshToken(refreshToken);
         }
-      } catch (error) {
-        console.error('[AuthProvider] Erro ao carregar usuário:', error);
-        // Limpar dados corrompidos
-        handleLogout();
-      } finally {
-        setIsLoading(false);
       }
-    };
-
-    loadUser();
+    } catch (error) {
+      console.error('[AuthProvider] Erro ao carregar usuário:', error);
+      handleLogout();
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  // Tentar renovar token
   const tryRefreshToken = async (refreshToken: string) => {
     try {
       const result = await authService.refreshToken({ refreshToken });
@@ -84,25 +71,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (result.success && result.data) {
         const { accessToken, refreshToken: newRefreshToken, usuario } = result.data;
         
-        // Salvar novos tokens
-        localStorage.setItem('access-token', accessToken);
-        localStorage.setItem('refresh-token', newRefreshToken);
-        
-        // Configurar novo token
+        authService.setAccessToken(accessToken);
+        authService.setRefreshToken(newRefreshToken);
         configureAuthHeaders(accessToken);
         
-        // Mapear usuário
         const role: UserRole = usuario.tipo === 'ADMIN' ? 'admin' : 'usuario';
         const userMapped: User = {
           id: String(usuario.id),
           nome: usuario.nome,
           email: usuario.email,
           role,
-          departamento: usuario.departamento,
-          telefone: usuario.telefone,
+          departamento: undefined,
+          telefone: undefined,
           ativo: true,
           criadoEm: new Date().toISOString(),
-          ultimoLogin: usuario.ultimoLogin
+          ultimoLogin: undefined
         };
         
         setUser(userMapped);
@@ -118,7 +101,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Login
+  useEffect(() => {
+    loadUserFromStorage();
+
+    const interval = setInterval(async () => {
+      if (authService.isTokenExpiring(10)) {
+        const refreshToken = authService.getRefreshToken();
+        if (refreshToken) {
+          console.log('[AuthProvider] Token próximo de expirar, renovando...');
+          await tryRefreshToken(refreshToken);
+        }
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [loadUserFromStorage]);
+
   const login = async (email: string, password: string): Promise<boolean> => {
     console.log('[AuthProvider] Tentando login para:', email);
     setIsLoading(true);
@@ -131,16 +129,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       
       if (result.success && result.data) {
-        const { accessToken, refreshToken, usuario } = result.data;
+        const { accessToken, usuario } = result.data;
         
-        // Salvar tokens
-        localStorage.setItem('access-token', accessToken);
-        localStorage.setItem('refresh-token', refreshToken);
-        
-        // Configurar token no cliente HTTP
         configureAuthHeaders(accessToken);
         
-        // Mapear usuário
         const role: UserRole = usuario.tipo === 'ADMIN' ? 'admin' : 'usuario';
         const userMapped: User = {
           id: String(usuario.id),
@@ -156,28 +148,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         setUser(userMapped);
         setPermissions(ROLE_PERMISSIONS[role]);
+        setIsLoading(false);
         
         console.log('[AuthProvider] Login bem-sucedido:', userMapped.nome);
         return true;
       }
       
       console.log('[AuthProvider] Falha no login:', result.message);
+      setIsLoading(false);
       return false;
       
     } catch (error) {
       console.error('[AuthProvider] Erro no login:', error);
-      return false;
-    } finally {
       setIsLoading(false);
+      return false;
     }
   };
 
-  // Logout
   const logout = async () => {
     console.log('[AuthProvider] Realizando logout...');
     
     try {
-      const refreshToken = localStorage.getItem('refresh-token');
+      const refreshToken = authService.getRefreshToken();
       
       if (refreshToken) {
         await authService.logout({ refreshToken });
@@ -189,30 +181,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Limpar estado de autenticação
   const handleLogout = () => {
     setUser(null);
     setPermissions(null);
     
-    // Limpar storage
-    localStorage.removeItem('access-token');
-    localStorage.removeItem('refresh-token');
-    
-    // Limpar headers
+    authService.clearAuth();
     clearAuthHeaders();
     
-    // Redirecionar para login
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
   };
 
-  // Atualizar usuário
   const updateUser = async (userData: Partial<User>) => {
     if (!user) return;
     
     try {
-      // Atualizar no backend
       const result = await authService.getProfile();
       
       if (result.success && result.data) {
@@ -238,7 +222,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Verificar permissão
   const hasPermission = (resource: string, action: string): boolean => {
     if (!permissions || !user) return false;
     
@@ -248,12 +231,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return resourcePermissions[action] === true;
   };
 
-  // Verificar se é admin
   const isAdmin = (): boolean => {
     return user?.role === 'admin';
   };
 
-  // Verificar se é usuário
   const isUsuario = (): boolean => {
     return user?.role === 'usuario';
   };
@@ -286,7 +267,6 @@ export function useAuth(): AuthContextType {
   return context;
 }
 
-// Hooks adicionais
 export function usePermissions() {
   const { permissions, hasPermission, isAdmin, isUsuario } = useAuth();
   
