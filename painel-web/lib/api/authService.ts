@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient } from '@/lib/http/client';
 
 interface LoginRequest {
@@ -9,21 +10,24 @@ interface LoginRequest {
 interface LoginResponse {
   success: boolean;
   message: string;
-  data: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    usuario: {
-      id: number;
-      nome: string;
-      email: string;
-      tipo: 'ADMIN' | 'USUARIO';
-      departamento?: string;
-      telefone?: string;
-      ativo: boolean;
-      ultimoLogin?: string;
-    };
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresIn: number;
+  sessionId: string;
+  usuario: {
+    id: number;
+    nome: string;
+    email: string;
+    tipo: 'ADMIN' | 'USUARIO';
+    departamento?: string;
+    telefone?: string;
+    avatar?: string | null;
+    ultimoLogin?: string;
+    mfaEnabled: boolean;
   };
+  requiresMfa: boolean;
+  requiresPasswordChange: boolean;
 }
 
 interface ValidateTokenResponse {
@@ -45,16 +49,14 @@ interface RefreshTokenRequest {
 
 interface RefreshTokenResponse {
   success: boolean;
-  data: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    usuario: {
-      id: number;
-      nome: string;
-      email: string;
-      tipo: 'ADMIN' | 'USUARIO';
-    };
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  usuario: {
+    id: number;
+    nome: string;
+    email: string;
+    tipo: 'ADMIN' | 'USUARIO';
   };
 }
 
@@ -100,26 +102,55 @@ class AuthService {
   private readonly REFRESH_TOKEN_KEY = 'refresh-token';
   private readonly USER_KEY = 'user-data';
 
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
+  async login(credentials: LoginRequest): Promise<{ success: boolean; data?: LoginResponse; message?: string }> {
     console.log('[AuthService] Realizando login:', credentials.email);
     
-    const response = await httpClient.post<LoginResponse>('/auth/login', {
-      email: credentials.email,
-      senha: credentials.senha,
-      rememberMe: credentials.rememberMe
-    });
+    try {
+      const response = await httpClient.post<LoginResponse>('/auth/login', {
+        email: credentials.email,
+        senha: credentials.senha,
+        rememberMe: credentials.rememberMe
+      });
 
-    if (response.success && response.data?.data) {
-      console.log('[AuthService] Login bem-sucedido, salvando tokens');
+      console.log('[AuthService] Resposta do login:', response);
+
+      // A resposta já vem no formato correto direto do httpClient
+      if (response.success && response.data) {
+        const loginData = response.data;
+        
+        console.log('[AuthService] Login bem-sucedido, salvando tokens');
+        console.log('[AuthService] AccessToken:', loginData.accessToken?.substring(0, 20) + '...');
+        console.log('[AuthService] RefreshToken:', loginData.refreshToken);
+        
+        // Salvar tokens
+        this.setAccessToken(loginData.accessToken);
+        this.setRefreshToken(loginData.refreshToken);
+        this.setUserData(loginData.usuario);
+        
+        // Configurar header de autenticação
+        httpClient.setAuthToken(loginData.accessToken);
+        
+        console.log('[AuthService] Tokens salvos com sucesso');
+        console.log('[AuthService] AccessToken armazenado:', this.getAccessToken()?.substring(0, 20) + '...');
+        
+        return { 
+          success: true, 
+          data: loginData 
+        };
+      }
+
+      return { 
+        success: false, 
+        message: response.data?.message || 'Erro ao realizar login' 
+      };
       
-      this.setAccessToken(response.data.data.accessToken);
-      this.setRefreshToken(response.data.data.refreshToken);
-      this.setUserData(response.data.data.usuario);
-      
-      httpClient.setAuthToken(response.data.data.accessToken);
+    } catch (error: any) {
+      console.error('[AuthService] Erro no login:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Erro ao conectar com o servidor' 
+      };
     }
-
-    return response.data as LoginResponse;
   }
 
   async validateToken(): Promise<ValidateTokenResponse> {
@@ -134,21 +165,31 @@ class AuthService {
     }
   }
 
-  async refreshToken(request: RefreshTokenRequest): Promise<RefreshTokenResponse> {
+  async refreshToken(request: RefreshTokenRequest): Promise<{ success: boolean; data?: RefreshTokenResponse }> {
     console.log('[AuthService] Renovando token');
     
-    const response = await httpClient.post<RefreshTokenResponse>('/auth/refresh', request);
+    try {
+      const response = await httpClient.post<RefreshTokenResponse>('/auth/refresh', request);
 
-    if (response.success && response.data?.data) {
-      console.log('[AuthService] Token renovado com sucesso');
+      if (response.success && response.data) {
+        const refreshData = response.data;
+        
+        console.log('[AuthService] Token renovado com sucesso');
+        
+        this.setAccessToken(refreshData.accessToken);
+        this.setRefreshToken(refreshData.refreshToken);
+        
+        httpClient.setAuthToken(refreshData.accessToken);
+        
+        return { success: true, data: refreshData };
+      }
+
+      return { success: false };
       
-      this.setAccessToken(response.data.data.accessToken);
-      this.setRefreshToken(response.data.data.refreshToken);
-      
-      httpClient.setAuthToken(response.data.data.accessToken);
+    } catch (error) {
+      console.error('[AuthService] Erro ao renovar token:', error);
+      return { success: false };
     }
-
-    return response.data as RefreshTokenResponse;
   }
 
   async logout(request: LogoutRequest): Promise<void> {
@@ -176,35 +217,55 @@ class AuthService {
   }
 
   setAccessToken(token: string): void {
-    localStorage.setItem(this.ACCESS_TOKEN_KEY, token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.ACCESS_TOKEN_KEY, token);
+      console.log('[AuthService] AccessToken salvo no localStorage');
+    }
   }
 
   getAccessToken(): string | null {
-    return localStorage.getItem(this.ACCESS_TOKEN_KEY);
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(this.ACCESS_TOKEN_KEY);
+    }
+    return null;
   }
 
   setRefreshToken(token: string): void {
-    localStorage.setItem(this.REFRESH_TOKEN_KEY, token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.REFRESH_TOKEN_KEY, token);
+      console.log('[AuthService] RefreshToken salvo no localStorage');
+    }
   }
 
   getRefreshToken(): string | null {
-    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+    }
+    return null;
   }
 
   setUserData(usuario: any): void {
-    localStorage.setItem(this.USER_KEY, JSON.stringify(usuario));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.USER_KEY, JSON.stringify(usuario));
+      console.log('[AuthService] Dados do usuário salvos');
+    }
   }
 
   getUserData(): any | null {
-    const data = localStorage.getItem(this.USER_KEY);
-    return data ? JSON.parse(data) : null;
+    if (typeof window !== 'undefined') {
+      const data = localStorage.getItem(this.USER_KEY);
+      return data ? JSON.parse(data) : null;
+    }
+    return null;
   }
 
   clearAuth(): void {
     console.log('[AuthService] Limpando dados de autenticação');
-    localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-    localStorage.removeItem(this.USER_KEY);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+      localStorage.removeItem(this.USER_KEY);
+    }
     httpClient.clearAuthToken();
   }
 

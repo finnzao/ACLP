@@ -800,11 +800,11 @@ export const testService = {
   },
 
   async info(): Promise<AppInfoResponse> {
-    console.log('[TestService] Obtendo info da aplicação');
+    console.log('[TestService] Obtendo health da aplicação');
 
-    // Tentar endpoint de info do actuator primeiro
+    // Tentar endpoint de health do actuator primeiro
     try {
-      const response = await apiClient.get<AppInfoResponse>('/actuator/info');
+      const response = await apiClient.get<AppInfoResponse>('/setup/health');
 
       if (response.success && response.data) {
         return response.data;
