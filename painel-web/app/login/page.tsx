@@ -19,9 +19,10 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
 
+  // Redirecionar se já estiver autenticado
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      console.log('[LoginPage] Usuário já autenticado, redirecionando imediatamente...');
+      console.log('[LoginPage] Usuário já autenticado, redirecionando...');
       router.replace('/dashboard');
     }
   }, [isAuthenticated, authLoading, router]);
@@ -61,27 +62,60 @@ export default function LoginPage() {
     setError('');
 
     try {
-      console.log('[LoginPage] Tentando login...');
+      console.log('[LoginPage] Iniciando processo de login...');
+      
       const success = await login(email, password);
       
       if (success) {
-        console.log('[LoginPage] Login bem-sucedido!');
+        console.log('[LoginPage] Login bem-sucedido! Aguardando atualização do estado...');
+        console.log(success);
         
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Aguardar um pouco mais para garantir que o estado foi atualizado
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         console.log('[LoginPage] Redirecionando para dashboard...');
-        window.location.href = '/dashboard';
+        
+        // Usar replace para evitar voltar para login
+        router.replace('/dashboard/geral');
+        
+        // Fallback: forçar redirecionamento após 500ms se router.replace não funcionar
+        setTimeout(() => {
+          if (window.location.pathname === '/login') {
+            console.log('[LoginPage] Fallback: forçando redirecionamento via window.location');
+            window.location.href = '/dashboard/geral';
+          }
+        }, 500);
       } else {
+        console.log('[LoginPage] Login falhou');
         setError('E-mail ou senha inválidos. Verifique suas credenciais.');
         setLoading(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[LoginPage] Erro no login:', error);
-      setError('Erro ao conectar com o servidor. Tente novamente.');
+      
+      // Tratamento de erros específicos baseado na documentação
+      if (error.response?.status === 401) {
+        setError('E-mail ou senha incorretos');
+      } else if (error.response?.status === 403) {
+        const message = error.response?.data?.message || '';
+        if (message.includes('bloqueada')) {
+          setError(message);
+        } else if (message.includes('desativada')) {
+          setError('Conta desativada. Entre em contato com o administrador');
+        } else {
+          setError(message || 'Acesso negado');
+        }
+      } else if (error.response?.status === 429) {
+        setError('Muitas tentativas. Aguarde antes de tentar novamente');
+      } else {
+        setError('Erro ao conectar com o servidor. Tente novamente.');
+      }
+      
       setLoading(false);
     }
   };
 
+  // Mostrar loading enquanto verifica autenticação
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light">
@@ -93,6 +127,7 @@ export default function LoginPage() {
     );
   }
 
+  // Se já autenticado, mostrar loading de redirecionamento
   if (isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light">
@@ -108,12 +143,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light font-sans px-4">
       <div className="relative w-[400px] min-h-[700px] bg-gradient-to-br from-primary-dark to-primary rounded-xl shadow-2xl overflow-hidden">
         
+        {/* Elementos decorativos de fundo */}
         <span className="absolute bg-primary h-[520px] w-[520px] top-[-50px] right-[120px] rounded-tr-[72px] rotate-45"></span>
         <span className="absolute bg-primary-light h-[220px] w-[220px] top-[-172px] right-0 rounded-[32px] rotate-45"></span>
         <span className="absolute bg-accent-blue h-[540px] w-[190px] top-[-24px] right-0 rounded-[32px] rotate-45"></span>
         <span className="absolute bg-primary h-[400px] w-[200px] top-[420px] right-[50px] rounded-[60px] rotate-45"></span>
 
         <div className="relative z-10 h-full flex flex-col justify-center items-center px-6 py-8">
+          {/* Logo e título */}
           <div className="text-center mb-6">
             <h1 className="text-white text-2xl font-bold drop-shadow-sm">SCC</h1>
             <h3 className="text-white text-sm opacity-80 font-medium">Sistema de Controle de Comparecimento</h3>
@@ -128,7 +165,9 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Formulário de login */}
           <form onSubmit={handleSubmit} className="w-full space-y-6">
+            {/* Mensagem de erro */}
             {error && (
               <div className="bg-red-500 text-white px-4 py-3 text-sm rounded flex items-center gap-2 shadow animate-in slide-in-from-top-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -136,6 +175,7 @@ export default function LoginPage() {
               </div>
             )}
 
+            {/* Campo de email */}
             <div className="relative">
               <FaUser className="absolute top-3 left-3 text-primary-light" />
               <input
@@ -152,6 +192,7 @@ export default function LoginPage() {
               />
             </div>
 
+            {/* Campo de senha */}
             <div className="relative">
               <FaLock className="absolute top-3 left-3 text-primary-light" />
               <input
@@ -177,6 +218,7 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {/* Opções extras */}
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-white/80 text-sm cursor-pointer">
                 <input
@@ -201,6 +243,7 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {/* Botão de submit */}
             <button
               type="submit"
               disabled={loading}
@@ -217,6 +260,7 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Informações sobre acesso */}
           <div className="mt-8 w-full">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
               <h4 className="text-white font-medium mb-2 text-sm">Acesso ao Sistema</h4>
@@ -233,6 +277,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Footer */}
           <div className="mt-6 text-center">
             <p className="text-white/60 text-xs">
               Sistema protegido por autenticação JWT

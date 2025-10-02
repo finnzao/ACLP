@@ -1,8 +1,28 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { User, UserPermissions, AuthContextType, UserRole, ROLE_PERMISSIONS } from '@/types/user';
-import { authService, configureAuthHeaders, clearAuthHeaders } from '@/lib/api/authService';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { authService } from '@/lib/api/authService';
+import { httpClient } from '@/lib/http/client';
+
+interface Usuario {
+  id: number;
+  nome: string;
+  email: string;
+  tipo: 'ADMIN' | 'USUARIO';
+  departamento?: string;
+  telefone?: string;
+  ultimoLogin?: string;
+}
+
+interface AuthContextType {
+  user: Usuario | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, senha: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string }>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -11,278 +31,146 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [permissions, setPermissions] = useState<UserPermissions | null>(null);
+  const [user, setUser] = useState<Usuario | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  const loadUserFromStorage = useCallback(async () => {
+  const isAuthenticated = !!user;
+
+  const loadUser = async () => {
     try {
+      console.log('[AuthContext] Carregando dados do usuário');
+
       const accessToken = authService.getAccessToken();
-      const refreshToken = authService.getRefreshToken();
       
-      console.log('[AuthProvider] Verificando tokens salvos...');
-      
-      if (accessToken && refreshToken) {
-        configureAuthHeaders(accessToken);
+      if (!accessToken) {
+        console.log('[AuthContext] Nenhum token encontrado');
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('[AuthContext] Token encontrado, configurando no httpClient');
+      httpClient.setAuthToken(accessToken);
+
+      console.log('[AuthContext] Buscando perfil do usuário');
+      const profileResponse = await authService.getProfile();
+
+      if (profileResponse.success && profileResponse.data) {
+        console.log('[AuthContext] Perfil carregado com sucesso:', profileResponse.data);
         
-        const validationResult = await authService.validateToken();
+        const userData = profileResponse.data.data || profileResponse.data;
         
-        if (validationResult.success && validationResult.data?.valid) {
-          const profileResult = await authService.getProfile();
-          
-          if (profileResult.success && profileResult.data) {
-            const userData = profileResult.data;
-            const role: UserRole = userData.tipo === 'ADMIN' ? 'admin' : 'usuario';
-            
-            const userMapped: User = {
-              id: String(userData.id),
-              nome: userData.nome,
-              email: userData.email,
-              role,
-              departamento: userData.departamento,
-              telefone: userData.telefone,
-              ativo: userData.ativo,
-              criadoEm: userData.criadoEm,
-              ultimoLogin: userData.ultimoLogin
-            };
-            
-            setUser(userMapped);
-            setPermissions(ROLE_PERMISSIONS[role]);
-            
-            console.log('[AuthProvider] Usuário carregado:', userMapped.nome);
-          }
-        } else {
-          console.log('[AuthProvider] Token inválido, tentando refresh...');
-          await tryRefreshToken(refreshToken);
-        }
+        setUser({
+          id: userData.id,
+          nome: userData.nome,
+          email: userData.email,
+          tipo: userData.tipo,
+          departamento: userData.departamento,
+          telefone: userData.telefone,
+          ultimoLogin: userData.ultimoLogin
+        });
+      } else {
+        console.warn('[AuthContext] Falha ao carregar perfil, limpando autenticação');
+        authService.clearAuth();
+        setUser(null);
       }
     } catch (error) {
-      console.error('[AuthProvider] Erro ao carregar usuário:', error);
-      handleLogout();
+      console.error('[AuthContext] Erro ao carregar usuário:', error);
+      authService.clearAuth();
+      setUser(null);
     } finally {
       setIsLoading(false);
-    }
-  }, []);
-
-  const tryRefreshToken = async (refreshToken: string) => {
-    try {
-      const result = await authService.refreshToken({ refreshToken });
-      
-      if (result.success && result.data) {
-        const { accessToken, refreshToken: newRefreshToken, usuario } = result.data;
-        
-        authService.setAccessToken(accessToken);
-        authService.setRefreshToken(newRefreshToken);
-        configureAuthHeaders(accessToken);
-        
-        const role: UserRole = usuario.tipo === 'ADMIN' ? 'admin' : 'usuario';
-        const userMapped: User = {
-          id: String(usuario.id),
-          nome: usuario.nome,
-          email: usuario.email,
-          role,
-          departamento: undefined,
-          telefone: undefined,
-          ativo: true,
-          criadoEm: new Date().toISOString(),
-          ultimoLogin: undefined
-        };
-        
-        setUser(userMapped);
-        setPermissions(ROLE_PERMISSIONS[role]);
-        
-        console.log('[AuthProvider] Token renovado com sucesso');
-      } else {
-        throw new Error('Falha ao renovar token');
-      }
-    } catch (error) {
-      console.error('[AuthProvider] Erro ao renovar token:', error);
-      handleLogout();
     }
   };
 
   useEffect(() => {
-    loadUserFromStorage();
+    loadUser();
+  }, []);
 
-    const interval = setInterval(async () => {
-      if (authService.isTokenExpiring(10)) {
-        const refreshToken = authService.getRefreshToken();
-        if (refreshToken) {
-          console.log('[AuthProvider] Token próximo de expirar, renovando...');
-          await tryRefreshToken(refreshToken);
-        }
-      }
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [loadUserFromStorage]);
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    console.log('[AuthProvider] Tentando login para:', email);
-    setIsLoading(true);
-    
+  const login = async (email: string, senha: string, rememberMe: boolean = false) => {
     try {
+      console.log('[AuthContext] Iniciando login para:', email);
+
       const result = await authService.login({
         email,
-        senha: password,
-        rememberMe: true
+        senha,
+        rememberMe
       });
-      
+
       if (result.success && result.data) {
-        const { accessToken, usuario } = result.data;
+        console.log('[AuthContext] Login bem-sucedido');
         
-        configureAuthHeaders(accessToken);
+        authService.setAccessToken(result.data.accessToken);
+        authService.setRefreshToken(result.data.refreshToken);
+        authService.setUserData(result.data.usuario);
         
-        const role: UserRole = usuario.tipo === 'ADMIN' ? 'admin' : 'usuario';
-        const userMapped: User = {
-          id: String(usuario.id),
-          nome: usuario.nome,
-          email: usuario.email,
-          role,
-          departamento: usuario.departamento,
-          telefone: usuario.telefone,
-          ativo: true,
-          criadoEm: new Date().toISOString(),
-          ultimoLogin: usuario.ultimoLogin
-        };
+        httpClient.setAuthToken(result.data.accessToken);
         
-        setUser(userMapped);
-        setPermissions(ROLE_PERMISSIONS[role]);
-        setIsLoading(false);
-        
-        console.log('[AuthProvider] Login bem-sucedido:', userMapped.nome);
-        return true;
+        setUser({
+          id: result.data.usuario.id,
+          nome: result.data.usuario.nome,
+          email: result.data.usuario.email,
+          tipo: result.data.usuario.tipo,
+          departamento: result.data.usuario.departamento,
+          telefone: result.data.usuario.telefone,
+          ultimoLogin: result.data.usuario.ultimoLogin
+        });
+
+        return { success: true };
       }
-      
-      console.log('[AuthProvider] Falha no login:', result.message);
-      setIsLoading(false);
-      return false;
-      
-    } catch (error) {
-      console.error('[AuthProvider] Erro no login:', error);
-      setIsLoading(false);
-      return false;
+
+      return { 
+        success: false, 
+        message: result.message || 'Erro ao realizar login' 
+      };
+    } catch (error: any) {
+      console.error('[AuthContext] Erro no login:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Erro ao conectar com o servidor' 
+      };
     }
   };
 
   const logout = async () => {
-    console.log('[AuthProvider] Realizando logout...');
-    
     try {
+      console.log('[AuthContext] Realizando logout');
+
       const refreshToken = authService.getRefreshToken();
       
       if (refreshToken) {
         await authService.logout({ refreshToken });
       }
     } catch (error) {
-      console.error('[AuthProvider] Erro no logout:', error);
+      console.error('[AuthContext] Erro no logout:', error);
     } finally {
-      handleLogout();
+      authService.clearAuth();
+      setUser(null);
+      router.push('/login');
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setPermissions(null);
-    
-    authService.clearAuth();
-    clearAuthHeaders();
-    
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-  };
-
-  const updateUser = async (userData: Partial<User>) => {
-    if (!user) return;
-    
-    try {
-      const result = await authService.getProfile();
-      
-      if (result.success && result.data) {
-        const updatedData = result.data;
-        const role: UserRole = updatedData.tipo === 'ADMIN' ? 'admin' : 'usuario';
-        
-        const updatedUser: User = {
-          ...user,
-          nome: updatedData.nome,
-          email: updatedData.email,
-          departamento: updatedData.departamento,
-          telefone: updatedData.telefone,
-          role
-        };
-        
-        setUser(updatedUser);
-        setPermissions(ROLE_PERMISSIONS[role]);
-        
-        console.log('[AuthProvider] Usuário atualizado');
-      }
-    } catch (error) {
-      console.error('[AuthProvider] Erro ao atualizar usuário:', error);
-    }
-  };
-
-  const hasPermission = (resource: string, action: string): boolean => {
-    if (!permissions || !user) return false;
-    
-    const resourcePermissions = (permissions as any)[resource];
-    if (!resourcePermissions) return false;
-    
-    return resourcePermissions[action] === true;
-  };
-
-  const isAdmin = (): boolean => {
-    return user?.role === 'admin';
-  };
-
-  const isUsuario = (): boolean => {
-    return user?.role === 'usuario';
+  const refreshUser = async () => {
+    await loadUser();
   };
 
   const value: AuthContextType = {
     user,
-    permissions,
-    isAuthenticated: !!user,
+    isAuthenticated,
     isLoading,
     login,
     logout,
-    updateUser,
-    hasPermission,
-    isAdmin,
-    isUsuario,
+    refreshUser
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth deve ser usado dentro de AuthProvider');
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
-}
-
-export function usePermissions() {
-  const { permissions, hasPermission, isAdmin, isUsuario } = useAuth();
-  
-  return {
-    permissions,
-    hasPermission,
-    isAdmin,
-    isUsuario,
-    canCreatePeople: () => hasPermission('pessoas', 'cadastrar'),
-    canEditPeople: () => hasPermission('pessoas', 'editar'),
-    canDeletePeople: () => hasPermission('pessoas', 'excluir'),
-    canRegisterAttendance: () => hasPermission('comparecimentos', 'registrar'),
-    canEditAttendance: () => hasPermission('comparecimentos', 'editar'),
-    canExportData: () => hasPermission('pessoas', 'exportar') || hasPermission('comparecimentos', 'exportar'),
-    canManageSystem: () => hasPermission('sistema', 'configurar'),
-    canManageUsers: () => hasPermission('sistema', 'gerenciarUsuarios'),
-    canManageBiometric: () => hasPermission('biometria', 'gerenciar'),
-  };
 }

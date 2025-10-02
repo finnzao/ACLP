@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient } from '@/lib/http/client';
 
+// ===========================
+// Interfaces
+// ===========================
+
 interface LoginRequest {
   email: string;
   senha: string;
   rememberMe?: boolean;
 }
 
-interface LoginResponse {
+interface LoginResponseData {
   success: boolean;
   message: string;
   accessToken: string;
@@ -47,24 +51,18 @@ interface RefreshTokenRequest {
   refreshToken: string;
 }
 
-interface RefreshTokenResponse {
+interface RefreshTokenResponseData {
   success: boolean;
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
-  usuario: {
-    id: number;
-    nome: string;
-    email: string;
-    tipo: 'ADMIN' | 'USUARIO';
-  };
 }
 
 interface LogoutRequest {
   refreshToken: string;
 }
 
-interface GetProfileResponse {
+interface GetProfileResponseData {
   success: boolean;
   data: {
     id: number;
@@ -97,16 +95,66 @@ interface TokenPayload {
   iss: string;
 }
 
+// ===========================
+// Helper para extrair dados
+// ===========================
+
+/**
+ * Extrai dados de uma resposta que pode vir em diferentes formatos
+ */
+function extractResponseData<T>(response: any): T | null {
+  // Se já tem os dados diretamente
+  if (response && typeof response === 'object') {
+    // Verificar se tem success e data
+    if ('data' in response && response.data) {
+      return response.data as T;
+    }
+    // Se a resposta já é o dado esperado
+    return response as T;
+  }
+  return null;
+}
+
+/**
+ * Verifica se a resposta indica sucesso
+ */
+function isSuccessResponse(response: any): boolean {
+  if (!response) return false;
+  
+  // Se tem propriedade success
+  if ('success' in response) {
+    return response.success === true;
+  }
+  
+  // Se tem data com success
+  if ('data' in response && response.data && typeof response.data === 'object') {
+    if ('success' in response.data) {
+      return response.data.success === true;
+    }
+  }
+  
+  // Se chegou aqui e tem dados, considerar sucesso
+  return true;
+}
+
+// ===========================
+// AuthService Class
+// ===========================
+
 class AuthService {
   private readonly ACCESS_TOKEN_KEY = 'access-token';
   private readonly REFRESH_TOKEN_KEY = 'refresh-token';
   private readonly USER_KEY = 'user-data';
 
-  async login(credentials: LoginRequest): Promise<{ success: boolean; data?: LoginResponse; message?: string }> {
+  async login(credentials: LoginRequest): Promise<{ 
+    success: boolean; 
+    data?: LoginResponseData; 
+    message?: string 
+  }> {
     console.log('[AuthService] Realizando login:', credentials.email);
     
     try {
-      const response = await httpClient.post<LoginResponse>('/auth/login', {
+      const response = await httpClient.post<any>('/auth/login', {
         email: credentials.email,
         senha: credentials.senha,
         rememberMe: credentials.rememberMe
@@ -114,34 +162,51 @@ class AuthService {
 
       console.log('[AuthService] Resposta do login:', response);
 
-      // A resposta já vem no formato correto direto do httpClient
-      if (response.success && response.data) {
-        const loginData = response.data;
-        
-        console.log('[AuthService] Login bem-sucedido, salvando tokens');
-        console.log('[AuthService] AccessToken:', loginData.accessToken?.substring(0, 20) + '...');
-        console.log('[AuthService] RefreshToken:', loginData.refreshToken);
-        
-        // Salvar tokens
-        this.setAccessToken(loginData.accessToken);
-        this.setRefreshToken(loginData.refreshToken);
-        this.setUserData(loginData.usuario);
-        
-        // Configurar header de autenticação
-        httpClient.setAuthToken(loginData.accessToken);
-        
-        console.log('[AuthService] Tokens salvos com sucesso');
-        console.log('[AuthService] AccessToken armazenado:', this.getAccessToken()?.substring(0, 20) + '...');
-        
-        return { 
-          success: true, 
-          data: loginData 
+      // Verificar se foi sucesso
+      if (!isSuccessResponse(response)) {
+        return {
+          success: false,
+          message: response?.message || 'Erro ao realizar login'
         };
       }
 
+      // Extrair dados da resposta
+      const loginData = extractResponseData<LoginResponseData>(response);
+      
+      if (!loginData) {
+        console.error('[AuthService] Não foi possível extrair dados da resposta');
+        return {
+          success: false,
+          message: 'Estrutura de resposta inválida'
+        };
+      }
+
+      // Verificar se tem os campos obrigatórios
+      if (!loginData.accessToken || !loginData.refreshToken || !loginData.usuario) {
+        console.error('[AuthService] Resposta sem campos obrigatórios:', loginData);
+        return {
+          success: false,
+          message: 'Resposta incompleta do servidor'
+        };
+      }
+
+      console.log('[AuthService] Login bem-sucedido, salvando tokens');
+      console.log('[AuthService] AccessToken:', loginData.accessToken.substring(0, 20) + '...');
+      console.log('[AuthService] RefreshToken:', loginData.refreshToken);
+      
+      // Salvar tokens
+      this.setAccessToken(loginData.accessToken);
+      this.setRefreshToken(loginData.refreshToken);
+      this.setUserData(loginData.usuario);
+      
+      // Configurar header de autenticação
+      httpClient.setAuthToken(loginData.accessToken);
+      
+      console.log('[AuthService] Tokens salvos com sucesso');
+      
       return { 
-        success: false, 
-        message: response.data?.message || 'Erro ao realizar login' 
+        success: true, 
+        data: loginData 
       };
       
     } catch (error: any) {
@@ -157,34 +222,50 @@ class AuthService {
     console.log('[AuthService] Validando token');
     
     try {
-      const response = await httpClient.get<ValidateTokenResponse>('/auth/validate');
-      return response.data as ValidateTokenResponse;
+      const response = await httpClient.get<any>('/auth/validate');
+      return extractResponseData<ValidateTokenResponse>(response) || { success: false };
     } catch (error) {
       console.error('[AuthService] Erro ao validar token:', error);
       return { success: false };
     }
   }
 
-  async refreshToken(request: RefreshTokenRequest): Promise<{ success: boolean; data?: RefreshTokenResponse }> {
+  async refreshToken(request: RefreshTokenRequest): Promise<{ 
+    success: boolean; 
+    data?: RefreshTokenResponseData 
+  }> {
     console.log('[AuthService] Renovando token');
     
     try {
-      const response = await httpClient.post<RefreshTokenResponse>('/auth/refresh', request);
+      const response = await httpClient.post<any>('/auth/refresh', request);
 
-      if (response.success && response.data) {
-        const refreshData = response.data;
-        
-        console.log('[AuthService] Token renovado com sucesso');
-        
-        this.setAccessToken(refreshData.accessToken);
-        this.setRefreshToken(refreshData.refreshToken);
-        
-        httpClient.setAuthToken(refreshData.accessToken);
-        
-        return { success: true, data: refreshData };
+      console.log('[AuthService] Resposta do refresh:', response);
+
+      // Verificar se foi sucesso
+      if (!isSuccessResponse(response)) {
+        return { success: false };
       }
 
-      return { success: false };
+      // Extrair dados
+      const refreshData = extractResponseData<RefreshTokenResponseData>(response);
+      
+      if (!refreshData || !refreshData.accessToken || !refreshData.refreshToken) {
+        console.error('[AuthService] Dados de refresh inválidos');
+        return { success: false };
+      }
+
+      console.log('[AuthService] Token renovado com sucesso');
+      console.log('[AuthService] Novo AccessToken:', refreshData.accessToken.substring(0, 20) + '...');
+      
+      this.setAccessToken(refreshData.accessToken);
+      this.setRefreshToken(refreshData.refreshToken);
+      
+      httpClient.setAuthToken(refreshData.accessToken);
+      
+      return { 
+        success: true, 
+        data: refreshData
+      };
       
     } catch (error) {
       console.error('[AuthService] Erro ao renovar token:', error);
@@ -204,17 +285,51 @@ class AuthService {
     }
   }
 
-  async getProfile(): Promise<GetProfileResponse> {
+  async getProfile(): Promise<GetProfileResponseData> {
     console.log('[AuthService] Buscando perfil do usuário');
-    const response = await httpClient.get<GetProfileResponse>('/auth/me');
-    return response.data as GetProfileResponse;
+    
+    try {
+      const response = await httpClient.get<any>('/auth/me');
+      
+      // Extrair dados do perfil
+      const profileData = extractResponseData<GetProfileResponseData>(response);
+      
+      if (!profileData) {
+        throw new Error('Dados de perfil não encontrados');
+      }
+      
+      return profileData;
+    } catch (error) {
+      console.error('[AuthService] Erro ao buscar perfil:', error);
+      throw error;
+    }
   }
 
-  async alterarSenha(data: ChangePasswordRequest): Promise<{ success: boolean; message?: string }> {
+  async alterarSenha(data: ChangePasswordRequest): Promise<{ 
+    success: boolean; 
+    message?: string 
+  }> {
     console.log('[AuthService] Alterando senha');
-    const response = await httpClient.put('/auth/change-password', data);
-    return response.data as { success: boolean; message?: string };
+    
+    try {
+      const response = await httpClient.put<any>('/auth/change-password', data);
+      
+      return {
+        success: isSuccessResponse(response),
+        message: response?.message
+      };
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao alterar senha:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao alterar senha'
+      };
+    }
   }
+
+  // ===========================
+  // Métodos de armazenamento
+  // ===========================
 
   setAccessToken(token: string): void {
     if (typeof window !== 'undefined') {
@@ -269,6 +384,10 @@ class AuthService {
     httpClient.clearAuthToken();
   }
 
+  // ===========================
+  // Métodos utilitários
+  // ===========================
+
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
@@ -319,6 +438,10 @@ class AuthService {
     return new Date(decoded.exp * 1000);
   }
 }
+
+// ===========================
+// Exportações
+// ===========================
 
 export const authService = new AuthService();
 
