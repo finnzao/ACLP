@@ -22,6 +22,7 @@ interface AuthContextType {
   login: (email: string, senha: string, rememberMe?: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  logAction: (action: string, resource: string, details?: Record<string, any>) => void;
 }
 
 interface PermissionsContextType {
@@ -182,6 +183,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await loadUser();
   };
 
+  const logAction = (action: string, resource: string, details?: Record<string, any>) => {
+    if (!user) return;
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      userId: user.id,
+      userName: user.nome,
+      userType: user.tipo,
+      action,
+      resource,
+      details: details || {}
+    };
+
+    console.log('[Audit]', logEntry);
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const auditLogs = JSON.parse(localStorage.getItem('audit_logs') || '[]');
+        auditLogs.push(logEntry);
+        
+        if (auditLogs.length > 1000) {
+          auditLogs.shift();
+        }
+        
+        localStorage.setItem('audit_logs', JSON.stringify(auditLogs));
+      } catch (error) {
+        console.error('[Audit] Erro ao salvar log:', error);
+      }
+    }
+  };
+
   const hasPermission = (resource: string, action: string): boolean => {
     if (!user) return false;
     
@@ -220,7 +252,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     login,
     logout,
-    refreshUser
+    refreshUser,
+    logAction
   };
 
   const permissionsValue: PermissionsContextType = {
