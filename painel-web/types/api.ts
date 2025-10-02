@@ -138,16 +138,21 @@ export interface CustodiadoResponse {
   comarca: string;
   dataDecisao: string;
   periodicidade: number;
+  periodicidadeDescricao: string;
   dataComparecimentoInicial: string;
   status: StatusComparecimento | string;
   ultimoComparecimento: string;
   proximoComparecimento: string;
+  diasAtraso: number;
   observacoes?: string;
-  endereco?: EnderecoDTO;
-  // Campos calculados
+  endereco: EnderecoResponse;
+  criadoEm: string;
+  atualizadoEm: string | null;
+  identificacao: string;
+  inadimplente: boolean;
+  comparecimentoHoje: boolean;  
+  // Campos calculados opcionais (compatibilidade)
   atrasado?: boolean;
-  diasAtraso?: number;
-  comparecimentoHoje?: boolean;
   enderecoCompleto?: string;
   cidadeEstado?: string;
 }
@@ -157,6 +162,31 @@ export interface ListarCustodiadosResponse {
   success: boolean;
   message: string;
   data: CustodiadoResponse[];
+  timestamp?: string;
+  total?: number;
+}
+// Type Guard para validação
+export function isListarCustodiadosResponse(data: any): data is ListarCustodiadosResponse {
+  return (
+    data &&
+    typeof data === 'object' &&
+    typeof data.success === 'boolean' &&
+    typeof data.message === 'string' &&
+    Array.isArray(data.data)
+  );
+}
+
+export function isCustodiadoResponse(data: any): data is CustodiadoResponse {
+  return (
+    data &&
+    typeof data === 'object' &&
+    typeof data.id === 'number' &&
+    typeof data.nome === 'string' &&
+    typeof data.processo === 'string' &&
+    typeof data.status === 'string' &&
+    data.endereco &&
+    typeof data.endereco === 'object'
+  );
 }
 
 // Comparecimento Response
@@ -175,6 +205,31 @@ export interface ComparecimentoResponse {
   motivoMudancaEndereco?: string;
   criadoEm: string;
   atualizadoEm?: string;
+}
+
+// Endereço Completo (Response da API)
+export interface EnderecoResponse {
+  id: number;
+  cep: string;
+  logradouro: string;
+  numero?: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  nomeEstado: string;
+  regiaoEstado: string;
+  dataInicio: string;
+  dataFim: string | null;
+  ativo: boolean;
+  motivoAlteracao?: string;
+  validadoPor?: string;
+  enderecoCompleto: string;
+  enderecoResumido: string;
+  diasResidencia: number;
+  periodoResidencia: string;
+  criadoEm: string;
+  atualizadoEm: string | null;
 }
 
 // Histórico de Endereços Response
