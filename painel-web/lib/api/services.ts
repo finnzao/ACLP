@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiClient, ApiResponse } from '../http/client';
+import { requestCache } from '@/lib/cache/requestCache';
 import type {
   CustodiadoResponse,
   ComparecimentoResponse,

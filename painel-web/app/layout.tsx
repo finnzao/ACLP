@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { ToastProvider } from '@/components/Toast';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ApiProvider, ApiStatusIndicator } from '@/contexts/ApiContext';
-import DebugApiStatus from '@/components/DebugApiStatus';
+// import DebugApiStatus from '@/components/DebugApiStatus';
 
 export const metadata: Metadata = {
   title: 'Sistema de Controle de Comparecimento',
@@ -21,12 +21,12 @@ export default function RootLayout({
   return (
     <html lang="pt-br">
       <body>
-        <ApiProvider autoCheck={true} checkInterval={300000}>
+        <ApiProvider autoCheck={false} checkInterval={300000}>
           <AuthProvider>
             <ToastProvider>
               {children}
-              <ApiStatusIndicator />
-              <DebugApiStatus />
+              {process.env.NODE_ENV === 'development' && <ApiStatusIndicator />}
+              
             </ToastProvider>
           </AuthProvider>
         </ApiProvider>

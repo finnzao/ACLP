@@ -174,7 +174,7 @@ function OriginalRegistrarPage() {
     }
 
     // Validar CPF se fornecido
-    if (cpfLimpo && !isValidCPF(formData.cpf)) {
+    if (cpfLimpo && !isValidCPF(formData.cpf?.toString() ?? '')) {
       newErrors.cpf = 'CPF inválido';
     }
 
