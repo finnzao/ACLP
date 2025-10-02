@@ -19,16 +19,41 @@ interface AuthContextType {
   user: Usuario | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, senha: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, senha: string, rememberMe?: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
+interface PermissionsContextType {
+  hasPermission: (resource: string, action: string) => boolean;
+  isAdmin: () => boolean;
+  isUsuario: () => boolean;
+  getUserPermissions: () => string[];
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const PermissionsContext = createContext<PermissionsContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
 }
+
+const PERMISSIONS = {
+  ADMIN: {
+    pessoas: ['listar', 'visualizar', 'cadastrar', 'editar', 'excluir', 'exportar'],
+    comparecimentos: ['listar', 'visualizar', 'registrar', 'editar', 'cancelar', 'exportar'],
+    sistema: ['configurar', 'gerenciarUsuarios', 'backup', 'logs'],
+    relatorios: ['visualizar', 'gerar', 'exportar'],
+    biometria: ['cadastrar', 'verificar', 'gerenciar']
+  },
+  USUARIO: {
+    pessoas: ['listar', 'visualizar', 'exportar'],
+    comparecimentos: ['listar', 'visualizar', 'registrar', 'exportar'],
+    sistema: [] as string[],
+    relatorios: ['visualizar', 'exportar'],
+    biometria: ['verificar']
+  }
+};
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<Usuario | null>(null);
@@ -88,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadUser();
   }, []);
 
-  const login = async (email: string, senha: string, rememberMe: boolean = false) => {
+  const login = async (email: string, senha: string, rememberMe: boolean = false): Promise<boolean> => {
     try {
       console.log('[AuthContext] Iniciando login para:', email);
 
@@ -107,6 +132,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         httpClient.setAuthToken(result.data.accessToken);
         
+        const maxAge = result.data.expiresIn || 3600;
+        document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+        
+        console.log('[AuthContext] Cookie salvo:', document.cookie.includes('auth-token') ? 'SIM' : 'NÃO');
+        
         setUser({
           id: result.data.usuario.id,
           nome: result.data.usuario.nome,
@@ -117,19 +147,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
           ultimoLogin: result.data.usuario.ultimoLogin
         });
 
-        return { success: true };
+        console.log('[AuthContext] Estado atualizado, retornando true');
+        return true;
       }
 
-      return { 
-        success: false, 
-        message: result.message || 'Erro ao realizar login' 
-      };
+      console.log('[AuthContext] Login falhou:', result.message);
+      return false;
     } catch (error: any) {
       console.error('[AuthContext] Erro no login:', error);
-      return { 
-        success: false, 
-        message: error.message || 'Erro ao conectar com o servidor' 
-      };
+      return false;
     }
   };
 
@@ -146,6 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('[AuthContext] Erro no logout:', error);
     } finally {
       authService.clearAuth();
+      document.cookie = 'auth-token=; path=/; max-age=0';
       setUser(null);
       router.push('/login');
     }
@@ -155,7 +182,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await loadUser();
   };
 
-  const value: AuthContextType = {
+  const hasPermission = (resource: string, action: string): boolean => {
+    if (!user) return false;
+    
+    const userPermissions = user.tipo === 'ADMIN' ? PERMISSIONS.ADMIN : PERMISSIONS.USUARIO;
+    const resourcePermissions = userPermissions[resource as keyof typeof userPermissions] || [];
+    
+    return resourcePermissions.includes(action);
+  };
+
+  const isAdmin = (): boolean => {
+    return user?.tipo === 'ADMIN';
+  };
+
+  const isUsuario = (): boolean => {
+    return user?.tipo === 'USUARIO';
+  };
+
+  const getUserPermissions = (): string[] => {
+    if (!user) return [];
+    
+    const userPermissions = user.tipo === 'ADMIN' ? PERMISSIONS.ADMIN : PERMISSIONS.USUARIO;
+    const allPermissions: string[] = [];
+    
+    Object.entries(userPermissions).forEach(([resource, actions]) => {
+      actions.forEach(action => {
+        allPermissions.push(`${resource}:${action}`);
+      });
+    });
+    
+    return allPermissions;
+  };
+
+  const authValue: AuthContextType = {
     user,
     isAuthenticated,
     isLoading,
@@ -164,13 +223,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshUser
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const permissionsValue: PermissionsContextType = {
+    hasPermission,
+    isAdmin,
+    isUsuario,
+    getUserPermissions
+  };
+
+  return (
+    <AuthContext.Provider value={authValue}>
+      <PermissionsContext.Provider value={permissionsValue}>
+        {children}
+      </PermissionsContext.Provider>
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+}
+
+export function usePermissions(): PermissionsContextType {
+  const context = useContext(PermissionsContext);
+  if (context === undefined) {
+    throw new Error('usePermissions deve ser usado dentro de um AuthProvider');
   }
   return context;
 }

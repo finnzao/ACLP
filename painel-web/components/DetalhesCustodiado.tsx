@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,8 +8,12 @@ import type { Comparecimento } from '@/types';
 import { custodiadosService } from '@/lib/api/services';
 import { STATUS_LABELS, STATUS_COLORS } from '@/constants/status';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { formatCPF, formatRG, formatContato, formatCEP } from '@/lib/utils/formatting';
-
+import { 
+  FormattingCPF as formatCPF,
+  FormattingRG as formatRG,
+  FormattingPhone as formatContato,
+  FormattingCEP as formatCEP
+} from '@/lib/utils/formatting';
 
 interface Props {
   dados: Comparecimento;
@@ -48,7 +53,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [dadosCompletos, setDadosCompletos] = useState<Comparecimento>(dados);
 
-  // Carregar dados completos do custodiado incluindo endereço
   useEffect(() => {
     const carregarDadosCompletos = async () => {
       if (!dados.id) return;
@@ -59,17 +63,17 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
         const custodiado = await custodiadosService.buscarPorId(custodiadoId);
         
         if (custodiado) {
-          // Dados já vêm com objeto endereco estruturado
           setDadosCompletos({
             ...dados,
             ...custodiado,
-            endereco: custodiado.endereco || dados.endereco
-          });
+            endereco: custodiado.endereco || dados.endereco,
+            status: custodiado.status || dados.status
+          } as any);
           
-          console.log('[DetalhesModal] Dados completos carregados:', custodiado);
+          console.log('Dados completos carregados:', custodiado);
         }
       } catch (error) {
-        console.error('[DetalhesModal] Erro ao buscar dados completos:', error);
+        console.error('Erro ao buscar dados completos:', error);
         setDadosCompletos(dados);
       } finally {
         setLoadingDetails(false);
@@ -80,7 +84,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
   }, [dados]);
 
   const handleConfirmarPresenca = () => {
-    router.push(`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(dadosCompletos.processo)}`);
+    router.push(`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(String(dadosCompletos.processo))}`);
   };
 
   const handleEditarClick = () => {
@@ -98,12 +102,12 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
         throw new Error('ID do custodiado inválido');
       }
 
-      console.log('[DetalhesModal] Excluindo custodiado:', custodiadoId);
+      console.log('Excluindo custodiado:', custodiadoId);
       
       const resultado = await custodiadosService.excluir(custodiadoId);
       
       if (resultado.success) {
-        console.log('[DetalhesModal] Exclusão bem-sucedida');
+        console.log('Exclusão bem-sucedida');
         
         if (onExcluir) {
           onExcluir(custodiadoId);
@@ -118,7 +122,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
       }
       
     } catch (error) {
-      console.error('[DetalhesModal] Erro ao excluir:', error);
+      console.error('Erro ao excluir:', error);
       
       let errorMessage = 'Erro ao excluir registro';
       if (error instanceof Error) {
@@ -132,7 +136,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
     }
   };
 
-  // Formatar periodicidade
   const formatarPeriodicidade = (periodicidade: number | string): string => {
     if (typeof periodicidade === 'number') {
       return `${periodicidade} dias`;
@@ -147,7 +150,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
       <div className="relative bg-white p-6 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
           <div>
             <h3 className="text-2xl font-bold text-primary-dark">Detalhes do Custodiado</h3>
@@ -162,7 +164,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </button>
         </div>
 
-        {/* Indicador de carregamento */}
         {loadingDetails && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center gap-2">
@@ -172,7 +173,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         )}
 
-        {/* Mensagem de erro na exclusão */}
         {deleteError && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2">
@@ -182,7 +182,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         )}
 
-        {/* Status e Alerta */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <span className={`px-4 py-2 rounded-full text-sm font-medium ${STATUS_COLORS[dadosCompletos.status].bg} ${STATUS_COLORS[dadosCompletos.status].text}`}>
@@ -220,7 +219,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           )}
         </div>
 
-        {/* Informações Pessoais */}
         <div className="bg-gray-50 rounded-lg p-4 mb-6">
           <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <UserCheck className="w-5 h-5" />
@@ -234,13 +232,13 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
             <div>
               <span className="font-medium text-gray-700">CPF:</span>
               <p className="text-gray-600 mt-1 font-mono">
-                {dadosCompletos.cpf ? formatCPF(dadosCompletos.cpf) : 'Não informado'}
+                {dadosCompletos.cpf ? formatCPF(String(dadosCompletos.cpf)) : 'Não informado'}
               </p>
             </div>
             <div>
               <span className="font-medium text-gray-700">RG:</span>
               <p className="text-gray-600 mt-1 font-mono">
-                {dadosCompletos.rg ? formatRG(dadosCompletos.rg) : 'Não informado'}
+                {dadosCompletos.rg ? formatRG(String(dadosCompletos.rg)) : 'Não informado'}
               </p>
             </div>
             <div>
@@ -248,7 +246,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
                 <Phone className="w-4 h-4" />
                 Contato:
               </span>
-              <p className="text-gray-600 mt-1">{formatContato(dadosCompletos.contato)}</p>
+              <p className="text-gray-600 mt-1">{formatContato(String(dadosCompletos.contato))}</p>
             </div>
             {dadosCompletos.observacoes && (
               <div className="md:col-span-2">
@@ -259,7 +257,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         </div>
 
-        {/* Informações de Endereço - Seção Aprimorada */}
         {dadosCompletos.endereco && (
           <div className="bg-green-50 rounded-lg p-4 mb-6">
             <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
@@ -267,7 +264,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
               Endereço Residencial
             </h4>
             
-            {/* Endereço completo formatado */}
             <div className="mb-4 p-3 bg-white rounded-lg border border-green-200">
               <p className="text-green-700 text-sm font-medium">
                 {dadosCompletos.endereco.enderecoCompleto || 
@@ -275,7 +271,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
               </p>
             </div>
 
-            {/* Status do endereço */}
             {dadosCompletos.endereco.ativo && (
               <div className="mb-3 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600" />
@@ -288,7 +283,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
               </div>
             )}
 
-            {/* Grid de detalhes do endereço */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               <div>
                 <span className="font-medium text-green-700">CEP:</span>
@@ -322,7 +316,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
                 </p>
               </div>
 
-              {/* Informações adicionais do endereço */}
               {dadosCompletos.endereco.diasResidencia !== undefined && (
                 <div>
                   <span className="font-medium text-green-700 flex items-center gap-1">
@@ -348,7 +341,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
               )}
             </div>
 
-            {/* Motivo da alteração se houver */}
             {dadosCompletos.endereco.motivoAlteracao && (
               <div className="mt-3 pt-3 border-t border-green-200">
                 <span className="font-medium text-green-700 text-sm">Motivo do cadastro/alteração:</span>
@@ -360,7 +352,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         )}
 
-        {/* Caso não tenha endereço */}
         {!dadosCompletos.endereco && (
           <div className="bg-yellow-50 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2">
@@ -370,7 +361,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         )}
 
-        {/* Informações Processuais */}
         <div className="bg-blue-50 rounded-lg p-4 mb-6">
           <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
             <FileText className="w-5 h-5" />
@@ -405,7 +395,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         </div>
 
-        {/* Informações de Comparecimento */}
         <div className="bg-yellow-50 rounded-lg p-4 mb-6">
           <h4 className="font-semibold text-yellow-800 mb-3 flex items-center gap-2">
             <Calendar className="w-5 h-5" />
@@ -438,9 +427,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         </div>
 
-        {/* Ações */}
         <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200">
-          {/* Confirmar Presença */}
           <button 
             onClick={handleConfirmarPresenca}
             disabled={isDeleting}
@@ -454,7 +441,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
             Validar Comparecimento
           </button>
 
-          {/* Editar */}
           <button
             onClick={handleEditarClick}
             disabled={isDeleting || loadingDetails}
@@ -466,7 +452,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
             Editar Dados
           </button>
 
-          {/* Excluir */}
           <button 
             onClick={() => setShowConfirmDialog(true)}
             disabled={isDeleting}
@@ -488,10 +473,9 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </button>
         </div>
 
-        {/* Informações Adicionais */}
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <p className="text-xs text-gray-500">
-            Registro atualizado em: {dateUtils.formatToBR(dadosCompletos.atualizadoEm) || new Date().toLocaleString('pt-BR')}
+            Registro atualizado em: {dateUtils.formatToBR((dadosCompletos as any).atualizadoEm) || new Date().toLocaleString('pt-BR')}
           </p>
           {dadosCompletos.id && (
             <p className="text-xs text-gray-400 mt-1">
@@ -501,7 +485,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
         </div>
       </div>
 
-      {/* Modal de Confirmação de Exclusão */}
       <ConfirmDialog
         isOpen={showConfirmDialog}
         onClose={() => setShowConfirmDialog(false)}
@@ -511,7 +494,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
         message={`Tem certeza que deseja excluir o registro de ${dadosCompletos.nome}?`}
         details={[
           `Processo: ${dadosCompletos.processo}`,
-          `CPF: ${dadosCompletos.cpf ? formatCPF(dadosCompletos.cpf) : 'Não informado'}`,
+          `CPF: ${dadosCompletos.cpf ? formatCPF(String(dadosCompletos.cpf)) : 'Não informado'}`,
           `Status: ${STATUS_LABELS[dadosCompletos.status]}`,
           'Esta ação não pode ser desfeita!'
         ]}

@@ -10,11 +10,6 @@ interface User {
 
 // Rotas que requerem permissões específicas
 const PROTECTED_ROUTES = {
-  '/dashboard/registrar': {
-    resource: 'pessoas',
-    action: 'cadastrar',
-    adminOnly: false
-  },
   '/dashboard/configuracoes/sistema': {
     resource: 'sistema',
     action: 'configurar',
@@ -43,62 +38,85 @@ const PROTECTED_ROUTES = {
 };
 
 // Rotas públicas que não precisam de autenticação
-const PUBLIC_ROUTES = ['/login', '/api/auth/login'];
+const PUBLIC_ROUTES = [
+  '/login', 
+  '/api/auth/login',
+  '/ativar',
+  '/_next',
+  '/favicon.ico',
+  '/img',
+  '/public'
+];
 
 // Rotas que qualquer usuário autenticado pode acessar
 const AUTHENTICATED_ROUTES = [
   '/dashboard',
   '/dashboard/geral',
+  '/dashboard/registrar',
   '/dashboard/configuracoes',
   '/api/pessoas/list',
   '/api/comparecimentos'
 ];
 
+function decodeJWT(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('[Middleware] Erro ao decodificar token:', error);
+    return null;
+  }
+}
+
 function getUserFromToken(token: string): User | null {
   try {
-    console.log('Middleware - checking token:', token);
+    console.log('[Middleware] Verificando token...');
     
-    // Aceitar tanto o token genérico quanto os específicos
-    if (token === 'fake-jwt-token' || token === 'fake-token-admin') {
-      // Tentar obter usuário do localStorage do lado do servidor não funciona
-      // Vamos aceitar qualquer token válido e permitir que o cliente gerencie
-      return {
-        id: '1',
-        role: 'admin',
-        nome: 'João Silva',
-        email: 'admin@tjba.com.br'
-      };
+    // Decodificar o JWT real
+    const decoded = decodeJWT(token);
+    
+    if (!decoded) {
+      console.log('[Middleware] Token inválido - não foi possível decodificar');
+      return null;
     }
-    
-    if (token === 'fake-token-usuario') {
-      return {
-        id: '2',
-        role: 'usuario',
-        nome: 'Maria Santos',
-        email: 'usuario@tjba.com.br'
-      };
+
+    console.log('[Middleware] Token decodificado:', {
+      userId: decoded.userId,
+      email: decoded.email,
+      tipo: decoded.tipo,
+      exp: new Date(decoded.exp * 1000).toISOString()
+    });
+
+    // Verificar se o token expirou
+    const now = Math.floor(Date.now() / 1000);
+    if (decoded.exp && decoded.exp < now) {
+      console.log('[Middleware] Token expirado');
+      return null;
     }
-    
-    // Se tem token mas não é reconhecido, vamos permitir e deixar o cliente decidir
-    if (token && token.length > 0) {
-      console.log('Middleware - token exists, allowing access');
-      return {
-        id: '1',
-        role: 'admin',
-        nome: 'User',
-        email: 'user@system.com'
-      };
-    }
-    
-    return null;
+
+    // Converter tipo do backend (ADMIN/USUARIO) para role do frontend (admin/usuario)
+    const role = decoded.tipo === 'ADMIN' ? 'admin' : 'usuario';
+
+    return {
+      id: decoded.userId?.toString() || '0',
+      role: role,
+      nome: decoded.nome || 'Usuário',
+      email: decoded.email || ''
+    };
   } catch (error) {
-    console.error('Middleware - error checking token:', error);
+    console.error('[Middleware] Erro ao processar token:', error);
     return null;
   }
 }
 
 function hasPermission(user: User, resource: string, action: string): boolean {
-  // Definir permissões baseadas no role
   const permissions = {
     admin: {
       pessoas: ['listar', 'visualizar', 'cadastrar', 'editar', 'excluir', 'exportar'],
@@ -125,21 +143,37 @@ function hasPermission(user: User, resource: string, action: string): boolean {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  console.log('Middleware - processing path:', pathname);
+  console.log('[Middleware] Processando:', pathname);
   
   // Permitir rotas públicas
   if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    console.log('Middleware - public route, allowing');
+    console.log('[Middleware] Rota pública, permitindo acesso');
     return NextResponse.next();
   }
 
-  // Verificar token de autenticação - corrigido para usar 'auth-token'
-  const token = req.cookies.get('auth-token')?.value || req.cookies.get('token')?.value;
+  // Verificar token de autenticação
+  const token = req.cookies.get('auth-token')?.value;
   
-  console.log('Middleware - found token:', token);
+  console.log('[Middleware] Token encontrado:', token ? 'SIM' : 'NÃO');
   
   if (!token) {
-    console.log('Middleware - no token, redirecting to login');
+    console.log('[Middleware] Sem token, redirecionando para login');
+    
+    // Se for rota de API, retornar 401
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ 
+          error: 'Unauthorized', 
+          message: 'Token de autenticação não encontrado' 
+        }),
+        { 
+          status: 401, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    // Para rotas de página, redirecionar para login
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
@@ -147,15 +181,29 @@ export function middleware(req: NextRequest) {
   const user = getUserFromToken(token);
   
   if (!user) {
-    console.log('Middleware - invalid token, redirecting to login');
+    console.log('[Middleware] Token inválido ou expirado, redirecionando para login');
+    
+    // Se for rota de API, retornar 401
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ 
+          error: 'Unauthorized', 
+          message: 'Token inválido ou expirado' 
+        }),
+        { 
+          status: 401, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
     // Token inválido - limpar cookie e redirecionar
     const response = NextResponse.redirect(new URL('/login', req.url));
     response.cookies.delete('auth-token');
-    response.cookies.delete('token');
     return response;
   }
 
-  console.log('Middleware - user authenticated:', user.email);
+  console.log('[Middleware] Usuário autenticado:', user.email, '- Role:', user.role);
 
   // Verificar se a rota requer permissões específicas
   const protectedRoute = Object.entries(PROTECTED_ROUTES).find(([route]) => 
@@ -164,11 +212,12 @@ export function middleware(req: NextRequest) {
 
   if (protectedRoute) {
     const [routePath, permissions] = protectedRoute;
-    console.log('Middleware - checking protected route:', routePath);
+    console.log('[Middleware] Verificando permissões para rota protegida:', routePath);
     
     // Verificar se é rota apenas para admin
     if (permissions.adminOnly && user.role !== 'admin') {
-      console.log('Middleware - admin only route, user is not admin');
+      console.log('[Middleware] Acesso negado - rota requer admin');
+      
       // Para rotas de API, retornar 403
       if (pathname.startsWith('/api/')) {
         return new NextResponse(
@@ -183,13 +232,14 @@ export function middleware(req: NextRequest) {
         );
       }
       
-      // Para rotas de página, redirecionar para página de erro
+      // Para rotas de página, redirecionar para página de acesso negado
       return NextResponse.redirect(new URL('/dashboard/acesso-negado', req.url));
     }
 
     // Verificar permissão específica
     if (!hasPermission(user, permissions.resource, permissions.action)) {
-      console.log('Middleware - insufficient permissions');
+      console.log('[Middleware] Acesso negado - permissão insuficiente');
+      
       // Para rotas de API, retornar 403
       if (pathname.startsWith('/api/')) {
         return new NextResponse(
@@ -209,29 +259,20 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // Verificar se é rota autenticada geral
-  const isAuthenticatedRoute = AUTHENTICATED_ROUTES.some(route => 
-    pathname.startsWith(route)
-  );
+  // Adicionar informações do usuário no header para uso na aplicação
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-user-id', user.id);
+  requestHeaders.set('x-user-role', user.role);
+  requestHeaders.set('x-user-email', user.email);
+  requestHeaders.set('x-user-nome', user.nome);
 
-  if (isAuthenticatedRoute || pathname.startsWith('/api/')) {
-    console.log('Middleware - authenticated route, adding headers');
-    // Adicionar informações do usuário no header para uso na aplicação
-    const requestHeaders = new Headers(req.headers);
-    requestHeaders.set('x-user-id', user.id);
-    requestHeaders.set('x-user-role', user.role);
-    requestHeaders.set('x-user-email', user.email);
+  console.log('[Middleware] Acesso permitido');
 
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    });
-  }
-
-  // Rota não reconhecida para usuário autenticado - permitir
-  console.log('Middleware - allowing unrecognized route');
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {

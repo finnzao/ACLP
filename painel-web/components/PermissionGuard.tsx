@@ -24,7 +24,6 @@ interface MultiPermissionGuardProps {
   requireAll?: boolean;
 }
 
-// Componente para verificar uma única permissão
 export function PermissionGuard({
   resource,
   action,
@@ -51,7 +50,6 @@ export function PermissionGuard({
   return null;
 }
 
-// Componente para verificar múltiplas permissões
 export function MultiPermissionGuard({
   permissions,
   children,
@@ -80,7 +78,6 @@ export function MultiPermissionGuard({
   return null;
 }
 
-// Componente para verificar se é admin
 export function AdminGuard({
   children,
   fallback = null,
@@ -107,7 +104,6 @@ export function AdminGuard({
   return null;
 }
 
-// Componente para mostrar conteúdo apenas para usuários comuns
 export function UserOnlyGuard({
   children,
   fallback = null
@@ -124,7 +120,6 @@ export function UserOnlyGuard({
   return <>{fallback}</>;
 }
 
-// Mensagem padrão de permissão negada
 function PermissionDeniedMessage({ 
   message = "Você não tem permissão para acessar esta funcionalidade" 
 }: { 
@@ -146,7 +141,6 @@ function PermissionDeniedMessage({
   );
 }
 
-// Componente para desabilitar elementos baseado em permissões
 interface ConditionalWrapperProps {
   condition: boolean;
   wrapper: (children: ReactNode) => ReactNode;
@@ -157,28 +151,36 @@ export function ConditionalWrapper({ condition, wrapper, children }: Conditional
   return condition ? wrapper(children) : <>{children}</>;
 }
 
-// Hook para envolver elementos com base em permissões
 export function usePermissionWrapper() {
   const { hasPermission } = usePermissions();
   
-  const wrapWithPermission = (
-    resource: string,
-    action: string
-  ) => {
-    return (children: ReactNode) => (
-      <PermissionGuard resource={resource} action={action} showMessage={false}>
-        {children}
-      </PermissionGuard>
-    );
-  };
+  const WrapWithPermission = ({ 
+    resource, 
+    action, 
+    children 
+  }: { 
+    resource: string; 
+    action: string; 
+    children: ReactNode 
+  }) => (
+    <PermissionGuard resource={resource} action={action} showMessage={false}>
+      {children}
+    </PermissionGuard>
+  );
+  WrapWithPermission.displayName = 'WrapWithPermission';
   
-  const disableIfNoPermission = (
-    resource: string,
-    action: string
-  ) => {
+  const DisableIfNoPermission = ({
+    resource,
+    action,
+    children
+  }: {
+    resource: string;
+    action: string;
+    children: ReactNode;
+  }) => {
     const hasAccess = hasPermission(resource, action);
     
-    return (children: ReactNode) => (
+    return (
       <ConditionalWrapper
         condition={!hasAccess}
         wrapper={(children) => (
@@ -199,14 +201,14 @@ export function usePermissionWrapper() {
       </ConditionalWrapper>
     );
   };
+  DisableIfNoPermission.displayName = 'DisableIfNoPermission';
   
   return {
-    wrapWithPermission,
-    disableIfNoPermission
+    WrapWithPermission,
+    DisableIfNoPermission
   };
 }
 
-// Componente para mostrar indicador de permissão
 export function PermissionIndicator({
   resource,
   action,
@@ -246,7 +248,6 @@ export function PermissionIndicator({
   );
 }
 
-// Componente para área administrativa
 export function AdminArea({ children }: { children: ReactNode }) {
   return (
     <AdminGuard

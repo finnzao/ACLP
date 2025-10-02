@@ -37,26 +37,30 @@ import {
   AtualizacaoEndereco,
   MobileSectionProps,
   EstadoPagina,
-  dateUtils
+  dateUtils,
+  Endereco
 } from '@/types/comparecimento';
+
+declare global {
+  interface Window {
+    enderecoTimeout?: NodeJS.Timeout;
+  }
+}
 
 export default function ConfirmarPresencaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const processo = searchParams.get('processo');
-  const { success, error, warning } = useToastHelpers();
+  const { success, error } = useToastHelpers();
 
-  // Hooks da API
   const { custodiados, loading: loadingCustodiados, error: errorCustodiados, refetch } = useCustodiados();
   const { registrarComparecimento, loading: loadingComparecimento } = useComparecimentos();
 
-  // Estados principais
   const [pessoa, setPessoa] = useState<CustodiadoResponse | null>(null);
   const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
 
-  // Estados do formulário
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
     dataComparecimento: dateUtils.getCurrentDate(),
     horaComparecimento: dateUtils.getCurrentTime(),
@@ -65,18 +69,15 @@ export default function ConfirmarPresencaPage() {
     validadoPor: 'Servidor Atual'
   });
 
-  // Estados para atualização de endereço
   const [atualizacaoEndereco, setAtualizacaoEndereco] = useState<AtualizacaoEndereco>({
     houveAlteracao: false
   });
   const [enderecoRespondido, setEnderecoRespondido] = useState(false);
 
-  // Estados mobile e UI
   const [isMobile, setIsMobile] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>('busca');
   const [proximoComparecimento, setProximoComparecimento] = useState<string | null>(null);
 
-  // Verificar se é mobile
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -88,7 +89,6 @@ export default function ConfirmarPresencaPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Buscar pessoa por processo
   const buscarPessoa = useCallback(async (numeroProcesso: string) => {
     if (!numeroProcesso.trim()) return;
 
@@ -118,14 +118,12 @@ export default function ConfirmarPresencaPage() {
     }
   }, [custodiados, success, error]);
 
-  // Buscar pessoa quando o processo é fornecido na URL
   useEffect(() => {
     if (processo && custodiados.length > 0 && !pessoa) {
       buscarPessoa(processo);
     }
   }, [processo, custodiados, pessoa, buscarPessoa]);
 
-  // Calcular próximo comparecimento quando bem-sucedido
   useEffect(() => {
     if (estado === 'sucesso' && pessoa) {
       const proximaData = calcularProximoComparecimento(
@@ -136,29 +134,23 @@ export default function ConfirmarPresencaPage() {
     }
   }, [estado, pessoa, formulario.dataComparecimento]);
 
-
-  //formatar hora
   const formatarHoraParaAPI = (hora: string): string => {
     if (!hora) return '00:00:00';
 
-    // Se já está no formato HH:mm:ss, retorna como está
     if (hora.match(/^\d{2}:\d{2}:\d{2}$/)) {
       return hora;
     }
 
-    // Se está no formato HH:mm, adiciona :00
     if (hora.match(/^\d{2}:\d{2}$/)) {
       return `${hora}:00`;
     }
 
-    // Se está em outro formato, tenta converter
     const [hours, minutes] = hora.split(':');
     const h = hours?.padStart(2, '0') || '00';
     const m = minutes?.padStart(2, '0') || '00';
     return `${h}:${m}:00`;
   };
 
-  // Manipular mudanças no formulário
   const handleInputChange = (field: keyof FormularioComparecimento, value: string) => {
     setFormulario(prev => ({
       ...prev,
@@ -166,7 +158,6 @@ export default function ConfirmarPresencaPage() {
     }));
   };
 
-  // Manipular resposta sobre atualização de endereço
   const handleRespostaAlteracaoEndereco = useCallback((houve: boolean) => {
     requestAnimationFrame(() => {
       setAtualizacaoEndereco(prev => ({
@@ -176,7 +167,6 @@ export default function ConfirmarPresencaPage() {
       setEnderecoRespondido(true);
       
       if (houve) {
-        // ✅ Pequeno delay para expansão suave
         setTimeout(() => {
           setExpandedSection('endereco');
         }, 50);
@@ -184,11 +174,9 @@ export default function ConfirmarPresencaPage() {
     });
   }, []);
 
-  // Confirmar comparecimento - CORRIGIDO COM VALIDAÇÃO
   const confirmarComparecimento = async () => {
     if (!pessoa) return;
 
-    // Validações de UI
     if (!enderecoRespondido) {
       error('Informação pendente', 'Responda sobre a atualização de endereço');
       setExpandedSection('endereco');
@@ -219,14 +207,11 @@ export default function ConfirmarPresencaPage() {
         } : undefined
       };
 
-      // ✅ Log para debug
       logFormDataForDebug(dadosBasicos, 'Dados Originais');
 
-      // ✅ Sanitizar e validar dados
       const dadosSanitizados = sanitizeFormData(dadosBasicos);
       logFormDataForDebug(dadosSanitizados, 'Dados Sanitizados');
 
-      // ✅ Validar antes do envio
       const validacao = validateBeforeSend(dadosSanitizados);
       if (!validacao.isValid) {
         setEstado('erro');
@@ -235,13 +220,11 @@ export default function ConfirmarPresencaPage() {
         return;
       }
 
-      // ✅ Preparar DTO final
       const dadosComparecimento: ComparecimentoDTO = dadosSanitizados;
 
-      console.log('[ConfirmarPresença] ✅ Dados finais sendo enviados:', dadosComparecimento);
-      console.log('[ConfirmarPresença] ✅ Hora formatada:', dadosComparecimento.horaComparecimento);
+      console.log('Dados finais sendo enviados:', dadosComparecimento);
+      console.log('Hora formatada:', dadosComparecimento.horaComparecimento);
 
-      // Registrar comparecimento
       const resultado = await registrarComparecimento(dadosComparecimento);
 
       if (resultado.success) {
@@ -250,18 +233,17 @@ export default function ConfirmarPresencaPage() {
         setMensagem(`Comparecimento confirmado com sucesso!${msgEndereco}`);
         success('Comparecimento registrado', resultado.message || 'Presença confirmada com sucesso');
       } else {
-        console.error('[ConfirmarPresença] ❌ Erro na resposta:', resultado);
+        console.error('Erro na resposta:', resultado);
         setEstado('erro');
         setMensagem(resultado.message || 'Erro ao confirmar comparecimento');
         error('Erro no registro', resultado.message || 'Falha ao registrar comparecimento');
       }
     } catch (err: unknown) {
-      console.error('[ConfirmarPresença] ❌ Erro na requisição:', err);
+      console.error('Erro na requisição:', err);
       setEstado('erro');
 
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
 
-      // Tratamento específico para diferentes tipos de erro
       if (errorMessage.includes('JSON_INVALIDO') || errorMessage.includes('Malformed JSON')) {
         setMensagem('Erro nos dados enviados. Verifique se todos os campos estão preenchidos corretamente.');
         error('Erro de validação', 'Dados inválidos. Verifique os campos obrigatórios.');
@@ -284,7 +266,6 @@ export default function ConfirmarPresencaPage() {
     }
   };
 
-  // Componente de seção móvel
   const MobileSection = ({
     id,
     title,
@@ -321,7 +302,6 @@ export default function ConfirmarPresencaPage() {
     );
   };
 
-  // Estados de loading
   if (loadingCustodiados) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
@@ -333,7 +313,6 @@ export default function ConfirmarPresencaPage() {
     );
   }
 
-  // Erro no carregamento dos custodiados
   if (errorCustodiados) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
@@ -360,11 +339,9 @@ export default function ConfirmarPresencaPage() {
     );
   }
 
-  // Interface Mobile
   if (isMobile) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Header Mobile */}
         <div className="bg-white sticky top-0 z-20 shadow-sm">
           <div className="flex items-center gap-4 p-4">
             <button
@@ -382,9 +359,7 @@ export default function ConfirmarPresencaPage() {
           </div>
         </div>
 
-        {/* Content Mobile */}
         <div className="p-4 pb-24">
-          {/* Estados de carregamento e erro */}
           {estado === 'buscando' && (
             <div className="bg-white rounded-lg p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
@@ -441,10 +416,8 @@ export default function ConfirmarPresencaPage() {
             </div>
           )}
 
-          {/* Formulário principal - Mobile */}
           {estado === 'inicial' && (
             <>
-              {/* Busca de Pessoa */}
               <MobileSection
                 id="busca"
                 title="Buscar Pessoa"
@@ -468,7 +441,6 @@ export default function ConfirmarPresencaPage() {
                 </div>
               </MobileSection>
 
-              {/* Dados da Pessoa */}
               {pessoa && (
                 <>
                   <MobileSection
@@ -510,7 +482,6 @@ export default function ConfirmarPresencaPage() {
                     </div>
                   </MobileSection>
 
-                  {/* Atualização de Endereço */}
                   <MobileSection
                     id="endereco"
                     title="Atualização de Endereço"
@@ -551,12 +522,10 @@ export default function ConfirmarPresencaPage() {
                       </div>
                     ) : atualizacaoEndereco.houveAlteracao ? (
                       <div className="space-y-4" style={{ transform: 'translateZ(0)' }}>
-                        {/* ✅ CORREÇÃO: Container estável para o formulário */}
                         <div key="endereco-form-stable" className="transition-none">
                           <EnderecoForm
-                            endereco={atualizacaoEndereco.endereco || {}}
+                            endereco={atualizacaoEndereco.endereco || {} as Endereco}
                             onEnderecoChange={(endereco) => {
-                              // ✅ CORREÇÃO: Usar requestAnimationFrame para suavizar updates
                               requestAnimationFrame(() => {
                                 setAtualizacaoEndereco(prev => ({
                                   ...prev,
@@ -576,7 +545,9 @@ export default function ConfirmarPresencaPage() {
                             value={atualizacaoEndereco.motivoAlteracao || ''}
                             onChange={(e) => {
                               const value = e.target.value;
-                              clearTimeout(window.enderecoTimeout);
+                              if (window.enderecoTimeout) {
+                                clearTimeout(window.enderecoTimeout);
+                              }
                               window.enderecoTimeout = setTimeout(() => {
                                 setAtualizacaoEndereco(prev => ({
                                   ...prev,
@@ -622,14 +593,12 @@ export default function ConfirmarPresencaPage() {
                     )}
                   </MobileSection>
 
-                  {/* Detalhes do Comparecimento */}
                   <MobileSection
                     id="comparecimento"
                     title="Detalhes do Comparecimento"
                     icon={<UserCheck className="w-5 h-5 text-blue-600" />}
                   >
                     <div className="space-y-4">
-                      {/* Tipo de Validação */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Tipo de Validação
@@ -658,7 +627,6 @@ export default function ConfirmarPresencaPage() {
                         </div>
                       </div>
 
-                      {/* Data e Hora */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -684,7 +652,6 @@ export default function ConfirmarPresencaPage() {
                         </div>
                       </div>
 
-                      {/* Observações */}
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Observações
@@ -698,7 +665,6 @@ export default function ConfirmarPresencaPage() {
                         />
                       </div>
 
-                      {/* Validado por */}
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Validado por
@@ -719,7 +685,6 @@ export default function ConfirmarPresencaPage() {
           )}
         </div>
 
-        {/* Fixed Bottom Actions - Mobile */}
         {estado === 'inicial' && pessoa && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
             <div className="grid grid-cols-2 gap-3">
@@ -750,11 +715,9 @@ export default function ConfirmarPresencaPage() {
     );
   }
 
-  // Interface Desktop
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
       <div className="max-w-4xl mx-auto">
-        {/* Header Desktop */}
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => router.back()}
@@ -769,7 +732,6 @@ export default function ConfirmarPresencaPage() {
           </div>
         </div>
 
-        {/* Estados de Loading, Sucesso e Erro - Desktop */}
         {(estado === 'buscando' || estado === 'confirmando' || estado === 'sucesso' || estado === 'erro') && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             {estado === 'buscando' && (
@@ -807,7 +769,7 @@ export default function ConfirmarPresencaPage() {
                     </p>
                     {atualizacaoEndereco.houveAlteracao && (
                       <p className="text-green-700 text-sm mt-1">
-                        ✅ Endereço atualizado com sucesso
+                        Endereço atualizado com sucesso
                       </p>
                     )}
                   </div>
@@ -816,7 +778,7 @@ export default function ConfirmarPresencaPage() {
                 {proximoComparecimento && pessoa && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">
-                      📅 Próximo Comparecimento
+                      Próximo Comparecimento
                     </h3>
                     <p className="text-blue-700 text-lg font-medium">
                       {proximoComparecimento}
@@ -878,11 +840,9 @@ export default function ConfirmarPresencaPage() {
           </div>
         )}
 
-        {/* Formulário Desktop */}
         {estado === 'inicial' && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="p-8">
-              {/* Busca de Pessoa */}
               {!pessoa && (
                 <div className="mb-8">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -912,7 +872,6 @@ export default function ConfirmarPresencaPage() {
                 </div>
               )}
 
-              {/* Dados da Pessoa */}
               {pessoa && (
                 <>
                   <div className="bg-primary p-6 rounded-xl mb-8 text-white">
@@ -954,7 +913,6 @@ export default function ConfirmarPresencaPage() {
                     </div>
                   </div>
 
-                  {/* Atualização de Endereço */}
                   <div className="mb-8">
                     <div className={`bg-orange-50 border border-orange-200 rounded-lg p-6 ${!enderecoRespondido ? 'ring-2 ring-orange-500 ring-offset-2' : ''
                       }`}>
@@ -995,7 +953,7 @@ export default function ConfirmarPresencaPage() {
                       ) : atualizacaoEndereco.houveAlteracao ? (
                         <div className="space-y-6">
                           <EnderecoForm
-                            endereco={atualizacaoEndereco.endereco || {}}
+                            endereco={atualizacaoEndereco.endereco || {} as Endereco}
                             onEnderecoChange={(endereco) =>
                               setAtualizacaoEndereco(prev => ({
                                 ...prev,
@@ -1056,7 +1014,6 @@ export default function ConfirmarPresencaPage() {
                     </div>
                   </div>
 
-                  {/* Formulário de Confirmação */}
                   <div className="space-y-6">
                     <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
                       <FileText className="w-5 h-5" />
@@ -1064,7 +1021,6 @@ export default function ConfirmarPresencaPage() {
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Tipo de Validação */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Tipo de Validação *
@@ -1081,7 +1037,6 @@ export default function ConfirmarPresencaPage() {
                         </select>
                       </div>
 
-                      {/* Validado por */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Validado por *
@@ -1096,7 +1051,6 @@ export default function ConfirmarPresencaPage() {
                         />
                       </div>
 
-                      {/* Data */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Data do Comparecimento *
@@ -1113,7 +1067,6 @@ export default function ConfirmarPresencaPage() {
                         </div>
                       </div>
 
-                      {/* Hora */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Horário do Comparecimento *
@@ -1131,7 +1084,6 @@ export default function ConfirmarPresencaPage() {
                       </div>
                     </div>
 
-                    {/* Observações */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Observações
@@ -1146,7 +1098,6 @@ export default function ConfirmarPresencaPage() {
                     </div>
                   </div>
 
-                  {/* Botões de Ação */}
                   <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
                     <button
                       onClick={() => router.back()}
@@ -1174,7 +1125,6 @@ export default function ConfirmarPresencaPage() {
           </div>
         )}
 
-        {/* Dicas importantes */}
         {estado === 'inicial' && !isMobile && (
           <div className="mt-6 bg-blue-50 rounded-xl p-6">
             <h3 className="font-semibold text-lg mb-3 text-blue-900 flex items-center gap-2">
@@ -1184,34 +1134,27 @@ export default function ConfirmarPresencaPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ul className="space-y-2 text-blue-800">
                 <li className="flex items-start">
-                  <span className="mr-2">✅</span>
-                  <span>Certifique-se de que a pessoa realmente compareceu</span>
+                  <span className="mr-2">Certifique-se de que a pessoa realmente compareceu</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">🏠</span>
-                  <span>Sempre pergunte sobre mudança de endereço</span>
+                  <span className="mr-2">Sempre pergunte sobre mudança de endereço</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">🕐</span>
-                  <span>Registre o horário exato do atendimento</span>
+                  <span className="mr-2">Registre o horário exato do atendimento</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">📝</span>
-                  <span>Adicione observações relevantes quando necessário</span>
+                  <span className="mr-2">Adicione observações relevantes quando necessário</span>
                 </li>
               </ul>
               <ul className="space-y-2 text-blue-800">
                 <li className="flex items-start">
-                  <span className="mr-2">⚠️</span>
-                  <span>Esta ação atualiza automaticamente o status</span>
+                  <span className="mr-2">Esta ação atualiza automaticamente o status</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">📅</span>
-                  <span>O próximo comparecimento será calculado automaticamente</span>
+                  <span className="mr-2">O próximo comparecimento será calculado automaticamente</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">🔄</span>
-                  <span>Todos os dados são sincronizados em tempo real</span>
+                  <span className="mr-2">Todos os dados são sincronizados em tempo real</span>
                 </li>
               </ul>
             </div>

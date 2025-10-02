@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, User, FileText, ChevronRight, Loader2, Filter, X, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, User, FileText, ChevronRight, Loader2, Filter, X, Calendar } from 'lucide-react';
 import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
 
@@ -311,7 +311,7 @@ export default function BuscarPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum resultado encontrado</h3>
             <p className="text-gray-500 text-center text-sm px-8 mb-6">
-              Não encontramos ninguém com "{busca}"
+              Não encontramos ninguém com &quot;{busca}&quot;
             </p>
             <button
               onClick={limparBusca}

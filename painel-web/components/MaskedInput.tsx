@@ -2,8 +2,8 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Info } from 'lucide-react';
-import { INPUT_MASKS, type MaskedInputProps, isValidCPF } from '@/lib/utils/inputFormatters';
-
+import { INPUT_MASKS,  type MaskedInputProps } from '@/lib/utils/inputFormatters';
+import { ValidationCPF } from '@/lib/utils/validation';
 export function MaskedInput({
     mask,
     value,
@@ -29,7 +29,7 @@ export function MaskedInput({
             setIsValid(cleanValue.length === 20 ? true : null);
         } else if (mask === 'cpf') {
             setIsComplete(cleanValue.length === 11);
-            setIsValid(cleanValue.length === 11 ? isValidCPF(value) : null);
+            setIsValid(cleanValue.length === 11 ? ValidationCPF(value) : null);
         } else if (mask === 'telefone') {
             setIsComplete(cleanValue.length >= 10);
             setIsValid(cleanValue.length >= 10 ? true : null);
@@ -222,7 +222,7 @@ export function MaskedInputField({
         if (mask === 'processo') {
             setShowSuccess(cleanValue.length === 20 && !errorMessage);
         } else if (mask === 'cpf') {
-            setShowSuccess(cleanValue.length === 11 && isValidCPF(value) && !errorMessage);
+            setShowSuccess(cleanValue.length === 11 && ValidationCPF(value) && !errorMessage);
         } else if (mask === 'telefone') {
             setShowSuccess(cleanValue.length >= 10 && !errorMessage);
         } else if (mask === 'cep') {

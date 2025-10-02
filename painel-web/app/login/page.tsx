@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Crown, User, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { isValidEmail } from '@/lib/utils/formatting';
+import { ValidationEmailFormat as isValidEmail } from '@/lib/utils/validation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,7 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  
+
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
       console.log('[LoginPage] Usuário já autenticado, redirecionando...');
-      router.replace('/dashboard');
+      router.replace('/dashboard/geral');
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -53,38 +54,32 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-  
+
     setLoading(true);
     setError('');
 
     try {
       console.log('[LoginPage] Iniciando processo de login...');
-      
-      const success = await login(email, password);
-      
+
+      const success = await login(email, password, rememberMe);
+
       if (success) {
-        console.log('[LoginPage] Login bem-sucedido! Aguardando atualização do estado...');
-        console.log(success);
-        
-        // Aguardar um pouco mais para garantir que o estado foi atualizado
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
+        console.log('[DEBUG] isAuthenticated:', isAuthenticated);
+        console.log('[DEBUG] Cookies:', document.cookie);
+        console.log('[DEBUG] LocalStorage token:', localStorage.getItem('access-token'));
+
+        // Aguardar um pouco para garantir que o estado foi atualizado
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         console.log('[LoginPage] Redirecionando para dashboard...');
-        
+
         // Usar replace para evitar voltar para login
         router.replace('/dashboard/geral');
-        
-        // Fallback: forçar redirecionamento após 500ms se router.replace não funcionar
-        setTimeout(() => {
-          if (window.location.pathname === '/login') {
-            console.log('[LoginPage] Fallback: forçando redirecionamento via window.location');
-            window.location.href = '/dashboard/geral';
-          }
-        }, 500);
+
       } else {
         console.log('[LoginPage] Login falhou');
         setError('E-mail ou senha inválidos. Verifique suas credenciais.');
@@ -92,25 +87,7 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error('[LoginPage] Erro no login:', error);
-      
-      // Tratamento de erros específicos baseado na documentação
-      if (error.response?.status === 401) {
-        setError('E-mail ou senha incorretos');
-      } else if (error.response?.status === 403) {
-        const message = error.response?.data?.message || '';
-        if (message.includes('bloqueada')) {
-          setError(message);
-        } else if (message.includes('desativada')) {
-          setError('Conta desativada. Entre em contato com o administrador');
-        } else {
-          setError(message || 'Acesso negado');
-        }
-      } else if (error.response?.status === 429) {
-        setError('Muitas tentativas. Aguarde antes de tentar novamente');
-      } else {
-        setError('Erro ao conectar com o servidor. Tente novamente.');
-      }
-      
+      setError('Erro ao conectar com o servidor. Tente novamente.');
       setLoading(false);
     }
   };
@@ -142,7 +119,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light font-sans px-4">
       <div className="relative w-[400px] min-h-[700px] bg-gradient-to-br from-primary-dark to-primary rounded-xl shadow-2xl overflow-hidden">
-        
+
         {/* Elementos decorativos de fundo */}
         <span className="absolute bg-primary h-[520px] w-[520px] top-[-50px] right-[120px] rounded-tr-[72px] rotate-45"></span>
         <span className="absolute bg-primary-light h-[220px] w-[220px] top-[-172px] right-0 rounded-[32px] rotate-45"></span>

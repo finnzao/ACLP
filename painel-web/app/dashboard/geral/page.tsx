@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCustodiados } from '@/hooks/useAPI';
 import type { CustodiadoResponse, ListarCustodiadosResponse } from '@/types/api';
-import type { Comparecimento } from '@/types';
 import DetalhesCustodiadoModal from '@/components/DetalhesCustodiado';
 import EditarCustodiadoModal from '@/components/EditarCustodiado';
 import ExportButton from '@/components/ExportButton';
@@ -27,14 +26,44 @@ import {
   MapPin
 } from 'lucide-react';
 
+interface CustodiadoFormatado {
+  id: number;
+  nome: string;
+  cpf: string;
+  rg: string;
+  contato: string;
+  processo: string;
+  vara: string;
+  comarca: string;
+  decisao: string;
+  periodicidade: number;
+  status: string;
+  primeiroComparecimento: string;
+  dataComparecimentoInicial: string;
+  ultimoComparecimento: string;
+  proximoComparecimento: string;
+  endereco?: {
+    cep: string;
+    logradouro: string;
+    numero?: string;
+    complemento?: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+  };
+  observacoes?: string;
+  atrasado?: boolean;
+  diasAtraso?: number;
+  comparecimentoHoje?: boolean;
+  enderecoCompleto?: string;
+  cidadeEstado?: string;
+}
+
 export default function GeralPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-
   const { showToast } = useToast();
 
-  // Hook do backend - mudança importante aqui
   const {
     custodiados: custodiadosBackend,
     loading: loadingBackend,
@@ -42,7 +71,6 @@ export default function GeralPage() {
     refetch: refetchCustodiados
   } = useCustodiados();
 
-  // Estados principais
   const [filtro, setFiltro] = useState('');
   const [colunaOrdenacao, setColunaOrdenacao] = useState<string>('nome');
   const [ordem, setOrdem] = useState<'asc' | 'desc'>('asc');
@@ -51,18 +79,15 @@ export default function GeralPage() {
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'em conformidade' | 'inadimplente'>('todos');
   const [filtroUrgencia, setFiltroUrgencia] = useState<'todos' | 'hoje' | 'atrasados' | 'proximos'>('todos');
 
-  // Estados de controle
-  const [selecionado, setSelecionado] = useState<Comparecimento | null>(null);
-  const [editando, setEditando] = useState<Comparecimento | null>(null);
+  const [selecionado, setSelecionado] = useState<CustodiadoFormatado | null>(null);
+  const [editando, setEditando] = useState<CustodiadoFormatado | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileExport, setShowMobileExport] = useState(false);
 
-  // Estados de paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Verificar se está em mobile
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -76,23 +101,18 @@ export default function GeralPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Converter dados do backend para formato esperado
-  const todosOsDados = useMemo(() => {
-    // Type guard para verificar se é ListarCustodiadosResponse
+  const todosOsDados = useMemo((): CustodiadoFormatado[] => {
     const isListarCustodiadosResponse = (data: any): data is ListarCustodiadosResponse => {
       return data && typeof data === 'object' && 'success' in data && 'data' in data;
     };
 
-    // Guard Clauses
     if (!custodiadosBackend) {
       console.warn('custodiadosBackend não está disponível');
       return [];
     }
 
-    // Verificar se tem a estrutura esperada
     if (!isListarCustodiadosResponse(custodiadosBackend)) {
       console.warn('custodiadosBackend não tem a estrutura esperada:', custodiadosBackend);
-      // Se for CustodiadoResponse[] diretamente, trabalhar com isso
       if (Array.isArray(custodiadosBackend)) {
         return custodiadosBackend.map((custodiado: CustodiadoResponse) => ({
           id: custodiado.id,
@@ -107,17 +127,10 @@ export default function GeralPage() {
           periodicidade: custodiado.periodicidade,
           status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
           primeiroComparecimento: custodiado.dataComparecimentoInicial,
+          dataComparecimentoInicial: custodiado.dataComparecimentoInicial,
           ultimoComparecimento: custodiado.ultimoComparecimento,
           proximoComparecimento: custodiado.proximoComparecimento,
-          endereco: custodiado.endereco ? {
-            cep: custodiado.endereco.cep,
-            logradouro: custodiado.endereco.logradouro,
-            numero: custodiado.endereco.numero,
-            complemento: custodiado.endereco.complemento,
-            bairro: custodiado.endereco.bairro,
-            cidade: custodiado.endereco.cidade,
-            estado: custodiado.endereco.estado
-          } : undefined,
+          endereco: custodiado.endereco,
           observacoes: custodiado.observacoes,
           atrasado: custodiado.atrasado,
           diasAtraso: custodiado.diasAtraso,
@@ -129,18 +142,8 @@ export default function GeralPage() {
       return [];
     }
 
-    if (!custodiadosBackend.success) {
-      console.warn('Resposta da API não foi bem-sucedida:', custodiadosBackend.message);
-      return [];
-    }
-
-    if (!custodiadosBackend.data) {
-      console.warn('Dados não estão presentes na resposta');
-      return [];
-    }
-
-    if (!Array.isArray(custodiadosBackend.data)) {
-      console.warn('Dados não são um array:', typeof custodiadosBackend.data);
+    if (!custodiadosBackend.success || !custodiadosBackend.data || !Array.isArray(custodiadosBackend.data)) {
+      console.warn('Dados inválidos na resposta');
       return [];
     }
 
@@ -151,10 +154,7 @@ export default function GeralPage() {
 
     console.info(`Processando ${custodiadosBackend.data.length} custodiados`);
 
-    // Extrair custodiados após todas as validações
-    const custodiados = custodiadosBackend.data;
-
-    return custodiados.map((custodiado: CustodiadoResponse) => ({
+    return custodiadosBackend.data.map((custodiado: CustodiadoResponse) => ({
       id: custodiado.id,
       nome: custodiado.nome,
       cpf: custodiado.cpf || '',
@@ -167,17 +167,10 @@ export default function GeralPage() {
       periodicidade: custodiado.periodicidade,
       status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
       primeiroComparecimento: custodiado.dataComparecimentoInicial,
+      dataComparecimentoInicial: custodiado.dataComparecimentoInicial,
       ultimoComparecimento: custodiado.ultimoComparecimento,
       proximoComparecimento: custodiado.proximoComparecimento,
-      endereco: custodiado.endereco ? {
-        cep: custodiado.endereco.cep,
-        logradouro: custodiado.endereco.logradouro,
-        numero: custodiado.endereco.numero,
-        complemento: custodiado.endereco.complemento,
-        bairro: custodiado.endereco.bairro,
-        cidade: custodiado.endereco.cidade,
-        estado: custodiado.endereco.estado
-      } : undefined,
+      endereco: custodiado.endereco,
       observacoes: custodiado.observacoes,
       atrasado: custodiado.atrasado,
       diasAtraso: custodiado.diasAtraso,
@@ -187,7 +180,6 @@ export default function GeralPage() {
     }));
   }, [custodiadosBackend]);
 
-  // Configurar busca inicial a partir da URL
   useEffect(() => {
     const busca = searchParams.get('busca');
     const status = searchParams.get('status') as 'todos' | 'em conformidade' | 'inadimplente' | null;
@@ -202,7 +194,6 @@ export default function GeralPage() {
     if (dataF) setDataFim(dataF);
   }, [searchParams]);
 
-  // Atualizar URL quando filtros mudarem
   useEffect(() => {
     const params = new URLSearchParams();
 
@@ -219,7 +210,6 @@ export default function GeralPage() {
     setCurrentPage(1);
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
 
-  // Utilitários
   const limparMascaraProcesso = useCallback((processo: string) => {
     return processo.replace(/\D/g, '');
   }, []);
@@ -250,8 +240,7 @@ export default function GeralPage() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) < 0;
   }, []);
 
-  // Filtros adaptados para trabalhar com dados do backend
-  const filtrarDados = useCallback((data: any[]): any[] => {
+  const filtrarDados = useCallback((data: CustodiadoFormatado[]): CustodiadoFormatado[] => {
     return data.filter((item) => {
       const termo = filtro.trim();
       let matchTexto = true;
@@ -293,10 +282,10 @@ export default function GeralPage() {
     });
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim, normalizarTexto, limparMascaraProcesso, isToday, isOverdue, getDaysUntil]);
 
-  const ordenarDados = useCallback((data: any[]): any[] => {
+  const ordenarDados = useCallback((data: CustodiadoFormatado[]): CustodiadoFormatado[] => {
     return [...data].sort((a, b) => {
-      const valA = a[colunaOrdenacao];
-      const valB = b[colunaOrdenacao];
+      const valA = a[colunaOrdenacao as keyof CustodiadoFormatado];
+      const valB = b[colunaOrdenacao as keyof CustodiadoFormatado];
 
       if (colunaOrdenacao.includes('Comparecimento') || colunaOrdenacao === 'decisao' || colunaOrdenacao === 'dataDecisao') {
         const dateA = valA ? new Date(valA as string | number | Date) : undefined;
@@ -335,7 +324,6 @@ export default function GeralPage() {
   const totalHoje = dadosFiltrados.filter(d => d.comparecimentoHoje || isToday(d.proximoComparecimento)).length;
   const totalAtrasados = dadosFiltrados.filter(d => d.atrasado || isOverdue(d.proximoComparecimento)).length;
 
-  // Paginação
   const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -359,7 +347,6 @@ export default function GeralPage() {
 
   const hasActiveFilters = filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim;
 
-  // Tratamento de estados de loading e erro
   if (loadingBackend) {
     return (
       <div className="p-4 sm:p-6">
@@ -390,8 +377,7 @@ export default function GeralPage() {
     );
   }
 
-  // Componente Mobile Card adaptado para dados do backend
-  const MobileCard = ({ item }: { item: any }) => {
+  const MobileCard = ({ item }: { item: CustodiadoFormatado }) => {
     const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
     const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
     const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
@@ -456,19 +442,14 @@ export default function GeralPage() {
 
   return (
     <div className="min-h-screen bg-gray-50" ref={containerRef}>
-      {/* Mobile Layout */}
       {isMobile ? (
         <>
-          {/* Header Mobile */}
           <div className="bg-white sticky top-0 z-20 shadow-sm">
             <div className="p-4 pb-2">
               <div className="flex items-center justify-between mb-3">
                 <h1 className="text-xl font-bold text-primary-dark">Lista Geral</h1>
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleRefresh}
-                    className="p-2 bg-gray-100 rounded-lg"
-                  >
+                  <button onClick={handleRefresh} className="p-2 bg-gray-100 rounded-lg">
                     <RefreshCw className="w-5 h-5 text-gray-600" />
                   </button>
                   <button
@@ -479,15 +460,13 @@ export default function GeralPage() {
                   </button>
                   <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-lg ${hasActiveFilters ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'
-                      }`}
+                    className={`p-2 rounded-lg ${hasActiveFilters ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}
                   >
                     <SlidersHorizontal className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Export Options Mobile */}
               {showMobileExport && (
                 <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                   <ExportButton
@@ -499,7 +478,6 @@ export default function GeralPage() {
                 </div>
               )}
 
-              {/* Search Bar */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -519,7 +497,6 @@ export default function GeralPage() {
                 )}
               </div>
 
-              {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <div className="bg-gray-50 p-2 rounded-lg text-center">
                   <p className="text-2xl font-bold text-primary">{totalFiltrados}</p>
@@ -531,92 +508,44 @@ export default function GeralPage() {
                 </div>
               </div>
 
-              {/* Filters Panel */}
               {showFilters && (
                 <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-3 animate-in slide-in-from-top-2">
-                  {/* Status Filter */}
                   <div>
                     <label className="text-xs font-medium text-gray-700 mb-1 block">Status</label>
                     <div className="grid grid-cols-3 gap-1">
                       <button
                         onClick={() => setFiltroStatus('todos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'todos'
-                            ? 'bg-primary text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'todos' ? 'bg-primary text-white' : 'bg-white text-gray-600'}`}
                       >
                         Todos
                       </button>
                       <button
                         onClick={() => setFiltroStatus('em conformidade')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'em conformidade'
-                            ? 'bg-green-500 text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'em conformidade' ? 'bg-green-500 text-white' : 'bg-white text-gray-600'}`}
                       >
                         Conformidade
                       </button>
                       <button
                         onClick={() => setFiltroStatus('inadimplente')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'inadimplente'
-                            ? 'bg-red-500 text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
+                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'inadimplente' ? 'bg-red-500 text-white' : 'bg-white text-gray-600'}`}
                       >
                         Inadimplente
                       </button>
                     </div>
                   </div>
 
-                  {/* Urgency Filter */}
                   <div>
                     <label className="text-xs font-medium text-gray-700 mb-1 block">Urgência</label>
                     <div className="grid grid-cols-4 gap-1">
-                      <button
-                        onClick={() => setFiltroUrgencia('todos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'todos'
-                            ? 'bg-primary text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
-                      >
-                        Todos
-                      </button>
-                      <button
-                        onClick={() => setFiltroUrgencia('hoje')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'hoje'
-                            ? 'bg-yellow-500 text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
-                      >
-                        Hoje
-                      </button>
-                      <button
-                        onClick={() => setFiltroUrgencia('atrasados')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'atrasados'
-                            ? 'bg-red-500 text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
-                      >
-                        Atraso
-                      </button>
-                      <button
-                        onClick={() => setFiltroUrgencia('proximos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'proximos'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-white text-gray-600'
-                          }`}
-                      >
-                        7 dias
-                      </button>
+                      <button onClick={() => setFiltroUrgencia('todos')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'todos' ? 'bg-primary text-white' : 'bg-white text-gray-600'}`}>Todos</button>
+                      <button onClick={() => setFiltroUrgencia('hoje')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'hoje' ? 'bg-yellow-500 text-white' : 'bg-white text-gray-600'}`}>Hoje</button>
+                      <button onClick={() => setFiltroUrgencia('atrasados')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'atrasados' ? 'bg-red-500 text-white' : 'bg-white text-gray-600'}`}>Atraso</button>
+                      <button onClick={() => setFiltroUrgencia('proximos')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'proximos' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'}`}>7 dias</button>
                     </div>
                   </div>
 
-                  {/* Clear Filters */}
                   {hasActiveFilters && (
-                    <button
-                      onClick={limparFiltros}
-                      className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium"
-                    >
+                    <button onClick={limparFiltros} className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
                       Limpar Filtros
                     </button>
                   )}
@@ -624,41 +553,28 @@ export default function GeralPage() {
               )}
             </div>
 
-            {/* Results Count */}
             <div className="px-4 pb-2 flex items-center justify-between text-xs text-gray-600 border-t">
               <span>{totalFiltrados} resultados</span>
-              {totalPages > 1 && (
-                <span>Página {currentPage} de {totalPages}</span>
-              )}
+              {totalPages > 1 && <span>Página {currentPage} de {totalPages}</span>}
             </div>
           </div>
 
-          {/* Mobile Cards */}
           <div className="p-4 pb-20 space-y-3">
             {dadosPaginados.map((item, index) => (
               <MobileCard key={item.id || index} item={item} />
             ))}
 
-            {/* Empty State */}
             {dadosFiltrados.length === 0 && (
               <div className="text-center py-12">
                 <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                  Nenhum resultado encontrado
-                </h3>
-                <p className="text-gray-500 text-sm mb-4">
-                  Tente ajustar os filtros ou termos de busca
-                </p>
-                <button
-                  onClick={limparFiltros}
-                  className="bg-primary text-white px-4 py-2 rounded-lg text-sm"
-                >
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
+                <p className="text-gray-500 text-sm mb-4">Tente ajustar os filtros ou termos de busca</p>
+                <button onClick={limparFiltros} className="bg-primary text-white px-4 py-2 rounded-lg text-sm">
                   Limpar Filtros
                 </button>
               </div>
             )}
 
-            {/* Mobile Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between pt-4">
                 <button
@@ -669,11 +585,7 @@ export default function GeralPage() {
                   <ChevronLeft className="w-4 h-4" />
                   Anterior
                 </button>
-
-                <span className="text-sm text-gray-600">
-                  {currentPage} / {totalPages}
-                </span>
-
+                <span className="text-sm text-gray-600">{currentPage} / {totalPages}</span>
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -687,14 +599,12 @@ export default function GeralPage() {
           </div>
         </>
       ) : (
-        /* Desktop Layout */
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-3xl font-bold text-primary mb-2">Painel Geral de Comparecimentos</h2>
               <p className="text-text-muted">Gerencie todos os comparecimentos em um só lugar</p>
             </div>
-
             <div className="flex gap-2">
               <button
                 onClick={handleRefresh}
@@ -703,15 +613,10 @@ export default function GeralPage() {
                 <RefreshCw className="w-4 h-4" />
                 Atualizar
               </button>
-              <ExportButton
-                dados={todosOsDados}
-                dadosFiltrados={dadosFiltrados}
-                filterInfo={exportFilterInfo}
-              />
+              <ExportButton dados={todosOsDados} dadosFiltrados={dadosFiltrados} filterInfo={exportFilterInfo} />
             </div>
           </div>
 
-          {/* Estatísticas Rápidas */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-primary">
               <p className="text-sm text-text-muted">Total de Custodiados</p>
@@ -735,10 +640,8 @@ export default function GeralPage() {
             </div>
           </div>
 
-          {/* Filtros Principais */}
           <div className="bg-white p-4 rounded-lg shadow mb-6">
             <div className="flex flex-wrap gap-4 items-end">
-              {/* Busca por texto */}
               <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <Search className="w-4 h-4 inline mr-1" />
@@ -753,7 +656,6 @@ export default function GeralPage() {
                 />
               </div>
 
-              {/* Filtro de Status */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
@@ -767,7 +669,6 @@ export default function GeralPage() {
                 </select>
               </div>
 
-              {/* Filtro de Urgência */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Urgência</label>
                 <select
@@ -782,7 +683,6 @@ export default function GeralPage() {
                 </select>
               </div>
 
-              {/* Ordenação */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
                 <select
@@ -794,7 +694,7 @@ export default function GeralPage() {
                   <option value="status">Status</option>
                   <option value="proximoComparecimento">Próximo Comparecimento</option>
                   <option value="ultimoComparecimento">Último Comparecimento</option>
-                  <option value="dataDecisao">Data da Decisão</option>
+                  <option value="decisao">Data da Decisão</option>
                 </select>
               </div>
 
@@ -810,7 +710,6 @@ export default function GeralPage() {
                 </select>
               </div>
 
-              {/* Filtro de Data */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
                 <input
@@ -831,7 +730,6 @@ export default function GeralPage() {
                 />
               </div>
 
-              {/* Botão Limpar Filtros */}
               {hasActiveFilters && (
                 <div className="flex items-end">
                   <button
@@ -846,7 +744,6 @@ export default function GeralPage() {
             </div>
           </div>
 
-          {/* Resultados */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
@@ -854,8 +751,7 @@ export default function GeralPage() {
                   Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'custodiado' : 'custodiados'})
                   {totalFiltrados > 0 && (
                     <span className="text-sm text-gray-600 ml-2">
-                      • Página {currentPage} de {totalPages}
-                      • Mostrando {startIndex + 1}-{Math.min(endIndex, totalFiltrados)} de {totalFiltrados}
+                      • Página {currentPage} de {totalPages} • Mostrando {startIndex + 1}-{Math.min(endIndex, totalFiltrados)} de {totalFiltrados}
                     </span>
                   )}
                 </h3>
@@ -868,7 +764,6 @@ export default function GeralPage() {
               </div>
             </div>
 
-            {/* Tabela Desktop */}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px] table-auto">
                 <thead className="bg-primary text-white">
@@ -891,8 +786,7 @@ export default function GeralPage() {
                     return (
                       <tr
                         key={item.id || index}
-                        className={`border-b border-border hover:bg-gray-50 transition-colors ${atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''
-                          }`}
+                        className={`border-b border-border hover:bg-gray-50 transition-colors ${atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''}`}
                       >
                         <td className="p-3">
                           <div>
@@ -905,8 +799,7 @@ export default function GeralPage() {
                           <p className="text-xs text-text-muted">{item.vara}</p>
                         </td>
                         <td className="p-3 text-center">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                            }`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                             {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
                           </span>
                         </td>
@@ -914,14 +807,11 @@ export default function GeralPage() {
                           {item.ultimoComparecimento ? new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR') : '-'}
                         </td>
                         <td className="p-3 text-center">
-                          <div className={`text-sm font-medium ${atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'
-                            }`}>
+                          <div className={`text-sm font-medium ${atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'}`}>
                             {new Date(item.proximoComparecimento).toLocaleDateString('pt-BR')}
                           </div>
                           <div className="text-xs text-text-muted">
-                            {atrasado ? `${Math.abs(diasRestantes)} dias atraso` :
-                              hoje ? 'Hoje' :
-                                diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
+                            {atrasado ? `${Math.abs(diasRestantes)} dias atraso` : hoje ? 'Hoje' : diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
                           </div>
                         </td>
                         <td className="p-3 text-center">
@@ -959,7 +849,6 @@ export default function GeralPage() {
               </table>
             </div>
 
-            {/* Paginação */}
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between">
@@ -994,10 +883,7 @@ export default function GeralPage() {
                           <button
                             key={pageNum}
                             onClick={() => handlePageChange(pageNum)}
-                            className={`px-3 py-2 text-sm rounded-lg ${currentPage === pageNum
-                                ? 'bg-primary text-white'
-                                : 'bg-white border border-gray-300 hover:bg-gray-50'
-                              }`}
+                            className={`px-3 py-2 text-sm rounded-lg ${currentPage === pageNum ? 'bg-primary text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
                           >
                             {pageNum}
                           </button>
@@ -1018,7 +904,6 @@ export default function GeralPage() {
               </div>
             )}
 
-            {/* Mensagem quando não há resultados */}
             {dadosFiltrados.length === 0 && (
               <div className="p-8 text-center">
                 <div className="text-gray-400 mb-4">
@@ -1026,38 +911,30 @@ export default function GeralPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
                 <p className="text-gray-500 mb-4">
-                  {filtroUrgencia === 'hoje' && totalHoje === 0 ?
-                    'Não há comparecimentos agendados para hoje.' :
-                    filtroUrgencia === 'atrasados' && totalAtrasados === 0 ?
-                      'Não há comparecimentos em atraso.' :
-                      'Tente ajustar os filtros ou termos de busca'
-                  }
+                  {filtroUrgencia === 'hoje' && totalHoje === 0 ? 'Não há comparecimentos agendados para hoje.' :
+                    filtroUrgencia === 'atrasados' && totalAtrasados === 0 ? 'Não há comparecimentos em atraso.' :
+                      'Tente ajustar os filtros ou termos de busca'}
                 </p>
-                <button
-                  onClick={limparFiltros}
-                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
-                >
+                <button onClick={limparFiltros} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors">
                   Limpar Filtros
                 </button>
               </div>
             )}
           </div>
 
-          {/* Informação sobre a fonte dos dados */}
           <div className="text-center text-xs text-gray-500 mt-4">
             Dados carregados do servidor em {new Date().toLocaleTimeString('pt-BR')}
           </div>
         </div>
       )}
 
-      {/* Modais */}
       {selecionado && (
         <DetalhesCustodiadoModal
           dados={selecionado}
           onClose={() => setSelecionado(null)}
-          onEditar={(dados) => {
+          onEditar={(item) => {
             setSelecionado(null);
-            setEditando(dados);
+            setEditando(item);
           }}
           onExcluir={async () => {
             setSelecionado(null);
@@ -1080,7 +957,7 @@ export default function GeralPage() {
             setSelecionado(editando);
             setEditando(null);
           }}
-          onSave={(dados: Comparecimento) => {
+          onSave={() => {
             handleRefresh();
             setEditando(null);
           }}

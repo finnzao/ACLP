@@ -7,12 +7,12 @@ import type { Comparecimento } from '@/types';
 import { custodiadosService } from '@/lib/api/services';
 import { useToast } from '@/components/Toast';
 import { 
-  formatCPF, 
-  formatRG, 
-  formatContato,
-  formatCEP,
-  validationUtils 
+  FormattingCPF,
+  FormattingRG, 
+  FormattingPhone,
+  FormattingCEP, 
 } from '@/lib/utils/formatting';
+import { ValidationCPF, ValidationPhone, ValidationCEP } from '@/lib/utils/validation';
 import { EstadoBrasil } from '@/types/api';
 
 interface Props {
@@ -26,29 +26,20 @@ interface ValidationErrors {
   [key: string]: string;
 }
 
-// ✅ CORREÇÃO: Função para formatar processo no padrão CNJ
 const formatProcessoCNJ = (processo: string): string => {
   if (!processo) return '';
   
-  // Remove todos os caracteres não numéricos
   const numeros = processo.replace(/\D/g, '');
   
-  // Se não tem números suficientes, retorna como está
   if (numeros.length < 13) {
     return numeros;
   }
   
-  // Aplica formatação CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO
-  // Exemplo: 1234567-89.2024.8.05.0001
-  
-  // Pega os primeiros 20 dígitos (máximo para processo CNJ)
   const numerosLimitados = numeros.slice(0, 20);
   
   if (numerosLimitados.length >= 20) {
-    // Formato completo: NNNNNNN-DD.AAAA.J.TR.OOOO
     return `${numerosLimitados.slice(0, 7)}-${numerosLimitados.slice(7, 9)}.${numerosLimitados.slice(9, 13)}.${numerosLimitados.slice(13, 14)}.${numerosLimitados.slice(14, 16)}.${numerosLimitados.slice(16, 20)}`;
   } else if (numerosLimitados.length >= 13) {
-    // Formato parcial baseado no que tem disponível
     const sequencial = numerosLimitados.slice(0, 7);
     const digitos = numerosLimitados.slice(7, 9);
     const ano = numerosLimitados.slice(9, 13);
@@ -76,33 +67,25 @@ const formatProcessoCNJ = (processo: string): string => {
   return numerosLimitados;
 };
 
-// ✅ CORREÇÃO: Validação de processo CNJ (versão mais permissiva)
 const isValidProcessoCNJ = (processo: string): boolean => {
   if (!processo) return false;
   
-  // Remove formatação
   const numeros = processo.replace(/\D/g, '');
   
-  // Verificações básicas de tamanho
   if (numeros.length < 13 || numeros.length > 20) return false;
   
-  // Se tem 20 dígitos, verifica estrutura básica
   if (numeros.length === 20) {
     try {
-      // Verifica ano (posições 9-12)
       const ano = parseInt(numeros.slice(9, 13));
       const anoAtual = new Date().getFullYear();
       if (ano < 1990 || ano > anoAtual + 2) return false;
       
-      // Verifica segmento (posição 13) - deve ser 1-9
       const segmento = parseInt(numeros.slice(13, 14));
       if (segmento < 1 || segmento > 9) return false;
       
-      // Verifica tribunal (posições 14-15) - deve ser 01-99
       const tribunal = parseInt(numeros.slice(14, 16));
       if (tribunal < 1 || tribunal > 99) return false;
       
-      // Validação dos dígitos verificadores (algoritmo CNJ)
       const sequencial = numeros.slice(0, 7);
       const digitosVerificadores = numeros.slice(7, 9);
       const parteResto = numeros.slice(9);
@@ -110,10 +93,8 @@ const isValidProcessoCNJ = (processo: string): boolean => {
       let soma = 0;
       let multiplicador = 2;
       
-      // Concatena sequencial + resto para o cálculo
       const parteCalculo = sequencial + parteResto;
       
-      // Calcula o somatório
       for (let i = parteCalculo.length - 1; i >= 0; i--) {
         soma += parseInt(parteCalculo[i]) * multiplicador;
         multiplicador = multiplicador === 9 ? 2 : multiplicador + 1;
@@ -123,21 +104,19 @@ const isValidProcessoCNJ = (processo: string): boolean => {
       const digitoCalculado = 98 - resto;
       const digitoCalculadoStr = digitoCalculado.toString().padStart(2, '0');
       
-      // Se o dígito verificador não bater, ainda aceita (muitos processos têm problemas nos dígitos)
       const isDigitoValido = digitoCalculadoStr === digitosVerificadores;
       if (!isDigitoValido) {
-        console.warn(`[ProcessoCNJ] Dígito verificador divergente, mas aceito. Esperado: ${digitoCalculadoStr}, Recebido: ${digitosVerificadores}`);
+        console.warn(`Dígito verificador divergente. Esperado: ${digitoCalculadoStr}, Recebido: ${digitosVerificadores}`);
       }
       
-      return true; // Aceita mesmo com dígito divergente
+      return true;
       
     } catch (error) {
-      console.error('[ProcessoCNJ] Erro na validação:', error);
+      console.error('Erro na validação do processo:', error);
       return false;
     }
   }
   
-  // Para processos com menos de 20 dígitos, aceita se tem estrutura mínima
   return true;
 };
 
@@ -147,13 +126,12 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
   const [loadingData, setLoadingData] = useState(true);
   const [errors, setErrors] = useState<ValidationErrors>({});
   
-  // Estado inicial do formulário com valores formatados
   const [form, setForm] = useState<Comparecimento>(() => ({
     ...dados,
-    cpf: formatCPF(dados.cpf || ''),
-    rg: formatRG(dados.rg || ''),
-    processo: formatProcessoCNJ(dados.processo), // ✅ Usar nova função
-    contato: formatContato(dados.contato),
+    cpf: FormattingCPF(String(dados.cpf || '')),
+    rg: FormattingRG(String(dados.rg || '')),
+    processo: formatProcessoCNJ(String(dados.processo)),
+    contato: FormattingPhone(String(dados.contato)),
     periodicidade: typeof dados.periodicidade === 'number' 
       ? dados.periodicidade 
       : parseInt(String(dados.periodicidade)) || 30,
@@ -168,12 +146,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }
   }));
 
-  // Estado para periodicidade personalizada
   const [periodicidadePersonalizada, setPeriodicidadePersonalizada] = useState(
     typeof dados.periodicidade === 'number' ? dados.periodicidade : 30
   );
 
-  // Carregar dados completos ao abrir o modal
   useEffect(() => {
     const carregarDadosCompletos = async () => {
       if (!dados.id) {
@@ -185,20 +161,20 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       
       try {
         const custodiadoId = typeof dados.id === 'string' ? parseInt(dados.id) : dados.id;
-        console.log('[EditarCustodiado] Buscando dados completos para ID:', custodiadoId);
+        console.log('Buscando dados completos para ID:', custodiadoId);
         
         const custodiado = await custodiadosService.buscarPorId(custodiadoId);
         
         if (custodiado) {
-          console.log('[EditarCustodiado] Dados completos recebidos:', custodiado);
+          console.log('Dados completos recebidos:', custodiado);
           
           setForm({
             ...dados,
             ...custodiado,
-            cpf: formatCPF(custodiado.cpf || dados.cpf || ''),
-            rg: formatRG(custodiado.rg || dados.rg || ''),
-            processo: formatProcessoCNJ(custodiado.processo || dados.processo), // ✅ Usar nova função
-            contato: formatContato(custodiado.contato || dados.contato),
+            cpf: FormattingCPF(String(custodiado.cpf || dados.cpf || '')),
+            rg: FormattingRG(String(custodiado.rg || dados.rg || '')),
+            processo: formatProcessoCNJ(String(custodiado.processo || dados.processo)),
+            contato: FormattingPhone(String(custodiado.contato || dados.contato)),
             decisao: formatDateForInput(custodiado.dataDecisao || dados.decisao),
             dataComparecimentoInicial: formatDateForInput(
               custodiado.dataComparecimentoInicial || dados.dataComparecimentoInicial || dados.primeiroComparecimento
@@ -214,13 +190,13 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               ? custodiado.periodicidade 
               : parseInt(String(custodiado.periodicidade)) || 30,
             endereco: custodiado.endereco ? {
-              cep: formatCEP(custodiado.endereco.cep || ''),
-              logradouro: custodiado.endereco.logradouro || '',
-              numero: custodiado.endereco.numero || '',
-              complemento: custodiado.endereco.complemento || '',
-              bairro: custodiado.endereco.bairro || '',
-              cidade: custodiado.endereco.cidade || '',
-              estado: custodiado.endereco.estado?.toUpperCase() || ''
+              cep: FormattingCEP(String(custodiado.endereco.cep || '')),
+              logradouro: String(custodiado.endereco.logradouro || ''),
+              numero: String(custodiado.endereco.numero || ''),
+              complemento: String(custodiado.endereco.complemento || ''),
+              bairro: String(custodiado.endereco.bairro || ''),
+              cidade: String(custodiado.endereco.cidade || ''),
+              estado: String(custodiado.endereco.estado || '').toUpperCase()
             } : dados.endereco || {
               cep: '',
               logradouro: '',
@@ -230,7 +206,8 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               cidade: '',
               estado: ''
             },
-            observacoes: custodiado.observacoes || dados.observacoes || ''
+            observacoes: String(custodiado.observacoes || dados.observacoes || ''),
+            status: (custodiado.status || dados.status) as any
           });
           
           setPeriodicidadePersonalizada(
@@ -240,7 +217,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           );
         }
       } catch (error) {
-        console.error('[EditarCustodiado] Erro ao buscar dados completos:', error);
+        console.error('Erro ao buscar dados completos:', error);
         showToast({
           type: 'warning',
           title: 'Aviso',
@@ -253,9 +230,8 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     };
     
     carregarDadosCompletos();
-  }, [dados.id]);
+  }, [dados.id, showToast, dados]);
 
-  // Função auxiliar para formatar data para input
   function formatDateForInput(date: string | Date | null | undefined): string {
     if (!date) return '';
     
@@ -263,95 +239,80 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       const dateObj = typeof date === 'string' ? new Date(date) : date;
       return dateObj.toISOString().split('T')[0];
     } catch (error) {
-      console.error('[EditarCustodiado] Erro ao formatar data:', date, error);
+      console.error('Erro ao formatar data:', date, error);
       return '';
     }
   }
 
-  // ✅ CORREÇÃO: Validar formulário com validação de processo CNJ
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
 
-    // Validação do nome
     if (!form.nome?.trim()) {
       newErrors.nome = 'Nome é obrigatório';
     } else if (form.nome.trim().length < 2) {
       newErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
     }
 
-    // ✅ CORREÇÃO: Validação do processo CNJ mais flexível
     if (!form.processo?.trim()) {
       newErrors.processo = 'Processo é obrigatório';
     } else {
-      const processoNumeros = form.processo.replace(/\D/g, '');
+      const processoNumeros = String(form.processo).replace(/\D/g, '');
       
       if (processoNumeros.length < 13) {
         newErrors.processo = 'Processo deve ter pelo menos 13 dígitos';
       } else if (processoNumeros.length > 20) {
         newErrors.processo = 'Processo não pode ter mais de 20 dígitos';
-      } else if (!isValidProcessoCNJ(form.processo)) {
-        // Se a validação rigorosa falha, verifica apenas estrutura básica
+      } else if (!isValidProcessoCNJ(String(form.processo))) {
         const ano = parseInt(processoNumeros.slice(9, 13));
         const anoAtual = new Date().getFullYear();
         
         if (processoNumeros.length === 20 && (ano < 1990 || ano > anoAtual + 2)) {
           newErrors.processo = `Ano do processo inválido: ${ano}. Deve estar entre 1990 e ${anoAtual + 2}`;
         } else if (processoNumeros.length === 20) {
-          // Se chegou até aqui, é provavelmente problema nos dígitos verificadores
-          // Vamos permitir, mas com aviso
-          console.warn('[EditarCustodiado] Processo aceito com possível divergência nos dígitos verificadores:', form.processo);
+          console.warn('Processo aceito com possível divergência nos dígitos verificadores:', form.processo);
         }
       }
     }
 
-    // Validação de documentos (pelo menos um)
-    const cpfLimpo = form.cpf?.replace(/\D/g, '');
-    const rgLimpo = form.rg?.replace(/\D/g, '');
+    const cpfLimpo = String(form.cpf || '').replace(/\D/g, '');
+    const rgLimpo = String(form.rg || '').replace(/\D/g, '');
     
     if (!cpfLimpo && !rgLimpo) {
       newErrors.documentos = 'Pelo menos CPF ou RG deve ser informado';
     }
     
-    // Validar CPF se fornecido
-    if (cpfLimpo && !validationUtils.isValidCPF(form.cpf)) {
+    if (cpfLimpo && !ValidationCPF(String(form.cpf))) {
       newErrors.cpf = 'CPF inválido';
     }
 
-    // Validação do contato
     if (!form.contato?.trim()) {
       newErrors.contato = 'Contato é obrigatório';
-    } else if (!validationUtils.isValidPhone(form.contato)) {
+    } else if (!ValidationPhone(String(form.contato))) {
       newErrors.contato = 'Telefone inválido';
     }
 
-    // Validação da vara
     if (!form.vara?.trim()) {
       newErrors.vara = 'Vara é obrigatória';
     }
 
-    // Validação da comarca
     if (!form.comarca?.trim()) {
       newErrors.comarca = 'Comarca é obrigatória';
     }
 
-    // Validação da data da decisão
     if (!form.decisao) {
       newErrors.decisao = 'Data da decisão é obrigatória';
     }
 
-    // Validação da periodicidade
     if (periodicidadePersonalizada < 1) {
       newErrors.periodicidade = 'Periodicidade deve ser maior que zero';
     } else if (periodicidadePersonalizada > 365) {
       newErrors.periodicidade = 'Periodicidade não pode ser maior que 365 dias';
     }
 
-    // Validação do status
     if (!form.status) {
       newErrors.status = 'Status é obrigatório';
     }
 
-    // Validações de datas
     if (!form.ultimoComparecimento) {
       newErrors.ultimoComparecimento = 'Último comparecimento é obrigatório';
     }
@@ -360,11 +321,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       newErrors.proximoComparecimento = 'Próximo comparecimento é obrigatório';
     }
 
-    // Validação de endereço
     if (form.endereco) {
       if (!form.endereco.cep?.trim()) {
         newErrors.cep = 'CEP é obrigatório';
-      } else if (!validationUtils.isValidCEP(form.endereco.cep)) {
+      } else if (!ValidationCEP(String(form.endereco.cep))) {
         newErrors.cep = 'CEP inválido';
       }
 
@@ -389,28 +349,24 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     return Object.keys(newErrors).length === 0;
   };
 
-  // ✅ CORREÇÃO: Manipulador de mudanças com formatação correta do processo
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
 
-    // Limpar erro do campo
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
 
-    // Formatadores específicos
     const formatters: Record<string, (v: string) => string> = {
-      cpf: formatCPF,
-      rg: formatRG,
-      processo: formatProcessoCNJ, // ✅ Usar nova função
-      contato: formatContato,
+      cpf: FormattingCPF,
+      rg: FormattingRG,
+      processo: formatProcessoCNJ,
+      contato: FormattingPhone,
     };
 
     const formattedValue = formatters[name] ? formatters[name](value) : value;
     setForm((prev) => ({ ...prev, [name]: formattedValue }));
   }
 
-  // Manipulador para campos de endereço
   function handleEnderecoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     
@@ -421,7 +377,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     let formattedValue = value;
     
     if (name === 'cep') {
-      formattedValue = formatCEP(value);
+      formattedValue = FormattingCEP(value);
     }
     
     if (name === 'estado') {
@@ -437,7 +393,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }));
   }
 
-  // Buscar endereço pelo CEP
   async function buscarEnderecoPorCEP(cep: string) {
     const cepLimpo = cep.replace(/\D/g, '');
     
@@ -453,7 +408,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           ...prev,
           endereco: {
             ...prev.endereco,
-            cep: formatCEP(cepLimpo),
+            cep: FormattingCEP(cepLimpo),
             logradouro: data.logradouro || prev.endereco.logradouro,
             bairro: data.bairro || prev.endereco.bairro,
             cidade: data.localidade || prev.endereco.cidade,
@@ -469,13 +424,12 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         });
       }
     } catch (error) {
-      console.error('[EditarCustodiado] Erro ao buscar CEP:', error);
+      console.error('Erro ao buscar CEP:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  // Manipulador para periodicidade
   function handlePeriodicidadeChange(value: string) {
     const numValue = parseInt(value) || 0;
     
@@ -492,7 +446,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     setForm(prev => ({ ...prev, periodicidade: numValue }));
   }
 
-  // ✅ CORREÇÃO: Submeter formulário com dados corretos
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -509,26 +462,25 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     setLoading(true);
 
     try {
-      // ✅ CORREÇÃO: Preparar dados para API com formatação correta
       const dadosAtualizacao = {
-        nome: form.nome.trim(),
-        cpf: form.cpf?.replace(/\D/g, '') || undefined,
-        rg: form.rg?.replace(/\D/g, '') || undefined,
-        contato: form.contato.replace(/\D/g, ''),
-        processo: formatProcessoCNJ(form.processo).replace(/\D/g, ''), // ✅ Formatar e depois remover pontuação
-        vara: form.vara.trim(),
-        comarca: form.comarca.trim(),
-        dataDecisao: form.decisao,
+        nome: String(form.nome).trim(),
+        cpf: String(form.cpf || '').replace(/\D/g, '') || undefined,
+        rg: String(form.rg || '').replace(/\D/g, '') || undefined,
+        contato: String(form.contato).replace(/\D/g, ''),
+        processo: formatProcessoCNJ(String(form.processo)).replace(/\D/g, ''),
+        vara: String(form.vara).trim(),
+        comarca: String(form.comarca).trim(),
+        dataDecisao: String(form.decisao),
         periodicidade: periodicidadePersonalizada,
-        dataComparecimentoInicial: form.dataComparecimentoInicial || form.decisao,
-        observacoes: form.observacoes?.trim() || '',
-        cep: form.endereco?.cep?.replace(/\D/g, '') || '',
-        logradouro: form.endereco?.logradouro?.trim() || '',
-        numero: form.endereco?.numero?.trim() || '',
-        complemento: form.endereco?.complemento?.trim() || '',
-        bairro: form.endereco?.bairro?.trim() || '',
-        cidade: form.endereco?.cidade?.trim() || '',
-        estado: (form.endereco?.estado?.toUpperCase() || 'BA') as EstadoBrasil
+        dataComparecimentoInicial: String(form.dataComparecimentoInicial || form.decisao),
+        observacoes: String(form.observacoes || '').trim(),
+        cep: String(form.endereco?.cep || '').replace(/\D/g, ''),
+        logradouro: String(form.endereco?.logradouro || '').trim(),
+        numero: String(form.endereco?.numero || '').trim(),
+        complemento: String(form.endereco?.complemento || '').trim(),
+        bairro: String(form.endereco?.bairro || '').trim(),
+        cidade: String(form.endereco?.cidade || '').trim(),
+        estado: (String(form.endereco?.estado || 'BA').toUpperCase()) as EstadoBrasil
       };
 
       const custodiadoId = typeof form.id === 'string' ? parseInt(form.id) : form.id;
@@ -537,7 +489,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         throw new Error('ID do custodiado inválido');
       }
 
-      console.log('[EditarCustodiado] Atualizando custodiado:', custodiadoId, dadosAtualizacao);
+      console.log('Atualizando custodiado:', custodiadoId, dadosAtualizacao);
 
       const resultado = await custodiadosService.atualizar(custodiadoId, dadosAtualizacao);
 
@@ -560,7 +512,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         throw new Error(resultado.message || 'Erro ao atualizar dados');
       }
     } catch (error: any) {
-      console.error('[EditarCustodiado] Erro:', error);
+      console.error('Erro ao atualizar:', error);
       
       showToast({
         type: 'error',
@@ -573,7 +525,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }
   }
 
-  // Mostrar loading enquanto carrega os dados
   if (loadingData) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
@@ -593,7 +544,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         onSubmit={handleSubmit}
         className="relative bg-white p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
       >
-        {/* Header */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b">
           <h3 className="text-2xl font-bold text-primary-dark">Editar Dados do Custodiado</h3>
           <button
@@ -606,7 +556,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </button>
         </div>
 
-        {/* Mensagem de erro geral */}
         {errors.documentos && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2">
@@ -616,7 +565,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         )}
 
-        {/* Seção: Dados Pessoais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <User className="w-5 h-5 text-primary" />
@@ -631,7 +579,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.nome ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="nome" 
-                value={form.nome} 
+                value={form.nome || ''} 
                 onChange={handleChange}
                 disabled={loading}
               />
@@ -645,7 +593,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.contato ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="contato" 
-                value={form.contato}
+                value={form.contato || ''}
                 onChange={handleChange}
                 placeholder="(00) 00000-0000"
                 disabled={loading}
@@ -658,7 +606,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.cpf ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="cpf" 
-                value={form.cpf} 
+                value={String(form.cpf || '')} 
                 onChange={handleChange}
                 placeholder="000.000.000-00"
                 disabled={loading}
@@ -671,7 +619,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.rg ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="rg" 
-                value={form.rg} 
+                value={String(form.rg || '')} 
                 onChange={handleChange}
                 placeholder="00.000.000-0"
                 disabled={loading}
@@ -681,7 +629,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Seção: Dados Processuais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-primary" />
@@ -696,14 +643,14 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.processo ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono`}
                 name="processo" 
-                value={form.processo} 
+                value={form.processo || ''} 
                 onChange={handleChange}
                 placeholder="0000000-00.0000.0.00.0000"
                 disabled={loading}
               />
               {errors.processo && <p className="text-red-500 text-xs mt-1">{errors.processo}</p>}
               <p className="text-gray-500 text-xs mt-1">
-                Formato CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO (ex: 4767193-87.2025.5.01.4044)
+                Formato CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO
               </p>
             </div>
             
@@ -715,7 +662,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
                 type="date" 
                 className={`w-full border ${errors.decisao ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="decisao" 
-                value={form.decisao} 
+                value={form.decisao || ''} 
                 onChange={handleChange}
                 disabled={loading}
               />
@@ -729,7 +676,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.vara ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="vara" 
-                value={form.vara} 
+                value={form.vara || ''} 
                 onChange={handleChange}
                 disabled={loading}
               />
@@ -743,7 +690,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <input 
                 className={`w-full border ${errors.comarca ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="comarca" 
-                value={form.comarca} 
+                value={form.comarca || ''} 
                 onChange={handleChange}
                 disabled={loading}
               />
@@ -757,7 +704,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <select 
                 className={`w-full border ${errors.status ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="status" 
-                value={form.status} 
+                value={form.status || ''} 
                 onChange={handleChange}
                 disabled={loading}
               >
@@ -769,7 +716,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Seção: Periodicidade e Datas */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-primary" />
@@ -803,7 +749,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
                 type="date" 
                 className={`w-full border ${errors.ultimoComparecimento ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="ultimoComparecimento" 
-                value={form.ultimoComparecimento} 
+                value={form.ultimoComparecimento || ''} 
                 onChange={handleChange}
                 disabled={loading}
               />
@@ -818,7 +764,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
                 type="date" 
                 className={`w-full border ${errors.proximoComparecimento ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
                 name="proximoComparecimento" 
-                value={form.proximoComparecimento} 
+                value={form.proximoComparecimento || ''} 
                 onChange={handleChange}
                 disabled={loading}
               />
@@ -827,7 +773,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Seção: Endereço */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-primary" />
@@ -935,7 +880,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Observações */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
           <textarea
@@ -948,11 +892,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
             disabled={loading}
           />
           <p className="text-gray-500 text-xs mt-1">
-            {form.observacoes?.length || 0}/500 caracteres
+            {(form.observacoes || '').length}/500 caracteres
           </p>
         </div>
 
-        {/* Botões de Ação */}
         <div className="pt-4 flex justify-between border-t">
           <button
             type="button"

@@ -20,7 +20,6 @@ import type {
   StatusEstatisticasResponse,
   ListarCustodiadosResponse
 } from '@/types/api';
-// Configuração Global
 
 export function initializeBackendApi() {
   console.log('[Services] API inicializada');
@@ -36,13 +35,10 @@ export function clearAuthHeaders() {
   console.log('[Services] Token de autenticação removido');
 }
 
-// Serviços de Custodiados
-
 export const custodiadosService = {
   async listar(): Promise<ListarCustodiadosResponse> {
     const response = await apiClient.get<any>('/custodiados');
     console.log('[CustodiadosService] Resposta bruta:', response);
-
 
     let parsedData: any;
 
@@ -52,10 +48,10 @@ export const custodiadosService = {
         console.log('[CustodiadosService] JSON parseado:', parsedData);
       } else {
         parsedData = response.data;
-        console.log('[CustodiadosService]  Data já é objeto:', parsedData);
+        console.log('[CustodiadosService] Data já é objeto:', parsedData);
       }
     } catch (parseError) {
-      console.error('[CustodiadosService]  Erro no parse do JSON:', parseError);
+      console.error('[CustodiadosService] Erro no parse do JSON:', parseError);
       return {
         success: false,
         message: 'Erro ao processar resposta do servidor',
@@ -64,7 +60,7 @@ export const custodiadosService = {
     }
 
     if (parsedData && parsedData.success && Array.isArray(parsedData.data)) {
-      console.log('[CustodiadosService]  Estrutura correta encontrada:', parsedData.data.length);
+      console.log('[CustodiadosService] Estrutura correta encontrada:', parsedData.data.length);
       return {
         success: true,
         message: parsedData.message || `${parsedData.data.length} custodiados carregados`,
@@ -73,7 +69,7 @@ export const custodiadosService = {
     }
 
     if (Array.isArray(parsedData)) {
-      console.log('[CustodiadosService]  Dados são array direto:', parsedData.length);
+      console.log('[CustodiadosService] Dados são array direto:', parsedData.length);
       return {
         success: true,
         message: `${parsedData.length} custodiados carregados (array direto)`,
@@ -84,7 +80,7 @@ export const custodiadosService = {
     if (parsedData && typeof parsedData === 'object') {
       for (const [key, value] of Object.entries(parsedData)) {
         if (Array.isArray(value)) {
-          console.log('[CustodiadosService]  Array encontrado em:', key, value.length);
+          console.log('[CustodiadosService] Array encontrado em:', key, value.length);
           return {
             success: true,
             message: `${value.length} custodiados carregados (${key})`,
@@ -94,7 +90,7 @@ export const custodiadosService = {
       }
     }
 
-    console.error('[CustodiadosService]  Nenhum array encontrado em:', parsedData);
+    console.error('[CustodiadosService] Nenhum array encontrado em:', parsedData);
     return {
       success: false,
       message: 'Nenhum custodiado encontrado na resposta',
@@ -148,9 +144,6 @@ export const custodiadosService = {
   }
 };
 
-
-// Serviços de Comparecimentos
-
 export const comparecimentosService = {
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     console.log('[ComparecimentosService] Registrando comparecimento:', data);
@@ -179,7 +172,6 @@ export const comparecimentosService = {
     console.log('[ComparecimentosService] Obtendo estatísticas:', params);
     const response = await apiClient.get<EstatisticasComparecimentoResponse>('/comparecimentos/estatisticas', params);
 
-    // Retorna dados padrão em caso de erro
     if (!response.success) {
       return {
         totalComparecimentos: 0,
@@ -207,22 +199,20 @@ export const comparecimentosService = {
     console.log('[ComparecimentosService] Obtendo resumo do sistema');
     const response = await apiClient.get<any>('/comparecimentos/resumo/sistema');
 
-    //Parse do JSON se necessário (similar ao custodiadosService)
     let parsedData: any;
 
     try {
       if (typeof response.data === 'string') {
-        console.log('[ComparecimentosService] 🔧 Fazendo parse da string JSON...');
+        console.log('[ComparecimentosService] Fazendo parse da string JSON...');
         parsedData = JSON.parse(response.data);
       } else {
         parsedData = response.data;
       }
     } catch (parseError) {
-      console.error('[ComparecimentosService]  Erro no parse do JSON:', parseError);
+      console.error('[ComparecimentosService] Erro no parse do JSON:', parseError);
       parsedData = null;
     }
 
-    // Retorna dados padrão em caso de erro
     if (!response.success || !parsedData) {
       return {
         totalCustodiados: 0,
@@ -238,7 +228,6 @@ export const comparecimentosService = {
         percentualConformidade: 0,
         percentualInadimplencia: 0,
         dataConsulta: new Date().toISOString(),
-        // Campos extras para o dashboard
         totalPessoas: 0,
         emConformidade: 0,
         inadimplentes: 0,
@@ -249,7 +238,6 @@ export const comparecimentosService = {
       };
     }
 
-    // Se parsedData tem success e data, usar data
     if (parsedData.success && parsedData.data) {
       parsedData = parsedData.data;
     }
@@ -278,7 +266,6 @@ export const comparecimentosService = {
     };
   }
 };
-// Serviços de Usuários
 
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
@@ -297,8 +284,6 @@ export const usuariosService = {
     return await apiClient.put<UsuarioResponse>(`/usuarios/${id}`, data);
   }
 };
-
-// Serviços de Autenticação
 
 export interface LoginRequest {
   email: string;
@@ -351,12 +336,6 @@ export interface ConfirmarResetRequest {
   novaSenha: string;
   confirmaSenha: string;
 }
-
-
-
-// ===========================
-// Serviços de Convites
-// ===========================
 
 export interface ConviteDTO {
   nome: string;
@@ -411,34 +390,22 @@ export interface ReenviarConviteDTO {
 }
 
 export const convitesService = {
-  /**
-   * Criar e enviar convite (Admin)
-   */
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
     console.log('[ConvitesService] Criando convite para:', data.email);
     return await apiClient.post<ConviteResponse>('/usuarios/convites', data);
   },
 
-  /**
-   * Listar convites (Admin)
-   */
   async listarConvites(status?: string): Promise<ApiResponse<ConviteResponse[]>> {
     console.log('[ConvitesService] Listando convites', status ? `com status: ${status}` : '');
     const params = status ? { status } : undefined;
     return await apiClient.get<ConviteResponse[]>('/usuarios/convites', params);
   },
 
-  /**
-   * Validar token de convite (Público)
-   */
   async validarToken(token: string): Promise<ApiResponse<ValidarTokenConviteResponse>> {
     console.log('[ConvitesService] Validando token de convite');
     return await apiClient.get<ValidarTokenConviteResponse>(`/usuarios/convites/validar/${token}`);
   },
 
-  /**
-   * Ativar conta com convite (Público)
-   */
   async ativarConta(data: AtivarContaDTO): Promise<ApiResponse<{
     id: number;
     email: string;
@@ -449,30 +416,21 @@ export const convitesService = {
     return await apiClient.post('/usuarios/convites/ativar', data);
   },
 
-  /**
-   * Reenviar convite (Admin)
-   */
   async reenviarConvite(id: number, data: ReenviarConviteDTO): Promise<ApiResponse<ConviteResponse>> {
     console.log('[ConvitesService] Reenviando convite:', id);
     return await apiClient.post<ConviteResponse>(`/usuarios/convites/${id}/reenviar`, data);
   },
 
-  /**
-   * Cancelar convite (Admin)
-   */
   async cancelarConvite(id: number, motivo?: string): Promise<ApiResponse<void>> {
     console.log('[ConvitesService] Cancelando convite:', id);
-    return await apiClient.delete<void>(`/usuarios/convites/${id}`, {
-      body: motivo ? { motivo } : undefined
-    });
+    if (motivo) {
+      return await apiClient.post<void>(`/usuarios/convites/${id}/cancelar`, { motivo });
+    }
+    return await apiClient.delete<void>(`/usuarios/convites/${id}`);
   }
 };
 
 export const authService = {
-  /**
-   * Realizar login
-   * POST /api/auth/login
-   */
   async login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     console.log('[AuthService] Realizando login para:', data.email);
     try {
@@ -480,10 +438,10 @@ export const authService = {
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro no login:', error);
-      // Se o erro for 401, pode ser credenciais inválidas
       if (error.response?.status === 401) {
         return {
           success: false,
+          status: 401,
           message: error.response?.data?.message || 'Email ou senha incorretos',
           error: error.response?.data
         };
@@ -492,27 +450,17 @@ export const authService = {
     }
   },
 
-  /**
-   * Realizar logout
-   * POST /api/auth/logout
-   */
   async logout(data?: LogoutRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Realizando logout');
     try {
-      // O logout precisa do token no header Authorization
       const response = await apiClient.post<void>('/auth/logout', data || {});
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro no logout:', error);
-      // Logout sempre deve ter sucesso do ponto de vista do cliente
-      return { success: true };
+      return { success: true, status: 200 };
     }
   },
 
-  /**
-   * Renovar token de acesso
-   * POST /api/auth/refresh
-   */
   async refreshToken(data: RefreshTokenRequest): Promise<ApiResponse<LoginResponse>> {
     console.log('[AuthService] Renovando token');
     try {
@@ -522,16 +470,13 @@ export const authService = {
       console.error('[AuthService] Erro ao renovar token:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         message: error.response?.data?.message || 'Erro ao renovar token',
         error: error.response?.data
       };
     }
   },
 
-  /**
-   * Validar token atual
-   * GET /api/auth/validate
-   */
   async validateToken(): Promise<ApiResponse<{
     valid: boolean;
     email?: string;
@@ -541,21 +486,24 @@ export const authService = {
   }>> {
     console.log('[AuthService] Validando token');
     try {
-      const response = await apiClient.get('/auth/validate');
+      const response = await apiClient.get<{
+        valid: boolean;
+        email?: string;
+        expiration?: string;
+        authorities?: string[];
+        message?: string;
+      }>('/auth/validate');
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao validar token:', error);
       return {
         success: false,
+        status: error.response?.status || 401,
         data: { valid: false, message: 'Token inválido' }
       };
     }
   },
 
-  /**
-   * Alterar senha (usuário autenticado)
-   * POST /api/auth/change-password
-   */
   async alterarSenha(data: AlterarSenhaRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Alterando senha');
     try {
@@ -565,16 +513,13 @@ export const authService = {
       console.error('[AuthService] Erro ao alterar senha:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         message: error.response?.data?.message || 'Erro ao alterar senha',
         error: error.response?.data
       };
     }
   },
 
-  /**
-   * Solicitar reset de senha
-   * POST /api/auth/forgot-password
-   */
   async solicitarResetSenha(data: ResetSenhaRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Solicitando reset de senha para:', data.email);
     try {
@@ -582,18 +527,14 @@ export const authService = {
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao solicitar reset:', error);
-      // Sempre retornar sucesso para não revelar se email existe
       return {
         success: true,
+        status: 200,
         message: 'Se o email estiver cadastrado, você receberá instruções para recuperação'
       };
     }
   },
 
-  /**
-   * Confirmar reset de senha
-   * POST /api/auth/reset-password
-   */
   async confirmarResetSenha(data: ConfirmarResetRequest): Promise<ApiResponse<void>> {
     console.log('[AuthService] Confirmando reset de senha');
     try {
@@ -603,25 +544,22 @@ export const authService = {
       console.error('[AuthService] Erro ao confirmar reset:', error);
       return {
         success: false,
+        status: error.response?.status || 400,
         message: error.response?.data?.message || 'Token inválido ou expirado',
         error: error.response?.data
       };
     }
   },
 
-  /**
-   * Obter usuário atual (perfil)
-   * GET /api/auth/me (CORRIGIDO - era /usuarios/me)
-   */
   async getProfile(): Promise<ApiResponse<UsuarioResponse>> {
     console.log('[AuthService] Obtendo perfil do usuário');
     try {
       const response = await apiClient.get<any>('/auth/me');
       
-      // O backend retorna um formato diferente, vamos adaptar
       if (response.success && response.data) {
         return {
           success: true,
+          status: response.status,
           data: response.data.data || response.data
         };
       }
@@ -631,16 +569,13 @@ export const authService = {
       console.error('[AuthService] Erro ao obter perfil:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         message: error.response?.data?.message || 'Erro ao obter perfil',
         error: error.response?.data
       };
     }
   },
 
-  /**
-   * Obter informações da sessão atual
-   * GET /api/auth/session
-   */
   async getSessionInfo(): Promise<ApiResponse<{
     sessionId: string;
     userEmail: string;
@@ -652,77 +587,78 @@ export const authService = {
   }>> {
     console.log('[AuthService] Obtendo informações da sessão');
     try {
-      const response = await apiClient.get('/auth/session');
+      const response = await apiClient.get<{
+        sessionId: string;
+        userEmail: string;
+        ipAddress: string;
+        userAgent: string;
+        loginTime: string;
+        lastActivity: string;
+        expiresAt: string;
+      }>('/auth/session');
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao obter sessão:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         message: error.response?.data?.message || 'Erro ao obter sessão'
       };
     }
   },
 
-  /**
-   * Listar todas as sessões do usuário
-   * GET /api/auth/sessions
-   */
   async getUserSessions(): Promise<ApiResponse<any[]>> {
     console.log('[AuthService] Listando sessões do usuário');
     try {
-      const response = await apiClient.get('/auth/sessions');
+      const response = await apiClient.get<any[]>('/auth/sessions');
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao listar sessões:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         message: error.response?.data?.message || 'Erro ao listar sessões',
         data: []
       };
     }
   },
 
-  /**
-   * Invalidar sessão específica
-   * DELETE /api/auth/sessions/{sessionId}
-   */
   async invalidateSession(sessionId: string): Promise<ApiResponse<void>> {
     console.log('[AuthService] Invalidando sessão:', sessionId);
     try {
-      const response = await apiClient.delete(`/auth/sessions/${sessionId}`);
+      const response = await apiClient.delete<void>(`/auth/sessions/${sessionId}`);
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao invalidar sessão:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         message: error.response?.data?.message || 'Erro ao invalidar sessão'
       };
     }
   },
 
-  /**
-   * Verificar se sistema requer setup inicial
-   * GET /api/auth/check-setup
-   */
   async checkSetup(): Promise<ApiResponse<{
     setupRequired: boolean;
     message: string;
   }>> {
     console.log('[AuthService] Verificando setup');
     try {
-      const response = await apiClient.get('/auth/check-setup');
+      const response = await apiClient.get<{
+        setupRequired: boolean;
+        message: string;
+      }>('/auth/check-setup');
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao verificar setup:', error);
       return {
         success: false,
+        status: error.response?.status || 500,
         data: { setupRequired: false, message: 'Erro ao verificar setup' }
       };
     }
   }
 };
-
-// Serviços de Status
 
 export const statusService = {
   async verificarInadimplentes(): Promise<ApiResponse<StatusVerificacaoResponse>> {
@@ -736,7 +672,6 @@ export const statusService = {
     return response.success ? response.data || null : null;
   }
 };
-// Serviços de Setup
 
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
@@ -756,14 +691,12 @@ export const setupService = {
     return await apiClient.post('/setup/admin', data);
   }
 };
-// Serviços de Teste/Health
 
 export const testService = {
   async health(): Promise<HealthResponse> {
     console.log('[TestService] Verificando health');
 
     try {
-      // Tentar endpoint de custodiados para verificar se API está funcionando
       const response = await apiClient.get<any>('/custodiados');
 
       if (response.success || response.status === 200) {
@@ -777,7 +710,6 @@ export const testService = {
       console.error('[TestService] Erro no health check:', error);
     }
 
-    // Fallback: tentar endpoint de info
     try {
       const response = await apiClient.get<any>('/status/info');
 
@@ -802,7 +734,6 @@ export const testService = {
   async info(): Promise<AppInfoResponse> {
     console.log('[TestService] Obtendo health da aplicação');
 
-    // Tentar endpoint de health do actuator primeiro
     try {
       const response = await apiClient.get<AppInfoResponse>('/setup/health');
 
@@ -813,7 +744,6 @@ export const testService = {
       console.log(`[TestService] Actuator/info não disponível, tentando status/info${error}`);
     }
 
-    // Se não funcionar, usar dados do status/info
     try {
       const statusResponse = await apiClient.get<any>('/status/info');
       if (statusResponse.success) {
@@ -831,7 +761,6 @@ export const testService = {
       console.error('[TestService] Status/info também falhou:', error);
     }
 
-    // Retorno padrão se tudo falhar
     return {
       name: 'Sistema de Controle de Comparecimento',
       version: '1.0.0',
@@ -842,6 +771,4 @@ export const testService = {
       springBootVersion: 'N/A'
     };
   }
-
-  
 };
