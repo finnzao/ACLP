@@ -23,12 +23,14 @@ import {
   SetupStatusResponse,
   HealthResponse,
   AppInfoResponse,
-  ResumoSistemaResponse
+  ResumoSistemaResponse,
+  ListarCustodiadosResponse
 } from '@/types/api';
 
 // Hook para custodiados
 export function useCustodiados() {
-  const [custodiados, setCustodiados] = useState<CustodiadoResponse[]>([]);
+  // ✅ Tipo correto: ListarCustodiadosResponse (que é ApiResponse<CustodiadoResponse[]>)
+  const [custodiados, setCustodiados] = useState<ListarCustodiadosResponse | CustodiadoResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,18 +43,33 @@ export function useCustodiados() {
       const response = await custodiadosService.listar();
       console.log('[useCustodiados] Resposta recebida:', response);
 
-      if (response.success && Array.isArray(response.data)) {
-        setCustodiados(response.data);
-        console.log('[useCustodiados] Custodiados carregados:', response.data.length);
+      // ✅ A resposta sempre é ApiResponse<CustodiadoResponse[]>
+      if (response && typeof response === 'object') {
+        // Se tem a estrutura { success, message, data }
+        if ('success' in response && 'data' in response) {
+          if (response.success && Array.isArray(response.data)) {
+            console.log('[useCustodiados] Custodiados carregados:', response.data.length);
+            setCustodiados(response); // ✅ Salvar a resposta completa
+          } else {
+            console.warn('[useCustodiados] API retornou erro ou dados inválidos');
+            setError(response.message || 'Erro ao carregar dados');
+            setCustodiados(null);
+          }
+        } 
+        // Se for array direto (fallback)
+        else if (Array.isArray(response)) {
+          console.log('[useCustodiados] Array direto recebido:', response.length);
+          setCustodiados(response);
+        }
       } else {
-        console.warn('[useCustodiados] API retornou erro, usando dados mock');
-        setError('Usando dados de exemplo (API não disponível)');
-        setCustodiados([]);
+        console.warn('[useCustodiados] Resposta inválida');
+        setError('Resposta inválida do servidor');
+        setCustodiados(null);
       }
     } catch (err) {
-      console.error('[useCustodiados] Erro na requisição, usando dados mock:', err);
-      setError('Conexão com API falhou, usando dados de exemplo');
-      setCustodiados([]);
+      console.error('[useCustodiados] Erro na requisição:', err);
+      setError('Erro ao conectar com o servidor');
+      setCustodiados(null);
     } finally {
       setLoading(false);
     }
@@ -71,7 +88,7 @@ export function useCustodiados() {
         await fetchCustodiados();
         return { 
           success: true, 
-          message: result.message || 'Custodiado criada com sucesso',
+          message: result.message || 'Custodiado criado com sucesso',
           data: result.data 
         };
       }
@@ -104,7 +121,7 @@ export function useCustodiados() {
         await fetchCustodiados();
         return { 
           success: true, 
-          message: result.message || 'Custodiado atualizada com sucesso',
+          message: result.message || 'Custodiado atualizado com sucesso',
           data: result.data 
         };
       }
@@ -136,7 +153,7 @@ export function useCustodiados() {
         await fetchCustodiados();
         return { 
           success: true, 
-          message: result.message || 'Custodiado excluída com sucesso' 
+          message: result.message || 'Custodiado excluído com sucesso' 
         };
       }
       
@@ -225,7 +242,7 @@ export function useCustodiados() {
   }, []);
 
   return {
-    custodiados,
+    custodiados, // ✅ Pode ser ListarCustodiadosResponse ou CustodiadoResponse[]
     loading,
     error,
     // Operações CRUD

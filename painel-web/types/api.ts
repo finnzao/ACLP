@@ -123,38 +123,38 @@ export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
   data?: T;
-  timestamp: string;
+  timestamp?: string;
 }
 
 // Custodiado Response
 export interface CustodiadoResponse {
-  id: number;
-  nome: string;
-  cpf?: string;
-  rg?: string;
-  contato: string;
-  processo: string;
-  vara: string;
-  comarca: string;
-  dataDecisao: string;
-  periodicidade: number;
-  periodicidadeDescricao: string;
-  dataComparecimentoInicial: string;
-  status: StatusComparecimento | string;
-  ultimoComparecimento: string;
-  proximoComparecimento: string;
-  diasAtraso: number;
-  observacoes?: string;
-  endereco: EnderecoResponse;
-  criadoEm: string;
-  atualizadoEm: string | null;
-  identificacao: string;
-  inadimplente: boolean;
-  comparecimentoHoje: boolean;  
-  // Campos calculados opcionais (compatibilidade)
-  atrasado?: boolean;
-  enderecoCompleto?: string;
-  cidadeEstado?: string;
+    id: number;
+    nome: string;
+    cpf?: string;
+    rg?: string;
+    contato: string;
+    processo: string;
+    vara: string;
+    comarca: string;
+    dataDecisao: string;
+    periodicidade: number;
+    periodicidadeDescricao: string;
+    dataComparecimentoInicial: string;
+    status: StatusComparecimento | string;
+    ultimoComparecimento: string;
+    proximoComparecimento: string;
+    diasAtraso: number;
+    observacoes?: string;
+    endereco: EnderecoResponse;
+    criadoEm: string;
+    atualizadoEm: string | null;
+    identificacao: string;
+    inadimplente: boolean;
+    comparecimentoHoje: boolean;  
+    // Campos calculados opcionais (compatibilidade)
+    atrasado?: boolean;
+    enderecoCompleto?: string;
+    cidadeEstado?: string;
 }
 
 // Lista de Custodiados Response

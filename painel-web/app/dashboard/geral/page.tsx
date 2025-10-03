@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCustodiados } from '@/hooks/useAPI';
-import type { CustodiadoResponse, ListarCustodiadosResponse } from '@/types/api';
+import type { CustodiadoResponse,  ApiResponse } from '@/types/api';
 import DetalhesCustodiadoModal from '@/components/DetalhesCustodiado';
 import EditarCustodiadoModal from '@/components/EditarCustodiado';
 import ExportButton from '@/components/ExportButton';
@@ -37,7 +37,7 @@ interface CustodiadoFormatado {
   comarca: string;
   decisao: string;
   periodicidade: number;
-  status: string;
+  status: 'em conformidade' | 'inadimplente'; // ✅ FIX: tipo específico
   primeiroComparecimento: string;
   dataComparecimentoInicial: string;
   ultimoComparecimento: string;
@@ -102,59 +102,12 @@ export default function GeralPage() {
   }, []);
 
   const todosOsDados = useMemo((): CustodiadoFormatado[] => {
-    const isListarCustodiadosResponse = (data: any): data is ListarCustodiadosResponse => {
-      return data && typeof data === 'object' && 'success' in data && 'data' in data;
-    };
-
     if (!custodiadosBackend) {
-      console.warn('custodiadosBackend não está disponível');
+      console.warn('[GeralPage] custodiadosBackend está vazio');
       return [];
     }
 
-    if (!isListarCustodiadosResponse(custodiadosBackend)) {
-      console.warn('custodiadosBackend não tem a estrutura esperada:', custodiadosBackend);
-      if (Array.isArray(custodiadosBackend)) {
-        return custodiadosBackend.map((custodiado: CustodiadoResponse) => ({
-          id: custodiado.id,
-          nome: custodiado.nome,
-          cpf: custodiado.cpf || '',
-          rg: custodiado.rg || '',
-          contato: custodiado.contato,
-          processo: custodiado.processo,
-          vara: custodiado.vara,
-          comarca: custodiado.comarca,
-          decisao: custodiado.dataDecisao,
-          periodicidade: custodiado.periodicidade,
-          status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
-          primeiroComparecimento: custodiado.dataComparecimentoInicial,
-          dataComparecimentoInicial: custodiado.dataComparecimentoInicial,
-          ultimoComparecimento: custodiado.ultimoComparecimento,
-          proximoComparecimento: custodiado.proximoComparecimento,
-          endereco: custodiado.endereco,
-          observacoes: custodiado.observacoes,
-          atrasado: custodiado.atrasado,
-          diasAtraso: custodiado.diasAtraso,
-          comparecimentoHoje: custodiado.comparecimentoHoje,
-          enderecoCompleto: custodiado.enderecoCompleto,
-          cidadeEstado: custodiado.cidadeEstado
-        }));
-      }
-      return [];
-    }
-
-    if (!custodiadosBackend.success || !custodiadosBackend.data || !Array.isArray(custodiadosBackend.data)) {
-      console.warn('Dados inválidos na resposta');
-      return [];
-    }
-
-    if (custodiadosBackend.data.length === 0) {
-      console.info('Nenhum custodiado encontrado na resposta');
-      return [];
-    }
-
-    console.info(`Processando ${custodiadosBackend.data.length} custodiados`);
-
-    return custodiadosBackend.data.map((custodiado: CustodiadoResponse) => ({
+    const transformarCustodiado = (custodiado: CustodiadoResponse): CustodiadoFormatado => ({
       id: custodiado.id,
       nome: custodiado.nome,
       cpf: custodiado.cpf || '',
@@ -170,15 +123,82 @@ export default function GeralPage() {
       dataComparecimentoInicial: custodiado.dataComparecimentoInicial,
       ultimoComparecimento: custodiado.ultimoComparecimento,
       proximoComparecimento: custodiado.proximoComparecimento,
-      endereco: custodiado.endereco,
+      endereco: custodiado.endereco ? {
+        cep: custodiado.endereco.cep,
+        logradouro: custodiado.endereco.logradouro,
+        numero: custodiado.endereco.numero,
+        complemento: custodiado.endereco.complemento,
+        bairro: custodiado.endereco.bairro,
+        cidade: custodiado.endereco.cidade,
+        estado: custodiado.endereco.estado
+      } : undefined,
       observacoes: custodiado.observacoes,
-      atrasado: custodiado.atrasado,
+      atrasado: custodiado.inadimplente || custodiado.atrasado,
       diasAtraso: custodiado.diasAtraso,
       comparecimentoHoje: custodiado.comparecimentoHoje,
-      enderecoCompleto: custodiado.enderecoCompleto,
-      cidadeEstado: custodiado.cidadeEstado
-    }));
+      enderecoCompleto: custodiado.endereco?.enderecoCompleto || '',
+      cidadeEstado: custodiado.endereco ? `${custodiado.endereco.cidade} - ${custodiado.endereco.estado}` : ''
+    });
+
+
+    const isApiResponse = (data: any): data is ApiResponse<CustodiadoResponse[]> => {
+      return (
+        data &&
+        typeof data === 'object' &&
+        'success' in data &&
+        'message' in data &&
+        'data' in data
+      );
+    };
+
+    // CASO 1: Estrutura ApiResponse { success, message, data: [] }
+    if (isApiResponse(custodiadosBackend)) {
+      console.log('[GeralPage] Estrutura ApiResponse detectada');
+
+      if (!custodiadosBackend.success) {
+        console.warn('[GeralPage] API retornou success=false');
+        return [];
+      }
+
+      if (!custodiadosBackend.data || !Array.isArray(custodiadosBackend.data)) {
+        console.warn('[GeralPage] data não é um array válido');
+        return [];
+      }
+
+      if (custodiadosBackend.data.length === 0) {
+        console.info('[GeralPage] Nenhum custodiado encontrado');
+        return [];
+      }
+
+      console.log('[GeralPage] Processando', custodiadosBackend.data.length, 'custodiados');
+      return custodiadosBackend.data.map(transformarCustodiado);
+    }
+
+    // CASO 2: Array direto
+    if (Array.isArray(custodiadosBackend)) {
+      console.log('[GeralPage] Array direto detectado:', custodiadosBackend.length);
+      return custodiadosBackend.map(transformarCustodiado);
+    }
+
+    // CASO 3: Objeto desconhecido - tentar encontrar array
+    if (typeof custodiadosBackend === 'object') {
+      console.log('[GeralPage] Objeto desconhecido, procurando array...');
+
+      const possibleKeys = ['data', 'custodiados', 'items', 'results'];
+
+      for (const key of possibleKeys) {
+        if (key in custodiadosBackend && Array.isArray((custodiadosBackend as any)[key])) {
+          const arrayData = (custodiadosBackend as any)[key];
+          console.log(`[GeralPage] Array encontrado em '${key}':`, arrayData.length);
+          return arrayData.map(transformarCustodiado);
+        }
+      }
+    }
+
+    console.error('[GeralPage] Estrutura não reconhecida:', typeof custodiadosBackend);
+    return [];
   }, [custodiadosBackend]);
+
 
   useEffect(() => {
     const busca = searchParams.get('busca');
@@ -424,8 +444,8 @@ export default function GeralPage() {
 
         <div className="flex items-center justify-between">
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'inadimplente'
-              ? 'bg-red-100 text-red-800'
-              : 'bg-green-100 text-green-800'
+            ? 'bg-red-100 text-red-800'
+            : 'bg-green-100 text-green-800'
             }`}>
             {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
           </span>
@@ -930,11 +950,11 @@ export default function GeralPage() {
 
       {selecionado && (
         <DetalhesCustodiadoModal
-          dados={selecionado}
+          dados={selecionado as any}
           onClose={() => setSelecionado(null)}
           onEditar={(item) => {
             setSelecionado(null);
-            setEditando(item);
+            setEditando(item as CustodiadoFormatado);
           }}
           onExcluir={async () => {
             setSelecionado(null);
@@ -951,7 +971,7 @@ export default function GeralPage() {
 
       {editando && (
         <EditarCustodiadoModal
-          dados={editando}
+          dados={editando as any}
           onClose={() => setEditando(null)}
           onVoltar={() => {
             setSelecionado(editando);
