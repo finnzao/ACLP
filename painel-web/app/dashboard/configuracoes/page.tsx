@@ -1,5 +1,3 @@
-// Parte 1: Seção de Perfil e Segurança para app/dashboard/configuracoes/page.tsx
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,7 +18,16 @@ import {
   Loader2,
   Shield,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Mail,
+  UserPlus,
+  Send,
+  Clock,
+  XCircle,
+  RefreshCw,
+  Copy,
+  Trash2,
+  CheckCheck
 } from 'lucide-react';
 
 // Componente de validação de senha
@@ -68,17 +75,38 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   );
 };
 
+// Tipo para abas
+type Tab = 'perfil' | 'seguranca' | 'convites';
+
+// Interface para Convite
+interface Convite {
+  id: number;
+  email: string;
+  nome: string;
+  tipoUsuario: 'ADMIN' | 'USUARIO';
+  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO' | 'CANCELADO';
+  linkAtivacao: string;
+  expiraEm: string;
+  criadoEm: string;
+  criadoPor?: string;
+}
+
 // Componente Principal
-export default function ConfiguracoesPerfilSeguranca() {
-  const { user, updateUser, logout } = useAuth();
+export default function ConfiguracoesPage() {
+  const { user, logout } = useAuth();
   const { isAdmin } = usePermissions();
   const { showToast } = useToast();
   const { 
     loading, 
     alterarSenha, 
-    atualizarPerfil 
+    atualizarPerfil,
+    criarConvite,
+    listarConvites,
+    reenviarConvite,
+    cancelarConvite
   } = useUserManagement();
   
+  const [activeTab, setActiveTab] = useState<Tab>('perfil');
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -96,7 +124,14 @@ export default function ConfiguracoesPerfilSeguranca() {
   const [mostrarNovaSenha, setMostrarNovaSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
-  // Atualizar campos quando user mudar
+  // Estados de convites
+  const [convites, setConvites] = useState<Convite[]>([]);
+  const [loadingConvites, setLoadingConvites] = useState(false);
+  const [novoConviteEmail, setNovoConviteEmail] = useState('');
+  const [novoConviteNome, setNovoConviteNome] = useState('');
+  const [novoConviteTipo, setNovoConviteTipo] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
+  const [mostrarFormConvite, setMostrarFormConvite] = useState(false);
+
   useEffect(() => {
     if (user) {
       setNomeUsuario(user.nome || '');
@@ -106,10 +141,27 @@ export default function ConfiguracoesPerfilSeguranca() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (activeTab === 'convites' && isAdmin()) {
+      carregarConvites();
+    }
+  }, [activeTab]);
+
+  const carregarConvites = async () => {
+    setLoadingConvites(true);
+    try {
+      const result = await listarConvites();
+      if (result.success && result.data) {
+        setConvites(result.data);
+      }
+    } finally {
+      setLoadingConvites(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
 
-    // Validações
     if (!nomeUsuario.trim()) {
       showToast({
         type: 'error',
@@ -141,14 +193,6 @@ export default function ConfiguracoesPerfilSeguranca() {
       });
 
       if (result.success) {
-        // Atualizar contexto
-        updateUser({
-          nome: nomeUsuario,
-          email: emailUsuario,
-          telefone: telefoneUsuario,
-          departamento: departamentoUsuario
-        });
-
         setShowSaveSuccess(true);
         setTimeout(() => setShowSaveSuccess(false), 3000);
       }
@@ -165,7 +209,6 @@ export default function ConfiguracoesPerfilSeguranca() {
     });
 
     if (result.success) {
-      // Limpar campos
       setSenhaAtual('');
       setNovaSenha('');
       setConfirmarSenha('');
@@ -173,6 +216,77 @@ export default function ConfiguracoesPerfilSeguranca() {
       setMostrarNovaSenha(false);
       setMostrarConfirmarSenha(false);
     }
+  };
+
+  const handleCriarConvite = async () => {
+    if (!novoConviteEmail.trim() || !novoConviteNome.trim()) {
+      showToast({
+        type: 'error',
+        title: 'Campos obrigatórios',
+        message: 'Preencha nome e e-mail',
+        duration: 3000
+      });
+      return;
+    }
+
+    const result = await criarConvite({
+      nome: novoConviteNome,
+      email: novoConviteEmail,
+      tipo: novoConviteTipo
+    });
+
+    if (result.success) {
+      setNovoConviteEmail('');
+      setNovoConviteNome('');
+      setNovoConviteTipo('USUARIO');
+      setMostrarFormConvite(false);
+      carregarConvites();
+    }
+  };
+
+  const handleReenviarConvite = async (id: number) => {
+    const result = await reenviarConvite(id);
+    if (result.success) {
+      carregarConvites();
+    }
+  };
+
+  const handleCancelarConvite = async (id: number) => {
+    if (!confirm('Deseja realmente cancelar este convite?')) return;
+    
+    const result = await cancelarConvite(id);
+    if (result.success) {
+      carregarConvites();
+    }
+  };
+
+  const copiarLink = (link: string) => {
+    navigator.clipboard.writeText(link);
+    showToast({
+      type: 'success',
+      title: 'Link copiado',
+      message: 'Link do convite copiado para a área de transferência',
+      duration: 2000
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      PENDENTE: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pendente' },
+      ACEITO: { color: 'bg-green-100 text-green-800', icon: CheckCheck, label: 'Aceito' },
+      EXPIRADO: { color: 'bg-gray-100 text-gray-800', icon: XCircle, label: 'Expirado' },
+      CANCELADO: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Cancelado' }
+    };
+
+    const badge = badges[status as keyof typeof badges] || badges.PENDENTE;
+    const Icon = badge.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+        <Icon className="w-3 h-3" />
+        {badge.label}
+      </span>
+    );
   };
 
   return (
@@ -208,196 +322,413 @@ export default function ConfiguracoesPerfilSeguranca() {
         </div>
       )}
 
-      {/* Perfil Tab */}
-      <div className="space-y-6 mb-8">
-        <section className="bg-white p-6 rounded-xl shadow">
-          <div className="flex items-center gap-3 mb-4">
-            <User className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-medium text-primary-dark">Informações Pessoais</h3>
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab('perfil')}
+          className={cn(
+            'px-4 py-2 font-medium transition-colors relative',
+            activeTab === 'perfil'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-gray-500 hover:text-gray-700'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            <span>Perfil</span>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputGroup 
-              label="Nome Completo"
-              value={nomeUsuario} 
-              onChange={e => setNomeUsuario(e.target.value)} 
-              placeholder="Nome completo" 
-            />
-            <InputGroup
-              label="Email"
-              type="email"
-              value={emailUsuario}
-              onChange={e => setEmailUsuario(e.target.value)}
-              placeholder="Email"
-            />
-            <InputGroup 
-              label="Telefone"
-              value={telefoneUsuario} 
-              onChange={e => setTelefoneUsuario(e.target.value)} 
-              placeholder="(00) 00000-0000" 
-            />
-            <InputGroup 
-              label="Departamento"
-              value={departamentoUsuario} 
-              onChange={e => setDepartamentoUsuario(e.target.value)} 
-              placeholder="Departamento" 
-            />
+        </button>
+
+        <button
+          onClick={() => setActiveTab('seguranca')}
+          className={cn(
+            'px-4 py-2 font-medium transition-colors relative',
+            activeTab === 'seguranca'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-gray-500 hover:text-gray-700'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            <span>Segurança</span>
           </div>
-          
-          <div className="flex justify-end mt-6">
-            <button 
-              onClick={handleSaveProfile}
-              disabled={isSaving}
-              className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Salvar Alterações
-                </>
-              )}
-            </button>
-          </div>
-        </section>
+        </button>
+
+        {isAdmin() && (
+          <button
+            onClick={() => setActiveTab('convites')}
+            className={cn(
+              'px-4 py-2 font-medium transition-colors relative',
+              activeTab === 'convites'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              <span>Convites</span>
+            </div>
+          </button>
+        )}
       </div>
+
+      {/* Perfil Tab */}
+      {activeTab === 'perfil' && (
+        <div className="space-y-6">
+          <section className="bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center gap-3 mb-4">
+              <User className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-medium text-primary-dark">Informações Pessoais</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputGroup 
+                label="Nome Completo"
+                value={nomeUsuario} 
+                onChange={e => setNomeUsuario(e.target.value)} 
+                placeholder="Nome completo" 
+              />
+              <InputGroup
+                label="Email"
+                type="email"
+                value={emailUsuario}
+                onChange={e => setEmailUsuario(e.target.value)}
+                placeholder="Email"
+              />
+              <InputGroup 
+                label="Telefone"
+                value={telefoneUsuario} 
+                onChange={e => setTelefoneUsuario(e.target.value)} 
+                placeholder="(00) 00000-0000" 
+              />
+              <InputGroup 
+                label="Departamento"
+                value={departamentoUsuario} 
+                onChange={e => setDepartamentoUsuario(e.target.value)} 
+                placeholder="Departamento" 
+              />
+            </div>
+            
+            <div className="flex justify-end mt-6">
+              <button 
+                onClick={handleSaveProfile}
+                disabled={isSaving}
+                className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Salvar Alterações
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Segurança Tab */}
-      <div className="space-y-6">
-        <section className="bg-white p-6 rounded-xl shadow">
-          <div className="flex items-center gap-3 mb-6">
-            <Lock className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-medium text-primary-dark">Alterar Senha</h3>
-          </div>
-          
-          <div className="max-w-md space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Senha Atual <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input 
-                  type={mostrarSenhaAtual ? "text" : "password"} 
-                  value={senhaAtual} 
-                  onChange={e => setSenhaAtual(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="Digite sua senha atual"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarSenhaAtual(!mostrarSenhaAtual)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                  disabled={loading}
-                >
-                  {mostrarSenhaAtual ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+      {activeTab === 'seguranca' && (
+        <div className="space-y-6">
+          <section className="bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <Lock className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-medium text-primary-dark">Alterar Senha</h3>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nova Senha <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input 
-                  type={mostrarNovaSenha ? "text" : "password"} 
-                  value={novaSenha} 
-                  onChange={e => setNovaSenha(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="Digite a nova senha"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarNovaSenha(!mostrarNovaSenha)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                  disabled={loading}
-                >
-                  {mostrarNovaSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            <div className="max-w-md space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Senha Atual <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={mostrarSenhaAtual ? "text" : "password"} 
+                    value={senhaAtual} 
+                    onChange={e => setSenhaAtual(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Digite sua senha atual"
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenhaAtual(!mostrarSenhaAtual)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {mostrarSenhaAtual ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-              <PasswordStrengthIndicator password={novaSenha} />
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nova Senha <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={mostrarNovaSenha ? "text" : "password"} 
+                    value={novaSenha} 
+                    onChange={e => setNovaSenha(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Digite a nova senha"
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarNovaSenha(!mostrarNovaSenha)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {mostrarNovaSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <PasswordStrengthIndicator password={novaSenha} />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirmar Nova Senha <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={mostrarConfirmarSenha ? "text" : "password"} 
+                    value={confirmarSenha} 
+                    onChange={e => setConfirmarSenha(e.target.value)} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Confirme a nova senha"
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {mostrarConfirmarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {confirmarSenha && novaSenha !== confirmarSenha && (
+                  <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    As senhas não coincidem
+                  </p>
+                )}
+                {confirmarSenha && novaSenha === confirmarSenha && (
+                  <p className="text-green-500 text-sm mt-1 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Senhas coincidem
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-blue-800">Requisitos de senha:</p>
+                <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                  <li className={novaSenha.length >= 8 ? 'text-green-600' : ''}>
+                    • Mínimo de 8 caracteres
+                  </li>
+                  <li className={/[a-z]/.test(novaSenha) && /[A-Z]/.test(novaSenha) ? 'text-green-600' : ''}>
+                    • Letras maiúsculas e minúsculas
+                  </li>
+                  <li className={/[0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
+                    • Pelo menos um número
+                  </li>
+                  <li className={/[^a-zA-Z0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
+                    • Pelo menos um caractere especial
+                  </li>
+                </ul>
+              </div>
+
+              <button 
+                onClick={handleAlterarSenha}
+                disabled={loading || !senhaAtual || !novaSenha || novaSenha !== confirmarSenha}
+                className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Alterando...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    Alterar Senha
+                  </>
+                )}
+              </button>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirmar Nova Senha <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input 
-                  type={mostrarConfirmarSenha ? "text" : "password"} 
-                  value={confirmarSenha} 
-                  onChange={e => setConfirmarSenha(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="Confirme a nova senha"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                  disabled={loading}
-                >
-                  {mostrarConfirmarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+          </section>
+        </div>
+      )}
+
+      {/* Convites Tab */}
+      {activeTab === 'convites' && isAdmin() && (
+        <div className="space-y-6">
+          {/* Novo Convite */}
+          <section className="bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <UserPlus className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-medium text-primary-dark">Novo Convite</h3>
               </div>
-              {confirmarSenha && novaSenha !== confirmarSenha && (
-                <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  As senhas não coincidem
-                </p>
-              )}
-              {confirmarSenha && novaSenha === confirmarSenha && (
-                <p className="text-green-500 text-sm mt-1 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" />
-                  Senhas coincidem
-                </p>
-              )}
+              <button
+                onClick={() => setMostrarFormConvite(!mostrarFormConvite)}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                Criar Convite
+              </button>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-blue-800">Requisitos de senha:</p>
-              <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                <li className={novaSenha.length >= 8 ? 'text-green-600' : ''}>
-                  • Mínimo de 8 caracteres
-                </li>
-                <li className={/[a-z]/.test(novaSenha) && /[A-Z]/.test(novaSenha) ? 'text-green-600' : ''}>
-                  • Letras maiúsculas e minúsculas
-                </li>
-                <li className={/[0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
-                  • Pelo menos um número
-                </li>
-                <li className={/[^a-zA-Z0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
-                  • Pelo menos um caractere especial
-                </li>
-              </ul>
+            {mostrarFormConvite && (
+              <div className="border-t pt-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <InputGroup
+                    label="Nome"
+                    value={novoConviteNome}
+                    onChange={e => setNovoConviteNome(e.target.value)}
+                    placeholder="Nome do usuário"
+                  />
+                  <InputGroup
+                    label="E-mail"
+                    type="email"
+                    value={novoConviteEmail}
+                    onChange={e => setNovoConviteEmail(e.target.value)}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Usuário
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="USUARIO"
+                        checked={novoConviteTipo === 'USUARIO'}
+                        onChange={() => setNovoConviteTipo('USUARIO')}
+                        className="w-4 h-4"
+                      />
+                      <span>Usuário</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="ADMIN"
+                        checked={novoConviteTipo === 'ADMIN'}
+                        onChange={() => setNovoConviteTipo('ADMIN')}
+                        className="w-4 h-4"
+                      />
+                      <span>Administrador</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setMostrarFormConvite(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCriarConvite}
+                    disabled={loading}
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Enviar Convite
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Lista de Convites */}
+          <section className="bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center gap-3 mb-4">
+              <Mail className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-medium text-primary-dark">Convites Enviados</h3>
             </div>
 
-            <button 
-              onClick={handleAlterarSenha}
-              disabled={loading || !senhaAtual || !novaSenha || novaSenha !== confirmarSenha}
-              className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Alterando...
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  Alterar Senha
-                </>
-              )}
-            </button>
-          </div>
-        </section>
-      </div>
+            {loadingConvites ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : convites.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Mail className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Nenhum convite enviado ainda</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {convites.map(convite => (
+                  <div
+                    key={convite.id}
+                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-medium">{convite.nome}</h4>
+                          {getStatusBadge(convite.status)}
+                        </div>
+                        <p className="text-sm text-gray-600">{convite.email}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tipo: {convite.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Expira em: {new Date(convite.expiraEm).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {convite.status === 'PENDENTE' && (
+                          <>
+                            <button
+                              onClick={() => copiarLink(convite.linkAtivacao)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Copiar link"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleReenviarConvite(convite.id)}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Reenviar"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleCancelarConvite(convite.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Cancelar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

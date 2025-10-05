@@ -86,7 +86,29 @@ class HttpClient {
     this.failedQueue = [];
   }
 
+  private clearAuthData(): void {
+    console.log('[HttpClient] Limpando dados de autenticação');
+    
+    this.clearAuthToken();
+    
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access-token');
+      localStorage.removeItem('refresh-token');
+      localStorage.removeItem('user-data');
+      document.cookie = 'auth-token=; path=/; max-age=0';
+    }
+  }
+
   private async handleUnauthorized(originalConfig: RequestConfig, endpoint: string): Promise<any> {
+    // Não tentar renovar se for endpoint de auth ou se já falhou antes
+    if (endpoint.includes('/auth/login') || endpoint.includes('/auth/refresh')) {
+      console.log('[HttpClient] Não renovando token para endpoint de autenticação');
+      this.clearAuthData();
+      this.handleLogout();
+      return Promise.reject(new Error('Não autenticado'));
+    }
+
+    // Se já estiver renovando, adicionar à fila
     if (this.isRefreshing) {
       return new Promise((resolve, reject) => {
         this.failedQueue.push({ resolve, reject });
@@ -103,14 +125,21 @@ class HttpClient {
 
     this.isRefreshing = true;
 
-    const refreshToken = localStorage.getItem('refresh-token');
+    const refreshToken = typeof window !== 'undefined' 
+      ? localStorage.getItem('refresh-token') 
+      : null;
 
     if (!refreshToken) {
+      console.log('[HttpClient] Sem refresh token disponível');
+      this.isRefreshing = false;
+      this.clearAuthData();
       this.handleLogout();
       return Promise.reject(new Error('Não autenticado'));
     }
 
     try {
+      console.log('[HttpClient] Tentando renovar token...');
+      
       const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
         method: 'POST',
         headers: {
@@ -123,10 +152,19 @@ class HttpClient {
         const data = await response.json();
 
         if (data.success && data.data) {
-          const { accessToken, refreshToken: newRefreshToken } = data.data;
+          const { accessToken, refreshToken: newRefreshToken, expiresIn } = data.data;
 
-          localStorage.setItem('access-token', accessToken);
-          localStorage.setItem('refresh-token', newRefreshToken);
+          console.log('[HttpClient] Token renovado com sucesso');
+
+          // Salvar novos tokens
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('access-token', accessToken);
+            localStorage.setItem('refresh-token', newRefreshToken);
+            
+            // Atualizar cookie
+            const maxAge = expiresIn || 3600;
+            document.cookie = `auth-token=${accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+          }
 
           this.setAuthToken(accessToken);
 
@@ -136,6 +174,7 @@ class HttpClient {
           };
 
           this.processQueue(null, accessToken);
+          this.isRefreshing = false;
 
           return this.makeRequest(endpoint, originalConfig);
         }
@@ -145,23 +184,14 @@ class HttpClient {
     } catch (refreshError) {
       console.error('[HttpClient] Erro ao renovar token:', refreshError);
       this.processQueue(refreshError, null);
+      this.isRefreshing = false;
+      this.clearAuthData();
       this.handleLogout();
       return Promise.reject(refreshError);
-    } finally {
-      this.isRefreshing = false;
     }
   }
 
-  private handleLogout(): void {
-    console.log('[HttpClient] Sessão expirada, redirecionando para login');
-    localStorage.removeItem('access-token');
-    localStorage.removeItem('refresh-token');
-    localStorage.removeItem('user-data');
-
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-  }
+ 
 
   // Métodos de Configuração
 
@@ -195,6 +225,7 @@ class HttpClient {
 
   clearAuth() {
     this.clearAuthToken();
+    this.clearAuthData();
   }
 
   // Método Principal de Requisição
@@ -251,7 +282,9 @@ class HttpClient {
         const response = await fetch(url, requestConfig);
         clearTimeout(timeoutId);
 
-        if (response.status === 401 && !endpoint.includes('/auth/login')) {
+        // Tratar token expirado
+        if (response.status === 401) {
+          console.warn('[HttpClient] Token expirado ou inválido (401)');
           return this.handleUnauthorized(config, endpoint);
         }
 
@@ -303,7 +336,8 @@ class HttpClient {
           timestamp: new Date().toISOString()
         };
 
-        if (!response.ok && attempt < retries) {
+        // Retry apenas para erros de servidor (5xx), não para erros do cliente (4xx)
+        if (!response.ok && response.status >= 500 && attempt < retries) {
           lastError = new Error(`HTTP ${response.status}: ${apiResponse.error}`);
           await this.delay(1000 * Math.pow(2, attempt));
           continue;

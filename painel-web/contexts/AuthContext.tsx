@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -63,6 +64,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = !!user;
 
+  // Verificar se o token está expirado
+  const isTokenExpired = (token: string): boolean => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expirationTime = payload.exp * 1000;
+      const currentTime = Date.now();
+      const timeUntilExpiry = expirationTime - currentTime;
+      
+      // Considera expirado se falta menos de 1 minuto
+      return timeUntilExpiry < 60000;
+    } catch (error) {
+      console.error('[AuthContext] Erro ao verificar expiração do token:', error);
+      return true;
+    }
+  };
+
+  // Limpar autenticação completamente
+  const clearAuthData = () => {
+    console.log('[AuthContext] Limpando dados de autenticação');
+    authService.clearAuth();
+    document.cookie = 'auth-token=; path=/; max-age=0';
+    setUser(null);
+  };
+
   const loadUser = async () => {
     try {
       console.log('[AuthContext] Carregando dados do usuário');
@@ -71,13 +96,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (!accessToken) {
         console.log('[AuthContext] Nenhum token encontrado');
-        setUser(null);
+        clearAuthData();
         setIsLoading(false);
         return;
       }
 
-      console.log('[AuthContext] Token encontrado, configurando no httpClient');
-      httpClient.setAuthToken(accessToken);
+      // Verificar se o token está expirado
+      if (isTokenExpired(accessToken)) {
+        console.log('[AuthContext] Token expirado, tentando renovar');
+        
+        const refreshToken = authService.getRefreshToken();
+        
+        if (refreshToken) {
+          try {
+            const refreshResult = await authService.refreshToken({ refreshToken });
+            
+            if (refreshResult.success && refreshResult.data) {
+              console.log('[AuthContext] Token renovado com sucesso');
+              
+              // Atualizar token no httpClient
+              httpClient.setAuthToken(refreshResult.data.accessToken);
+              
+              // Atualizar cookie
+              const maxAge = refreshResult.data.expiresIn || 3600;
+              document.cookie = `auth-token=${refreshResult.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+            } else {
+              console.warn('[AuthContext] Falha ao renovar token');
+              clearAuthData();
+              setIsLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.error('[AuthContext] Erro ao renovar token:', error);
+            clearAuthData();
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          console.warn('[AuthContext] Token expirado e sem refresh token');
+          clearAuthData();
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        // Token válido, configurar no httpClient
+        console.log('[AuthContext] Token válido, configurando no httpClient');
+        httpClient.setAuthToken(accessToken);
+      }
 
       console.log('[AuthContext] Buscando perfil do usuário');
       const profileResponse = await authService.getProfile();
@@ -98,21 +163,115 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       } else {
         console.warn('[AuthContext] Falha ao carregar perfil, limpando autenticação');
-        authService.clearAuth();
-        setUser(null);
+        clearAuthData();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[AuthContext] Erro ao carregar usuário:', error);
-      authService.clearAuth();
-      setUser(null);
+      
+      // Se for erro 401, limpar autenticação
+      if (error.message?.includes('401') || error.message?.includes('expirada')) {
+        console.log('[AuthContext] Sessão expirada, limpando autenticação');
+        clearAuthData();
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Configurar interceptor de eventos de expiração
+  useEffect(() => {
+    const handleTokenExpired = () => {
+      console.log('[AuthContext] Evento de token expirado recebido');
+      clearAuthData();
+      router.push('/login');
+    };
+
+    window.addEventListener('token-expired', handleTokenExpired);
+
+    return () => {
+      window.removeEventListener('token-expired', handleTokenExpired);
+    };
+  }, [router]);
+
   useEffect(() => {
     loadUser();
-  }, []);
+
+    // Verificar expiração do token a cada 1 minuto
+    const intervalId = setInterval(() => {
+      const token = authService.getAccessToken();
+      
+      if (!token) {
+        console.log('[AuthContext] Token não encontrado no intervalo');
+        clearAuthData();
+        router.push('/login');
+        return;
+      }
+      
+      const decoded = authService.decodeToken(token);
+      
+      if (!decoded) {
+        console.log('[AuthContext] Token inválido detectado no intervalo');
+        clearAuthData();
+        router.push('/login');
+        return;
+      }
+
+      const now = Date.now() / 1000;
+      
+      // Token expirado
+      if (decoded.exp < now) {
+        console.log('[AuthContext] Token expirado detectado no intervalo');
+        
+        const refreshToken = authService.getRefreshToken();
+        
+        if (refreshToken) {
+          authService.refreshToken({ refreshToken }).then(result => {
+            if (result.success && result.data) {
+              console.log('[AuthContext] Token renovado automaticamente');
+              httpClient.setAuthToken(result.data.accessToken);
+              
+              const maxAge = result.data.expiresIn || 3600;
+              document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+            } else {
+              console.log('[AuthContext] Falha ao renovar token automaticamente');
+              clearAuthData();
+              router.push('/login');
+            }
+          }).catch(error => {
+            console.error('[AuthContext] Erro ao renovar token automaticamente:', error);
+            clearAuthData();
+            router.push('/login');
+          });
+        } else {
+          console.log('[AuthContext] Sem refresh token, fazendo logout');
+          clearAuthData();
+          router.push('/login');
+        }
+      }
+      // Token próximo de expirar (menos de 5 minutos)
+      else if ((decoded.exp - now) < 300) {
+        console.log('[AuthContext] Token próximo de expirar, renovando...');
+        
+        const refreshToken = authService.getRefreshToken();
+        
+        if (refreshToken) {
+          authService.refreshToken({ refreshToken }).then(result => {
+            if (result.success && result.data) {
+              console.log('[AuthContext] Token renovado preventivamente');
+              httpClient.setAuthToken(result.data.accessToken);
+              
+              const maxAge = result.data.expiresIn || 3600;
+              document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+            }
+          }).catch(error => {
+            console.error('[AuthContext] Erro ao renovar token preventivamente:', error);
+          });
+        }
+      }
+    }, 60000); // Verificar a cada 1 minuto
+
+    return () => clearInterval(intervalId);
+  }, [router]);
 
   const login = async (email: string, senha: string, rememberMe: boolean = false): Promise<boolean> => {
     try {
@@ -126,10 +285,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (result.success && result.data) {
         console.log('[AuthContext] Login bem-sucedido');
-        
-        authService.setAccessToken(result.data.accessToken);
-        authService.setRefreshToken(result.data.refreshToken);
-        authService.setUserData(result.data.usuario);
         
         httpClient.setAuthToken(result.data.accessToken);
         
@@ -167,14 +322,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const refreshToken = authService.getRefreshToken();
       
       if (refreshToken) {
-        await authService.logout({ refreshToken });
+        try {
+          await authService.logout({ refreshToken });
+          console.log('[AuthContext] Logout no servidor realizado com sucesso');
+        } catch (error) {
+          console.error('[AuthContext] Erro ao fazer logout no servidor:', error);
+        }
       }
     } catch (error) {
       console.error('[AuthContext] Erro no logout:', error);
     } finally {
-      authService.clearAuth();
-      document.cookie = 'auth-token=; path=/; max-age=0';
-      setUser(null);
+      // Sempre limpar dados locais, independente do resultado do servidor
+      clearAuthData();
+      console.log('[AuthContext] Dados locais limpos após logout');
       router.push('/login');
     }
   };
