@@ -21,10 +21,9 @@ import type {
   StatusVerificacaoResponse,
   StatusEstatisticasResponse,
   ListarCustodiadosResponse,
+  ListarComparecimentosParams,
   ListarComparecimentosResponse,
-  ListarComparecimentosParams
 } from '@/types/api';
-
 
 const ENDPOINTS = {
   BASE: '/comparecimentos',
@@ -33,7 +32,7 @@ const ENDPOINTS = {
   PERIODO: '/comparecimentos/periodo',
   HOJE: '/comparecimentos/hoje',
   ESTATISTICAS: '/comparecimentos/estatisticas',
-  RESUMO: '/comparecimentos/resumo-sistema',
+  RESUMO: '/comparecimentos/resumo/sistema',
   TODOS: '/comparecimentos/todos',
   FILTRAR: '/comparecimentos/filtrar'
 } as const;
@@ -52,28 +51,27 @@ export function clearAuthHeaders() {
   console.log('[Services] Token de autenticação removido');
 }
 
+// ===========================
 // Custodiados Service
+// ===========================
 
 export const custodiadosService = {
   /**
-   * Lista todos os custodiados com cache
+   * Lista todos os custodiados com cache e tratamento robusto de erros
    */
-  async listar(options?: { 
+  async listar(options?: {
     forceRefresh?: boolean;
     cacheTimeout?: number;
   }): Promise<ListarCustodiadosResponse> {
     const cacheKey = 'custodiados:list';
-    const cacheTimeout = options?.cacheTimeout || 5 * 60 * 1000; // 5 minutos padrão
-    
-    // Tentar buscar do cache primeiro (se não for forceRefresh)
+    const cacheTimeout = options?.cacheTimeout || 5 * 60 * 1000;
+
     if (!options?.forceRefresh) {
       const cached = requestCache.get<ListarCustodiadosResponse>(cacheKey);
       if (cached) {
         console.log('[CustodiadosService] Retornando dados do cache');
         return cached;
       }
-    } else {
-      console.log('[CustodiadosService] forceRefresh=true, ignorando cache');
     }
 
     try {
@@ -82,11 +80,29 @@ export const custodiadosService = {
 
       let parsedData: any;
 
-      // Parse da resposta
+      // ✅ Parse seguro da resposta
       try {
         if (typeof response.data === 'string') {
-          parsedData = JSON.parse(response.data);
+          const trimmedData = response.data.trim();
+
+          if (trimmedData.length === 0) {
+            console.warn('[CustodiadosService] Resposta vazia do servidor');
+            return {
+              success: false,
+              message: 'Servidor retornou resposta vazia',
+              data: []
+            };
+          }
+
+          parsedData = JSON.parse(trimmedData);
           console.log('[CustodiadosService] JSON parseado:', parsedData);
+        } else if (response.data === null || response.data === undefined) {
+          console.warn('[CustodiadosService] Resposta nula do servidor');
+          return {
+            success: false,
+            message: 'Servidor não retornou dados',
+            data: []
+          };
         } else {
           parsedData = response.data;
           console.log('[CustodiadosService] Data já é objeto:', parsedData);
@@ -100,7 +116,6 @@ export const custodiadosService = {
         };
       }
 
-      // Inicializar result com valor padrão
       let result: ListarCustodiadosResponse = {
         success: false,
         message: 'Nenhum custodiado encontrado',
@@ -140,17 +155,24 @@ export const custodiadosService = {
         }
       }
 
-      // Cachear resultado de sucesso
       if (result.success && result.data.length > 0) {
         requestCache.set(cacheKey, result, cacheTimeout);
-        console.log(`[CustodiadosService] ${result.data.length} custodiados cacheados por ${cacheTimeout}ms`);
+        console.log(`[CustodiadosService] ${result.data.length} custodiados cacheados`);
       }
 
       return result;
 
     } catch (error) {
       console.error('[CustodiadosService] Erro ao listar custodiados:', error);
-      
+
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+          success: false,
+          message: 'Erro de conexão com o servidor',
+          data: []
+        };
+      }
+
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erro ao listar custodiados',
@@ -159,17 +181,13 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Busca custodiado por ID com cache
-   */
-  async buscarPorId(id: number, options?: { 
+  async buscarPorId(id: number, options?: {
     forceRefresh?: boolean;
     cacheTimeout?: number;
   }): Promise<CustodiadoResponse | null> {
     const cacheKey = `custodiados:id:${id}`;
-    const cacheTimeout = options?.cacheTimeout || 2 * 60 * 1000; // 2 minutos
+    const cacheTimeout = options?.cacheTimeout || 2 * 60 * 1000;
 
-    // Tentar cache primeiro
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse>(cacheKey);
       if (cached) {
@@ -181,10 +199,9 @@ export const custodiadosService = {
     try {
       console.log(`[CustodiadosService] Buscando custodiado ID: ${id}`);
       const response = await apiClient.get<CustodiadoResponse>(`/custodiados/${id}`);
-      
+
       const result = response.success ? response.data || null : null;
 
-      // Cachear se encontrou
       if (result) {
         requestCache.set(cacheKey, result, cacheTimeout);
       }
@@ -197,26 +214,22 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Cria novo custodiado e invalida cache
-   */
   async criar(data: CustodiadoDTO): Promise<ApiResponse<CustodiadoResponse>> {
     try {
       console.log('[CustodiadosService] Criando custodiado:', data);
-      
+
       const response = await apiClient.post<CustodiadoResponse>('/custodiados', data);
-      
-      // Invalidar cache da lista ao criar
+
       if (response.success) {
         requestCache.clear('custodiados:list');
         console.log('[CustodiadosService] Cache da lista invalidado após criação');
       }
-      
+
       return response;
 
     } catch (error) {
       console.error('[CustodiadosService] Erro ao criar custodiado:', error);
-      
+
       return {
         success: false,
         status: 500,
@@ -226,31 +239,26 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Atualiza custodiado e invalida cache
-   */
   async atualizar(
-    id: number, 
+    id: number,
     data: Partial<CustodiadoDTO>
   ): Promise<ApiResponse<CustodiadoResponse>> {
     try {
       console.log(`[CustodiadosService] Atualizando custodiado ID: ${id}`, data);
-      
+
       const response = await apiClient.put<CustodiadoResponse>(`/custodiados/${id}`, data);
-      
-      // Invalidar caches relacionados ao atualizar
+
       if (response.success) {
         requestCache.clear('custodiados:list');
         requestCache.clear(`custodiados:id:${id}`);
-        
         console.log('[CustodiadosService] Caches invalidados após atualização');
       }
-      
+
       return response;
 
     } catch (error) {
       console.error(`[CustodiadosService] Erro ao atualizar custodiado ${id}:`, error);
-      
+
       return {
         success: false,
         status: 500,
@@ -260,27 +268,23 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Exclui custodiado e invalida cache
-   */
   async excluir(id: number): Promise<ApiResponse<void>> {
     try {
       console.log(`[CustodiadosService] Excluindo custodiado ID: ${id}`);
-      
+
       const response = await apiClient.delete<void>(`/custodiados/${id}`);
-      
-      // Invalidar todos os caches relacionados ao excluir
+
       if (response.success) {
         requestCache.clear('custodiados:list');
         requestCache.clear(`custodiados:id:${id}`);
         console.log('[CustodiadosService] Caches invalidados após exclusão');
       }
-      
+
       return response;
 
     } catch (error) {
       console.error(`[CustodiadosService] Erro ao excluir custodiado ${id}:`, error);
-      
+
       return {
         success: false,
         status: 500,
@@ -289,17 +293,13 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Busca custodiado por número de processo com cache
-   */
   async buscarPorProcesso(
     processo: string,
     options?: { forceRefresh?: boolean; cacheTimeout?: number }
   ): Promise<CustodiadoResponse | null> {
     const cacheKey = `custodiados:processo:${processo}`;
-    const cacheTimeout = options?.cacheTimeout || 3 * 60 * 1000; // 3 minutos
+    const cacheTimeout = options?.cacheTimeout || 3 * 60 * 1000;
 
-    // Tentar cache primeiro
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse>(cacheKey);
       if (cached) {
@@ -310,14 +310,13 @@ export const custodiadosService = {
 
     try {
       console.log(`[CustodiadosService] Buscando por processo: ${processo}`);
-      
+
       const response = await apiClient.get<CustodiadoResponse>(
         `/custodiados/processo/${encodeURIComponent(processo)}`
       );
-      
+
       const result = response.success ? response.data || null : null;
 
-      // Cachear se encontrou
       if (result) {
         requestCache.set(cacheKey, result, cacheTimeout);
       }
@@ -330,17 +329,13 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Busca custodiados por status com cache
-   */
   async buscarPorStatus(
     status: StatusComparecimento,
     options?: { forceRefresh?: boolean; cacheTimeout?: number }
   ): Promise<CustodiadoResponse[]> {
     const cacheKey = `custodiados:status:${status}`;
-    const cacheTimeout = options?.cacheTimeout || 2 * 60 * 1000; // 2 minutos
+    const cacheTimeout = options?.cacheTimeout || 2 * 60 * 1000;
 
-    // Tentar cache primeiro
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse[]>(cacheKey);
       if (cached) {
@@ -351,14 +346,13 @@ export const custodiadosService = {
 
     try {
       console.log(`[CustodiadosService] Buscando por status: ${status}`);
-      
+
       const response = await apiClient.get<CustodiadoResponse[]>(
         `/custodiados/status/${status}`
       );
-      
+
       const result = response.success ? response.data || [] : [];
 
-      // Cachear resultado
       if (result.length > 0) {
         requestCache.set(cacheKey, result, cacheTimeout);
       }
@@ -371,17 +365,13 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Busca custodiados inadimplentes com cache
-   */
-  async buscarInadimplentes(options?: { 
-    forceRefresh?: boolean; 
+  async buscarInadimplentes(options?: {
+    forceRefresh?: boolean;
     cacheTimeout?: number;
   }): Promise<CustodiadoResponse[]> {
     const cacheKey = 'custodiados:inadimplentes';
-    const cacheTimeout = options?.cacheTimeout || 1 * 60 * 1000; // 1 minuto (dados críticos)
+    const cacheTimeout = options?.cacheTimeout || 1 * 60 * 1000;
 
-    // Tentar cache primeiro
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse[]>(cacheKey);
       if (cached) {
@@ -392,14 +382,13 @@ export const custodiadosService = {
 
     try {
       console.log('[CustodiadosService] Buscando inadimplentes');
-      
+
       const response = await apiClient.get<CustodiadoResponse[]>(
         '/custodiados/inadimplentes'
       );
-      
+
       const result = response.success ? response.data || [] : [];
 
-      // Cachear resultado
       requestCache.set(cacheKey, result, cacheTimeout);
 
       return result;
@@ -410,19 +399,15 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Busca custodiados com parâmetros personalizados
-   * Não usa cache por ser uma busca dinâmica
-   */
   async buscar(params: BuscarParams): Promise<CustodiadoResponse[]> {
     try {
       console.log('[CustodiadosService] Fazendo busca com parâmetros:', params);
-      
+
       const response = await apiClient.get<CustodiadoResponse[]>(
-        '/custodiados/buscar', 
+        '/custodiados/buscar',
         params
       );
-      
+
       return response.success ? response.data || [] : [];
 
     } catch (error) {
@@ -431,44 +416,24 @@ export const custodiadosService = {
     }
   },
 
-  /**
-   * Invalida todo o cache de custodiados
-   */
   invalidarCache(): void {
     console.log('[CustodiadosService] Invalidando todo o cache de custodiados');
-    
-    // Limpar cache da lista
     requestCache.clear('custodiados:list');
-    
-    // Limpar cache de inadimplentes
     requestCache.clear('custodiados:inadimplentes');
-    
-    // Nota: caches específicos (por ID, processo, status) expiram automaticamente
-    // ou são limpos individualmente nas operações de update/delete
   },
 
-  /**
-   * Pré-carrega dados em cache (útil para otimizar navegação)
-   */
   async precarregar(): Promise<void> {
     console.log('[CustodiadosService] Pré-carregando dados...');
-    
+
     try {
-      // Carregar lista (vai para o cache automaticamente)
       await this.listar();
-      
-      // Carregar inadimplentes
       await this.buscarInadimplentes();
-      
       console.log('[CustodiadosService] Pré-carregamento concluído');
     } catch (error) {
       console.error('[CustodiadosService] Erro no pré-carregamento:', error);
     }
   },
 
-  /**
-   * Estatísticas do cache (útil para debug)
-   */
   estatisticasCache(): {
     listaCacheada: boolean;
     inadimplentesCacheados: boolean;
@@ -480,11 +445,11 @@ export const custodiadosService = {
   }
 };
 
+// ===========================
 // Comparecimentos Service
+// ===========================
+
 export const comparecimentosService = {
-  /**
-   * Registrar um novo comparecimento
-   */
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     try {
       console.log('[ComparecimentosService] Registrando comparecimento:', data);
@@ -514,9 +479,6 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * Buscar comparecimentos por custodiado
-   */
   async buscarPorCustodiado(custodiadoId: number): Promise<ComparecimentoResponse[]> {
     try {
       console.log('[ComparecimentosService] Buscando comparecimentos do custodiado:', custodiadoId);
@@ -526,11 +488,9 @@ export const comparecimentosService = {
       );
 
       if (response.success && response.data) {
-        // Se a resposta tem estrutura ApiResponse
         if (Array.isArray(response.data)) {
           return response.data;
         }
-        // Se a resposta tem estrutura aninhada
         if ((response.data as any).data && Array.isArray((response.data as any).data)) {
           return (response.data as any).data;
         }
@@ -544,9 +504,6 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * Buscar comparecimentos por período
-   */
   async buscarPorPeriodo(params: PeriodoParams): Promise<ComparecimentoResponse[]> {
     try {
       console.log('[ComparecimentosService] Buscando por período:', params);
@@ -572,9 +529,6 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * Buscar comparecimentos de hoje
-   */
   async comparecimentosHoje(): Promise<ComparecimentoResponse[]> {
     try {
       console.log('[ComparecimentosService] Buscando comparecimentos de hoje');
@@ -597,9 +551,6 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * Obter estatísticas de comparecimentos
-   */
   async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
     try {
       console.log('[ComparecimentosService] Obtendo estatísticas:', params);
@@ -613,7 +564,6 @@ export const comparecimentosService = {
         return response.data;
       }
 
-      // Retornar estrutura padrão em caso de erro
       return {
         totalComparecimentos: 0,
         comparecimentosPresenciais: 0,
@@ -639,20 +589,41 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * Obter resumo do sistema
-   */
   async obterResumoSistema(): Promise<ResumoSistemaResponse> {
     try {
       console.log('[ComparecimentosService] Obtendo resumo do sistema');
 
-      const response = await httpClient.get<ResumoSistemaResponse>(ENDPOINTS.RESUMO);
+      const response = await httpClient.get<any>('/comparecimentos/resumo/sistema');
 
+      console.log('[ComparecimentosService] Resposta recebida:', response);
+
+      // ✅ EXTRAIR OS DADOS CORRETAMENTE
       if (response.success && response.data) {
-        return response.data;
+        // Caso 1: Se response.data tem a estrutura { success, data: {...} }
+        if (response.data.data && typeof response.data.data === 'object') {
+          console.log('[ComparecimentosService] Retornando response.data.data');
+          return response.data.data as ResumoSistemaResponse;
+        }
+
+        // Caso 2: Se response.data JÁ é o objeto de resumo direto
+        if (response.data.totalCustodiados !== undefined) {
+          console.log('[ComparecimentosService] Retornando response.data diretamente');
+          return response.data as ResumoSistemaResponse;
+        }
+
+        // Caso 3: Se response tem data aninhado (response.data é ApiResponse)
+        if (typeof response.data === 'object' && response.data !== null) {
+          // Tentar encontrar o objeto com os dados esperados
+          const possibleData = response.data.data || response.data;
+          if (possibleData && possibleData.totalCustodiados !== undefined) {
+            console.log('[ComparecimentosService] Retornando dados aninhados');
+            return possibleData as ResumoSistemaResponse;
+          }
+        }
       }
 
-      // Retornar estrutura padrão
+      // ✅ Se não encontrou dados válidos, retornar estrutura padrão
+      console.warn('[ComparecimentosService] Dados não encontrados na resposta, retornando estrutura padrão');
       return {
         totalCustodiados: 0,
         custodiadosEmConformidade: 0,
@@ -665,6 +636,8 @@ export const comparecimentosService = {
       };
     } catch (error: any) {
       console.error('[ComparecimentosService] Erro ao obter resumo:', error);
+
+      // Retornar estrutura padrão em caso de erro
       return {
         totalCustodiados: 0,
         custodiadosEmConformidade: 0,
@@ -678,10 +651,6 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * Listar TODOS os comparecimentos com paginação
-   * Endpoint: GET /api/comparecimentos/todos
-   */
   async listarTodos(params?: ListarComparecimentosParams): Promise<ApiResponse<any>> {
     try {
       console.log('[ComparecimentosService] Listando todos os comparecimentos:', params);
@@ -698,9 +667,8 @@ export const comparecimentosService = {
 
       console.log('[ComparecimentosService] Resposta de listarTodos:', response);
 
-      // ✅ CASO 1: Resposta com estrutura completa ApiResponse com data.comparecimentos
       if (response.success && response.data) {
-        // Se tem a estrutura: { success, message, data: { comparecimentos: [], paginaAtual, ... } }
+        // Estrutura paginada: { comparecimentos: [], paginaAtual, ... }
         if (response.data.comparecimentos && Array.isArray(response.data.comparecimentos)) {
           console.log('[ComparecimentosService] Estrutura paginada detectada');
           return {
@@ -720,7 +688,7 @@ export const comparecimentosService = {
           };
         }
 
-        // ✅ CASO 2: Array direto em response.data
+        // Array direto
         if (Array.isArray(response.data)) {
           console.log('[ComparecimentosService] Array direto detectado');
           return {
@@ -740,7 +708,7 @@ export const comparecimentosService = {
           };
         }
 
-        // ✅ CASO 3: Estrutura aninhada (response.data.data.comparecimentos)
+        // Estrutura aninhada
         if (response.data.data && response.data.data.comparecimentos) {
           console.log('[ComparecimentosService] Estrutura aninhada detectada');
           const nested = response.data.data;
@@ -781,8 +749,7 @@ export const comparecimentosService = {
   },
 
   /**
-   * Filtrar comparecimentos com múltiplos critérios
-   * Endpoint: GET /api/comparecimentos/filtrar
+   * ✅ NOVO: Filtrar comparecimentos
    */
   async filtrar(params: {
     dataInicio?: string;
@@ -802,7 +769,6 @@ export const comparecimentosService = {
       console.log('[ComparecimentosService] Resposta de filtrar:', response);
 
       if (response.success && response.data) {
-        // Se a resposta já tem a estrutura esperada
         if (response.data.comparecimentos) {
           return {
             success: true,
@@ -813,7 +779,6 @@ export const comparecimentosService = {
           };
         }
 
-        // Se response.data é um array direto
         if (Array.isArray(response.data)) {
           return {
             success: true,
@@ -851,7 +816,9 @@ export const comparecimentosService = {
   }
 };
 
+// ===========================
 // Usuários Service
+// ===========================
 
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
@@ -871,7 +838,10 @@ export const usuariosService = {
   }
 };
 
-// Interfaces de Auth
+// ===========================
+// Demais Interfaces e Services (Auth, Convites, Status, Setup, Test)
+// Mantidos exatamente como no código original
+// ===========================
 
 export interface LoginRequest {
   email: string;
@@ -977,8 +947,6 @@ export interface ReenviarConviteDTO {
   mensagemPersonalizada?: string;
 }
 
-// Convites Service
-
 export const convitesService = {
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
     console.log('[ConvitesService] Criando convite para:', data.email);
@@ -1019,8 +987,6 @@ export const convitesService = {
     return await apiClient.delete<void>(`/usuarios/convites/${id}`);
   }
 };
-
-// Auth Service
 
 export const authService = {
   async login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
@@ -1147,7 +1113,7 @@ export const authService = {
     console.log('[AuthService] Obtendo perfil do usuário');
     try {
       const response = await apiClient.get<any>('/auth/me');
-      
+
       if (response.success && response.data) {
         return {
           success: true,
@@ -1155,7 +1121,7 @@ export const authService = {
           data: response.data.data || response.data
         };
       }
-      
+
       return response;
     } catch (error: any) {
       console.error('[AuthService] Erro ao obter perfil:', error);
@@ -1252,8 +1218,6 @@ export const authService = {
   }
 };
 
-// Status Service
-
 export const statusService = {
   async verificarInadimplentes(): Promise<ApiResponse<StatusVerificacaoResponse>> {
     console.log('[StatusService] Verificando inadimplentes');
@@ -1266,8 +1230,6 @@ export const statusService = {
     return response.success ? response.data || null : null;
   }
 };
-
-// Setup Service
 
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
@@ -1287,8 +1249,6 @@ export const setupService = {
     return await apiClient.post('/setup/admin', data);
   }
 };
-
-// Test Service
 
 export const testService = {
   async health(): Promise<HealthResponse> {

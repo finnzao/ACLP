@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Interfaces e Tipos
-
 export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: any;
   timeout?: number;
   retries?: number;
+  requireAuth?: boolean; 
 }
 
 export interface ApiResponse<T = any> {
@@ -24,16 +24,17 @@ interface ClientConfig {
   timeout?: number;
   retries?: number;
   headers?: Record<string, string>;
+  onUnauthorized?: () => void;
 }
 
 // Classe do Cliente HTTP
-
 class HttpClient {
   private baseURL: string;
   private defaultHeaders: Record<string, string>;
   private timeout: number;
   private retries: number;
   private isRefreshing = false;
+  private onUnauthorized?: () => void;
   private failedQueue: Array<{
     resolve: (value?: any) => void;
     reject: (reason?: any) => void;
@@ -50,13 +51,31 @@ class HttpClient {
 
     this.timeout = config?.timeout || 30000;
     this.retries = config?.retries || 3;
+    this.onUnauthorized = config?.onUnauthorized; //  NOVO
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[HttpClient] Inicializado com baseURL:', this.baseURL);
     }
   }
 
-  // Métodos de Autenticação
+  //  NOVO: Método para configurar callback de unauthorized
+  setUnauthorizedHandler(handler: () => void) {
+    this.onUnauthorized = handler;
+  }
+
+  //  NOVO: Verificar se está autenticado
+  private isAuthenticated(): boolean {
+    if (typeof window === 'undefined') return false;
+
+    const token = localStorage.getItem('access-token');
+    return !!token;
+  }
+
+  //  NOVO: Obter token
+  private getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('access-token');
+  }
 
   setAuthToken(token: string) {
     this.defaultHeaders['Authorization'] = `Bearer ${token}`;
@@ -88,9 +107,9 @@ class HttpClient {
 
   private clearAuthData(): void {
     console.log('[HttpClient] Limpando dados de autenticação');
-    
+
     this.clearAuthToken();
-    
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access-token');
       localStorage.removeItem('refresh-token');
@@ -100,15 +119,17 @@ class HttpClient {
   }
 
   private async handleUnauthorized(originalConfig: RequestConfig, endpoint: string): Promise<any> {
-    // Não tentar renovar se for endpoint de auth ou se já falhou antes
     if (endpoint.includes('/auth/login') || endpoint.includes('/auth/refresh')) {
       console.log('[HttpClient] Não renovando token para endpoint de autenticação');
       this.clearAuthData();
-      this.handleLogout();
+
+      if (this.onUnauthorized) {
+        this.onUnauthorized();
+      }
+
       return Promise.reject(new Error('Não autenticado'));
     }
 
-    // Se já estiver renovando, adicionar à fila
     if (this.isRefreshing) {
       return new Promise((resolve, reject) => {
         this.failedQueue.push({ resolve, reject });
@@ -125,21 +146,25 @@ class HttpClient {
 
     this.isRefreshing = true;
 
-    const refreshToken = typeof window !== 'undefined' 
-      ? localStorage.getItem('refresh-token') 
+    const refreshToken = typeof window !== 'undefined'
+      ? localStorage.getItem('refresh-token')
       : null;
 
     if (!refreshToken) {
       console.log('[HttpClient] Sem refresh token disponível');
       this.isRefreshing = false;
       this.clearAuthData();
-      this.handleLogout();
+
+      if (this.onUnauthorized) {
+        this.onUnauthorized();
+      }
+
       return Promise.reject(new Error('Não autenticado'));
     }
 
     try {
       console.log('[HttpClient] Tentando renovar token...');
-      
+
       const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
         method: 'POST',
         headers: {
@@ -156,12 +181,10 @@ class HttpClient {
 
           console.log('[HttpClient] Token renovado com sucesso');
 
-          // Salvar novos tokens
           if (typeof window !== 'undefined') {
             localStorage.setItem('access-token', accessToken);
             localStorage.setItem('refresh-token', newRefreshToken);
-            
-            // Atualizar cookie
+
             const maxAge = expiresIn || 3600;
             document.cookie = `auth-token=${accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
           }
@@ -186,17 +209,14 @@ class HttpClient {
       this.processQueue(refreshError, null);
       this.isRefreshing = false;
       this.clearAuthData();
-      this.handleLogout();
+
+      if (this.onUnauthorized) {
+        this.onUnauthorized();
+      }
+
       return Promise.reject(refreshError);
     }
   }
-  handleLogout() {
-    throw new Error("Method not implemented.");
-  }
-
- 
-
-  // Métodos de Configuração
 
   setHeaders(headers: Record<string, string>) {
     this.defaultHeaders = { ...this.defaultHeaders, ...headers };
@@ -232,7 +252,6 @@ class HttpClient {
   }
 
   // Método Principal de Requisição
-
   private async makeRequest<T>(
     endpoint: string,
     config: RequestConfig = {}
@@ -242,8 +261,32 @@ class HttpClient {
       headers = {},
       body,
       timeout = this.timeout,
-      retries = this.retries
+      retries = this.retries,
+      requireAuth = true
     } = config;
+
+    if (requireAuth && !this.isAuthenticated()) {
+      console.error('[HttpClient] Requisição bloqueada: usuário não autenticado');
+
+      if (this.onUnauthorized) {
+        this.onUnauthorized();
+      }
+
+      return {
+        success: false,
+        status: 401,
+        error: 'Usuário não autenticado',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    //  MIDDLEWARE: Garantir que o token está no header
+    if (requireAuth) {
+      const token = this.getToken();
+      if (token && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
 
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
 
@@ -255,7 +298,8 @@ class HttpClient {
     if (process.env.NODE_ENV === 'development') {
       console.log(`[HttpClient] ${method} ${url}`, {
         headers: this.sanitizeHeadersForLog(requestHeaders),
-        body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined
+        body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+        requireAuth
       });
     }
 
@@ -285,8 +329,7 @@ class HttpClient {
         const response = await fetch(url, requestConfig);
         clearTimeout(timeoutId);
 
-        // Tratar token expirado
-        if (response.status === 401) {
+        if (response.status === 401 && requireAuth) {
           console.warn('[HttpClient] Token expirado ou inválido (401)');
           return this.handleUnauthorized(config, endpoint);
         }
@@ -297,22 +340,13 @@ class HttpClient {
         try {
           if (contentType && contentType.includes('application/json')) {
             responseData = await response.json();
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[HttpClient] JSON parseado automaticamente`);
-            }
           } else {
             const textData = await response.text();
 
             try {
               responseData = JSON.parse(textData);
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[HttpClient] JSON parseado manualmente de texto`);
-              }
             } catch (jsonError) {
               responseData = textData;
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[HttpClient] Mantendo como texto`);
-              }
             }
           }
         } catch (readError) {
@@ -339,7 +373,6 @@ class HttpClient {
           timestamp: new Date().toISOString()
         };
 
-        // Retry apenas para erros de servidor (5xx), não para erros do cliente (4xx)
         if (!response.ok && response.status >= 500 && attempt < retries) {
           lastError = new Error(`HTTP ${response.status}: ${apiResponse.error}`);
           await this.delay(1000 * Math.pow(2, attempt));
@@ -375,8 +408,6 @@ class HttpClient {
       timestamp: new Date().toISOString()
     };
   }
-
-  // Métodos Utilitários
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -425,9 +456,11 @@ class HttpClient {
     return sanitized;
   }
 
-  // Métodos de Conveniência
-
-  async get<T>(endpoint: string, params?: Record<string, any>, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
+  async get<T>(
+    endpoint: string,
+    params?: Record<string, any>,
+    config?: Omit<RequestConfig, 'method' | 'body'>
+  ): Promise<ApiResponse<T>> {
     let url = endpoint;
     if (params && Object.keys(params).length > 0) {
       const searchParams = new URLSearchParams();
@@ -439,26 +472,62 @@ class HttpClient {
       url += `?${searchParams.toString()}`;
     }
 
-    return this.makeRequest<T>(url, { ...config, method: 'GET' });
+    return this.makeRequest<T>(url, {
+      ...config,
+      method: 'GET',
+      requireAuth: config?.requireAuth ?? true
+    });
   }
 
-  async post<T>(endpoint: string, body?: any, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
-    return this.makeRequest<T>(endpoint, { ...config, method: 'POST', body });
+  async post<T>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<RequestConfig, 'method'>
+  ): Promise<ApiResponse<T>> {
+    return this.makeRequest<T>(endpoint, {
+      ...config,
+      method: 'POST',
+      body,
+      requireAuth: config?.requireAuth ?? true
+    });
   }
 
-  async put<T>(endpoint: string, body?: any, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
-    return this.makeRequest<T>(endpoint, { ...config, method: 'PUT', body });
+  async put<T>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<RequestConfig, 'method'>
+  ): Promise<ApiResponse<T>> {
+    return this.makeRequest<T>(endpoint, {
+      ...config,
+      method: 'PUT',
+      body,
+      requireAuth: config?.requireAuth ?? true
+    });
   }
 
-  async patch<T>(endpoint: string, body?: any, config?: Omit<RequestConfig, 'method'>): Promise<ApiResponse<T>> {
-    return this.makeRequest<T>(endpoint, { ...config, method: 'PATCH', body });
+  async patch<T>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<RequestConfig, 'method'>
+  ): Promise<ApiResponse<T>> {
+    return this.makeRequest<T>(endpoint, {
+      ...config,
+      method: 'PATCH',
+      body,
+      requireAuth: config?.requireAuth ?? true
+    });
   }
 
-  async delete<T>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
-    return this.makeRequest<T>(endpoint, { ...config, method: 'DELETE' });
+  async delete<T>(
+    endpoint: string,
+    config?: Omit<RequestConfig, 'method' | 'body'>
+  ): Promise<ApiResponse<T>> {
+    return this.makeRequest<T>(endpoint, {
+      ...config,
+      method: 'DELETE',
+      requireAuth: config?.requireAuth ?? true
+    });
   }
-
-  // Métodos Especiais
 
   async upload<T>(
     endpoint: string,
@@ -478,6 +547,7 @@ class HttpClient {
       ...config,
       method: 'POST',
       body: formData,
+      requireAuth: config?.requireAuth ?? true
     });
   }
 
@@ -533,7 +603,11 @@ class HttpClient {
     const startTime = Date.now();
 
     try {
-      const response = await this.get('/health', undefined, { timeout: 5000, retries: 0 });
+      const response = await this.get('/health', undefined, {
+        timeout: 5000,
+        retries: 0,
+        requireAuth: false
+      });
       const latency = Date.now() - startTime;
 
       return {

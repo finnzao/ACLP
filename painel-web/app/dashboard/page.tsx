@@ -36,7 +36,6 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { useResumoSistema } from '@/hooks/useAPI';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface DashboardStats {
@@ -73,11 +72,10 @@ interface ProximoComparecimento {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
 
   // Hook principal do resumo do sistema
   const { resumo, loading: loadingResumo, error: errorResumo, refetch } = useResumoSistema();
-
+  console.log(resumo)
   // Estados locais
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,

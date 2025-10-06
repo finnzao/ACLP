@@ -26,10 +26,8 @@ import {
   ResumoSistemaResponse,
   ListarCustodiadosResponse
 } from '@/types/api';
-
 // Hook para custodiados
 export function useCustodiados() {
-  // ✅ Tipo correto: ListarCustodiadosResponse (que é ApiResponse<CustodiadoResponse[]>)
   const [custodiados, setCustodiados] = useState<ListarCustodiadosResponse | CustodiadoResponse[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +53,7 @@ export function useCustodiados() {
             setError(response.message || 'Erro ao carregar dados');
             setCustodiados(null);
           }
-        } 
+        }
         // Se for array direto (fallback)
         else if (Array.isArray(response)) {
           console.log('[useCustodiados] Array direto recebido:', response.length);
@@ -80,28 +78,28 @@ export function useCustodiados() {
     try {
       setLoading(true);
       console.log('[useCustodiados] Criando Custodiado:', data);
-      
+
       const result = await custodiadosService.criar(data);
-      
+
       if (result.success) {
         // Atualizar lista automaticamente após criação
         await fetchCustodiados();
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: result.message || 'Custodiado criado com sucesso',
-          data: result.data 
+          data: result.data
         };
       }
-      
-      return { 
-        success: false, 
-        message: result.message || 'Erro ao criar Custodiado' 
+
+      return {
+        success: false,
+        message: result.message || 'Erro ao criar Custodiado'
       };
     } catch (error: any) {
       console.error('[useCustodiados] Erro ao criar Custodiado:', error);
-      return { 
-        success: false, 
-        message: error.message || 'Erro interno do sistema' 
+      return {
+        success: false,
+        message: error.message || 'Erro interno do sistema'
       };
     } finally {
       setLoading(false);
@@ -113,28 +111,28 @@ export function useCustodiados() {
     try {
       setLoading(true);
       console.log(`[useCustodiados] Atualizando Custodiado ID: ${id}`, data);
-      
+
       const result = await custodiadosService.atualizar(id, data);
-      
+
       if (result.success) {
         // Atualizar lista automaticamente após atualização
         await fetchCustodiados();
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: result.message || 'Custodiado atualizado com sucesso',
-          data: result.data 
+          data: result.data
         };
       }
-      
-      return { 
-        success: false, 
-        message: result.message || 'Erro ao atualizar Custodiado' 
+
+      return {
+        success: false,
+        message: result.message || 'Erro ao atualizar Custodiado'
       };
     } catch (error: any) {
       console.error('[useCustodiados] Erro ao atualizar Custodiado:', error);
-      return { 
-        success: false, 
-        message: error.message || 'Erro interno do sistema' 
+      return {
+        success: false,
+        message: error.message || 'Erro interno do sistema'
       };
     } finally {
       setLoading(false);
@@ -147,25 +145,25 @@ export function useCustodiados() {
       setLoading(true);
 
       const result = await custodiadosService.excluir(id);
-      
+
       if (result.success) {
         // Atualizar lista automaticamente após exclusão
         await fetchCustodiados();
-        return { 
-          success: true, 
-          message: result.message || 'Custodiado excluído com sucesso' 
+        return {
+          success: true,
+          message: result.message || 'Custodiado excluído com sucesso'
         };
       }
-      
-      return { 
-        success: false, 
-        message: result.message || 'Erro ao excluir Custodiado' 
+
+      return {
+        success: false,
+        message: result.message || 'Erro ao excluir Custodiado'
       };
     } catch (error: any) {
       console.error('[useCustodiados] Erro ao excluir Custodiado:', error);
-      return { 
-        success: false, 
-        message: error.message || 'Erro interno do sistema' 
+      return {
+        success: false,
+        message: error.message || 'Erro interno do sistema'
       };
     } finally {
       setLoading(false);
@@ -260,9 +258,7 @@ export function useCustodiados() {
   };
 }
 
-// ===========================
 // Hook para Comparecimentos
-// ===========================
 export function useComparecimentos() {
   const [comparecimentos, setComparecimentos] = useState<ComparecimentoResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -334,9 +330,7 @@ export function useComparecimentos() {
   };
 }
 
-// ===========================
 // Hook para Usuários
-// ===========================
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState<UsuarioResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -398,9 +392,7 @@ export function useUsuarios() {
   };
 }
 
-// ===========================
 // Hook para Estatísticas
-// ===========================
 export function useEstatisticas() {
   const [stats, setStats] = useState<EstatisticasComparecimentoResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -433,17 +425,16 @@ export function useEstatisticas() {
   };
 }
 
-// ===========================
 // Hook para Resumo do Sistema
-// ===========================
 export function useResumoSistema() {
   const [resumo, setResumo] = useState<ResumoSistemaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const carregarResumo = useCallback(async () => {
+    
+
     try {
-      setLoading(true);
       setError(null);
       const data = await comparecimentosService.obterResumoSistema();
       setResumo(data);
@@ -468,9 +459,7 @@ export function useResumoSistema() {
   };
 }
 
-// ===========================
 // Hook para Status
-// ===========================
 export function useStatus() {
   const verificarInadimplentes = useCallback(async () => {
     try {
@@ -496,9 +485,7 @@ export function useStatus() {
   };
 }
 
-// ===========================
 // Hook para Setup
-// ===========================
 export function useSetup() {
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -542,9 +529,7 @@ export function useSetup() {
   };
 }
 
-// ===========================
 // Hook para Health Check
-// ===========================
 export function useHealthCheck() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfoResponse | null>(null);
@@ -576,9 +561,7 @@ export function useHealthCheck() {
   };
 }
 
-// ===========================
 // Hook para Busca Geral
-// ===========================
 export function useBusca() {
   const [resultados, setResultados] = useState<CustodiadoResponse[]>([]);
   const [loading, setLoading] = useState(false);
