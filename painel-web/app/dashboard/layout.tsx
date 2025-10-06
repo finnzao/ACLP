@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { FiHome, FiPlus, FiSettings, FiGrid, FiMenu, FiX } from 'react-icons/fi';
+import { FiHome, FiPlus, FiSettings, FiGrid, FiMenu, FiX, FiClock } from 'react-icons/fi';
 
 const menuItems = [
   { label: 'Dashboard', path: '/dashboard', icon: FiHome },
   { label: 'Cadastrar', path: '/dashboard/registrar', icon: FiPlus },
   { label: 'Geral', path: '/dashboard/geral', icon: FiGrid },
+  { label: 'Histórico', path: '/dashboard/historicoComparecimento', icon: FiClock },
   { label: 'Configurações', path: '/dashboard/configuracoes', icon: FiSettings },
 ];
 
@@ -18,7 +19,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detectar se é mobile
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -30,12 +30,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fechar menu ao mudar de rota
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
-  // Prevenir scroll quando menu estiver aberto
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -50,13 +48,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background text-text-base">
-      {/* Menu Desktop */}
       <aside className={cn(
         "hidden md:block w-20 hover:w-64 bg-primary-dark text-white transition-all duration-200 overflow-hidden group",
         "fixed left-0 top-0 h-full z-30"
       )}>
         <div className="flex items-center justify-center h-16 text-lg font-bold border-b border-border">
-          <span >SCC</span>
+          <span>SCC</span>
         </div>
         <nav className="mt-4 space-y-1">
           {menuItems.map(({ label, path, icon: Icon }) => {
@@ -86,7 +83,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      {/* Header Mobile */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-primary-dark text-white z-40 shadow-lg">
         <div className="flex items-center justify-between h-full px-4">
           <h1 className="text-lg font-bold">SCC</h1>
@@ -100,7 +96,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* Menu Mobile - Overlay */}
       {isMobile && (
         <div
           className={cn(
@@ -111,7 +106,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         />
       )}
 
-      {/* Menu Mobile - Sidebar */}
       <aside
         className={cn(
           "fixed left-0 top-0 h-full w-64 bg-primary-dark text-white z-40 md:hidden",
@@ -156,13 +150,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        {/* Informações do usuário no menu mobile */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
-          <p className="text-xs text-white/60">© 2024 TJBA</p>
+          <p className="text-xs text-white/60">2024 TJBA</p>
         </div>
       </aside>
 
-      {/* Conteúdo Principal */}
       <main className={cn(
         "flex-1 transition-all duration-200",
         "pt-16 md:pt-0",

@@ -27,10 +27,8 @@ export enum EstadoBrasil {
   SE = 'SE', TO = 'TO'
 }
 
-
 // DTOs - Data Transfer Objects
 
-// Endereço (usado em vários DTOs)
 export interface EnderecoDTO {
   cep: string;
   logradouro: string;
@@ -41,7 +39,6 @@ export interface EnderecoDTO {
   estado: string;
 }
 
-// Custodiado DTO (antigo Pessoa)
 export interface CustodiadoDTO {
   nome: string;
   cpf?: string;
@@ -54,7 +51,6 @@ export interface CustodiadoDTO {
   periodicidade: number;
   dataComparecimentoInicial: string;
   observacoes?: string;
-  // Campos de endereço na raiz (como esperado pelo backend)
   cep: string;
   logradouro: string;
   numero?: string;
@@ -64,7 +60,6 @@ export interface CustodiadoDTO {
   estado: string;
 }
 
-// Comparecimento DTO
 export interface ComparecimentoDTO {
   custodiadoId: number;
   dataComparecimento: string;
@@ -78,7 +73,6 @@ export interface ComparecimentoDTO {
   novoEndereco?: EnderecoDTO;
 }
 
-// Usuário DTO
 export interface UsuarioDTO {
   nome: string;
   email: string;
@@ -89,7 +83,6 @@ export interface UsuarioDTO {
   ativo?: boolean;
 }
 
-// Setup Admin DTO
 export interface SetupAdminDTO {
   nome: string;
   email: string;
@@ -99,7 +92,6 @@ export interface SetupAdminDTO {
   telefone?: string;
 }
 
-// Verificação Email DTOs
 export interface SolicitarCodigoDTO {
   email: string;
   tipoUsuario?: TipoUsuario | string;
@@ -114,50 +106,46 @@ export interface ReenviarCodigoDTO {
   email: string;
 }
 
-
 // Response Types
 
-
-// Resposta base da API
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
   data?: T;
   timestamp?: string;
+  status?: number;
+  error?: string;
 }
 
-// Custodiado Response
 export interface CustodiadoResponse {
-    id: number;
-    nome: string;
-    cpf?: string;
-    rg?: string;
-    contato: string;
-    processo: string;
-    vara: string;
-    comarca: string;
-    dataDecisao: string;
-    periodicidade: number;
-    periodicidadeDescricao: string;
-    dataComparecimentoInicial: string;
-    status: StatusComparecimento | string;
-    ultimoComparecimento: string;
-    proximoComparecimento: string;
-    diasAtraso: number;
-    observacoes?: string;
-    endereco: EnderecoResponse;
-    criadoEm: string;
-    atualizadoEm: string | null;
-    identificacao: string;
-    inadimplente: boolean;
-    comparecimentoHoje: boolean;  
-    // Campos calculados opcionais (compatibilidade)
-    atrasado?: boolean;
-    enderecoCompleto?: string;
-    cidadeEstado?: string;
+  id: number;
+  nome: string;
+  cpf?: string;
+  rg?: string;
+  contato: string;
+  processo: string;
+  vara: string;
+  comarca: string;
+  dataDecisao: string;
+  periodicidade: number;
+  periodicidadeDescricao: string;
+  dataComparecimentoInicial: string;
+  status: StatusComparecimento | string;
+  ultimoComparecimento: string;
+  proximoComparecimento: string;
+  diasAtraso: number;
+  observacoes?: string;
+  endereco: EnderecoResponse;
+  criadoEm: string;
+  atualizadoEm: string | null;
+  identificacao: string;
+  inadimplente: boolean;
+  comparecimentoHoje: boolean;
+  atrasado?: boolean;
+  enderecoCompleto?: string;
+  cidadeEstado?: string;
 }
 
-// Lista de Custodiados Response
 export interface ListarCustodiadosResponse {
   success: boolean;
   message: string;
@@ -165,7 +153,7 @@ export interface ListarCustodiadosResponse {
   timestamp?: string;
   total?: number;
 }
-// Type Guard para validação
+
 export function isListarCustodiadosResponse(data: any): data is ListarCustodiadosResponse {
   return (
     data &&
@@ -189,10 +177,10 @@ export function isCustodiadoResponse(data: any): data is CustodiadoResponse {
   );
 }
 
-// Comparecimento Response
 export interface ComparecimentoResponse {
   id: number;
   custodiadoId: number;
+  custodiadoNome?: string;
   nomeCustodiado?: string;
   processoCustodiado?: string;
   dataComparecimento: string;
@@ -205,9 +193,24 @@ export interface ComparecimentoResponse {
   motivoMudancaEndereco?: string;
   criadoEm: string;
   atualizadoEm?: string;
+  version?: number;
 }
 
-// Endereço Completo (Response da API)
+export interface ListarComparecimentosParams {
+  page?: number;
+  size?: number;
+}
+
+export interface ListarComparecimentosResponse {
+  comparecimentos: ComparecimentoResponse[];
+  paginaAtual: number;
+  totalPaginas: number;
+  totalItens: number;
+  itensPorPagina: number;
+  temProxima?: boolean;
+  temAnterior?: boolean;
+}
+
 export interface EnderecoResponse {
   id: number;
   cep: string;
@@ -232,7 +235,6 @@ export interface EnderecoResponse {
   atualizadoEm: string | null;
 }
 
-// Histórico de Endereços Response
 export interface HistoricoEnderecoResponse {
   id: number;
   custodiadoId: number;
@@ -244,7 +246,6 @@ export interface HistoricoEnderecoResponse {
   criadoEm: string;
 }
 
-// Usuário Response
 export interface UsuarioResponse {
   id: number;
   nome: string;
@@ -255,9 +256,9 @@ export interface UsuarioResponse {
   ativo: boolean;
   criadoEm: string;
   ultimoLogin?: string;
+  atualizadoEm?: string;
 }
 
-// Estatísticas Responses
 export interface EstatisticasComparecimentoResponse {
   periodo?: string;
   totalComparecimentos: number;
@@ -265,8 +266,9 @@ export interface EstatisticasComparecimentoResponse {
   comparecimentosOnline: number;
   cadastrosIniciais: number;
   mudancasEndereco: number;
-  percentualPresencial: number;
-  percentualOnline: number;
+  mediaDiasEntreMudancas?: number;
+  percentualPresencial?: number;
+  percentualOnline?: number;
 }
 
 export interface ResumoSistemaResponse {
@@ -274,15 +276,19 @@ export interface ResumoSistemaResponse {
   custodiadosEmConformidade: number;
   custodiadosInadimplentes: number;
   comparecimentosHoje: number;
-  totalComparecimentos: number;
-  comparecimentosEsteMes: number;
-  totalMudancasEndereco: number;
-  enderecosAtivos: number;
-  custodiadosSemHistorico: number;
-  custodiadosSemEnderecoAtivo: number;
-  percentualConformidade: number;
-  percentualInadimplencia: number;
-  dataConsulta: string;
+  comparecimentosAtrasados?: number;
+  proximosComparecimentos7Dias?: number;
+  totalComparecimentos?: number;
+  totalComparecimentosRegistrados?: number;
+  comparecimentosEsteMes?: number;
+  totalMudancasEndereco?: number;
+  enderecosAtivos?: number;
+  custodiadosSemHistorico?: number;
+  custodiadosSemEnderecoAtivo?: number;
+  percentualConformidade?: number;
+  percentualInadimplencia?: number;
+  dataConsulta?: string;
+  ultimaAtualizacao?: string;
   analiseAtrasos?: {
     totalCustodiadosAtrasados: number;
     totalAtrasados30Dias: number;
@@ -290,7 +296,6 @@ export interface ResumoSistemaResponse {
     totalAtrasados90Dias: number;
     mediaDiasAtraso: number;
   };
-  // Para o dashboard
   totalPessoas?: number;
   emConformidade?: number;
   inadimplentes?: number;
@@ -308,7 +313,6 @@ export interface EstatisticasEnderecoResponse {
   estadosMaisFrequentes: Array<{ estado: string; total: number }>;
 }
 
-// Setup Responses
 export interface SetupStatusResponse {
   setupRequired?: boolean;
   setupCompleted?: boolean;
@@ -326,7 +330,6 @@ export interface VerificacaoStatusResponse {
   tentativasPermitidas?: number;
 }
 
-// Health & Info Responses
 export interface HealthResponse {
   status: 'UP' | 'DOWN';
   timestamp: string;
@@ -343,17 +346,23 @@ export interface AppInfoResponse {
   springBootVersion: string;
 }
 
-
-// Parâmetros de Consulta
-
+// Parametros de Consulta
 
 export interface PeriodoParams {
   inicio?: string;
   fim?: string;
+  dataInicio?: string;
+  dataFim?: string;
 }
 
 export interface BuscarParams {
   termo?: string;
+  nome?: string;
+  cpf?: string;
+  processo?: string;
+  status?: 'EM_CONFORMIDADE' | 'INADIMPLENTE';
+  dataInicio?: string;
+  dataFim?: string;
   page?: number;
   size?: number;
 }
@@ -364,10 +373,6 @@ export interface PaginationParams {
   sort?: string;
   direction?: 'ASC' | 'DESC';
 }
-
-
-// Status Response
-
 
 export interface StatusVerificacaoResponse {
   pessoasMarcadas: number;
@@ -381,4 +386,74 @@ export interface StatusEstatisticasResponse {
   inadimplentes: number;
   dataConsulta: string;
   percentualConformidade: number;
+}
+
+export interface LoginRequest {
+  email: string;
+  senha: string;
+  rememberMe?: boolean;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  usuario: {
+    id: number;
+    nome: string;
+    email: string;
+    tipo: string;
+    departamento?: string;
+    telefone?: string;
+    ultimoLogin?: string;
+  };
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface AlterarSenhaRequest {
+  senhaAtual: string;
+  novaSenha: string;
+  confirmaSenha: string;
+}
+
+export interface ConviteDTO {
+  nome: string;
+  email: string;
+  tipoUsuario: 'ADMIN' | 'USUARIO';
+  departamento?: string;
+  telefone?: string;
+  validadeHoras?: number;
+}
+
+export interface ConviteResponse {
+  id: number;
+  nome: string;
+  email: string;
+  tipoUsuario: string;
+  departamento?: string;
+  telefone?: string;
+  token: string;
+  dataExpiracao: string;
+  status: string;
+  criadoEm: string;
+  criadoPor: string;
+}
+
+export interface AceitarConviteRequest {
+  token: string;
+  senha: string;
+  confirmaSenha: string;
+}
+
+export interface ReenviarConviteRequest {
+  novaValidadeHoras?: number;
 }

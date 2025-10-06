@@ -190,6 +190,9 @@ class HttpClient {
       return Promise.reject(refreshError);
     }
   }
+  handleLogout() {
+    throw new Error("Method not implemented.");
+  }
 
  
 

@@ -37,7 +37,7 @@ interface CustodiadoFormatado {
   comarca: string;
   decisao: string;
   periodicidade: number;
-  status: 'em conformidade' | 'inadimplente'; // ✅ FIX: tipo específico
+  status: 'em conformidade' | 'inadimplente';
   primeiroComparecimento: string;
   dataComparecimentoInicial: string;
   ultimoComparecimento: string;

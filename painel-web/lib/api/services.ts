@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiClient, ApiResponse } from '../http/client';
+import { httpClient } from '@/lib/http/client';
 import { requestCache } from '@/lib/cache/requestCache';
 import type {
   CustodiadoResponse,
@@ -19,8 +20,23 @@ import type {
   AppInfoResponse,
   StatusVerificacaoResponse,
   StatusEstatisticasResponse,
-  ListarCustodiadosResponse
+  ListarCustodiadosResponse,
+  ListarComparecimentosResponse,
+  ListarComparecimentosParams
 } from '@/types/api';
+
+
+const ENDPOINTS = {
+  BASE: '/comparecimentos',
+  REGISTRAR: '/comparecimentos/registrar',
+  CUSTODIADO: (id: number) => `/comparecimentos/custodiado/${id}`,
+  PERIODO: '/comparecimentos/periodo',
+  HOJE: '/comparecimentos/hoje',
+  ESTATISTICAS: '/comparecimentos/estatisticas',
+  RESUMO: '/comparecimentos/resumo-sistema',
+  TODOS: '/comparecimentos/todos',
+  FILTRAR: '/comparecimentos/filtrar'
+} as const;
 
 export function initializeBackendApi() {
   console.log('[Services] API inicializada');
@@ -36,9 +52,7 @@ export function clearAuthHeaders() {
   console.log('[Services] Token de autenticação removido');
 }
 
-// ===========================
 // Custodiados Service
-// ===========================
 
 export const custodiadosService = {
   /**
@@ -466,117 +480,378 @@ export const custodiadosService = {
   }
 };
 
-// ===========================
 // Comparecimentos Service
-// ===========================
-
 export const comparecimentosService = {
+  /**
+   * Registrar um novo comparecimento
+   */
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
-    console.log('[ComparecimentosService] Registrando comparecimento:', data);
-    return await apiClient.post<ComparecimentoResponse>('/comparecimentos', data);
+    try {
+      console.log('[ComparecimentosService] Registrando comparecimento:', data);
+
+      const response = await httpClient.post<ComparecimentoResponse>(
+        ENDPOINTS.REGISTRAR,
+        data
+      );
+
+      console.log('[ComparecimentosService] Resposta do registro:', response);
+
+      return {
+        success: response.success,
+        message: response.message || (response.success ? 'Comparecimento registrado com sucesso' : 'Erro ao registrar comparecimento'),
+        data: response.data,
+        status: response.status,
+        timestamp: response.timestamp || new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao registrar:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao registrar comparecimento',
+        status: error.status || 500,
+        timestamp: new Date().toISOString()
+      };
+    }
   },
 
+  /**
+   * Buscar comparecimentos por custodiado
+   */
   async buscarPorCustodiado(custodiadoId: number): Promise<ComparecimentoResponse[]> {
-    console.log(`[ComparecimentosService] Buscando comparecimentos do custodiado: ${custodiadoId}`);
-    const response = await apiClient.get<ComparecimentoResponse[]>(`/comparecimentos/custodiado/${custodiadoId}`);
-    return response.success ? response.data || [] : [];
+    try {
+      console.log('[ComparecimentosService] Buscando comparecimentos do custodiado:', custodiadoId);
+
+      const response = await httpClient.get<ComparecimentoResponse[]>(
+        ENDPOINTS.CUSTODIADO(custodiadoId)
+      );
+
+      if (response.success && response.data) {
+        // Se a resposta tem estrutura ApiResponse
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+        // Se a resposta tem estrutura aninhada
+        if ((response.data as any).data && Array.isArray((response.data as any).data)) {
+          return (response.data as any).data;
+        }
+      }
+
+      console.warn('[ComparecimentosService] Resposta inesperada:', response);
+      return [];
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao buscar por custodiado:', error);
+      return [];
+    }
   },
 
+  /**
+   * Buscar comparecimentos por período
+   */
   async buscarPorPeriodo(params: PeriodoParams): Promise<ComparecimentoResponse[]> {
-    console.log('[ComparecimentosService] Buscando por período:', params);
-    const response = await apiClient.get<ComparecimentoResponse[]>('/comparecimentos/periodo', params);
-    return response.success ? response.data || [] : [];
+    try {
+      console.log('[ComparecimentosService] Buscando por período:', params);
+
+      const response = await httpClient.get<ComparecimentoResponse[]>(
+        ENDPOINTS.PERIODO,
+        params
+      );
+
+      if (response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+        if ((response.data as any).data && Array.isArray((response.data as any).data)) {
+          return (response.data as any).data;
+        }
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao buscar por período:', error);
+      return [];
+    }
   },
 
+  /**
+   * Buscar comparecimentos de hoje
+   */
   async comparecimentosHoje(): Promise<ComparecimentoResponse[]> {
-    console.log('[ComparecimentosService] Buscando comparecimentos de hoje');
-    const response = await apiClient.get<ComparecimentoResponse[]>('/comparecimentos/hoje');
-    return response.success ? response.data || [] : [];
+    try {
+      console.log('[ComparecimentosService] Buscando comparecimentos de hoje');
+
+      const response = await httpClient.get<ComparecimentoResponse[]>(ENDPOINTS.HOJE);
+
+      if (response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+        if ((response.data as any).data && Array.isArray((response.data as any).data)) {
+          return (response.data as any).data;
+        }
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao buscar comparecimentos de hoje:', error);
+      return [];
+    }
   },
 
+  /**
+   * Obter estatísticas de comparecimentos
+   */
   async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
-    console.log('[ComparecimentosService] Obtendo estatísticas:', params);
-    const response = await apiClient.get<EstatisticasComparecimentoResponse>('/comparecimentos/estatisticas', params);
+    try {
+      console.log('[ComparecimentosService] Obtendo estatísticas:', params);
 
-    if (!response.success) {
+      const response = await httpClient.get<EstatisticasComparecimentoResponse>(
+        ENDPOINTS.ESTATISTICAS,
+        params
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      }
+
+      // Retornar estrutura padrão em caso de erro
       return {
         totalComparecimentos: 0,
         comparecimentosPresenciais: 0,
         comparecimentosOnline: 0,
         cadastrosIniciais: 0,
         mudancasEndereco: 0,
-        percentualPresencial: 0,
-        percentualOnline: 0
+        mediaDiasEntreMudancas: 0,
+        periodo: params ? {
+          dataInicio: params.dataInicio,
+          dataFim: params.dataFim
+        } : undefined
+      };
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao obter estatísticas:', error);
+      return {
+        totalComparecimentos: 0,
+        comparecimentosPresenciais: 0,
+        comparecimentosOnline: 0,
+        cadastrosIniciais: 0,
+        mudancasEndereco: 0,
+        mediaDiasEntreMudancas: 0
       };
     }
-
-    return response.data || {
-      totalComparecimentos: 0,
-      comparecimentosPresenciais: 0,
-      comparecimentosOnline: 0,
-      cadastrosIniciais: 0,
-      mudancasEndereco: 0,
-      percentualPresencial: 0,
-      percentualOnline: 0
-    };
   },
 
+  /**
+   * Obter resumo do sistema
+   */
   async obterResumoSistema(): Promise<ResumoSistemaResponse> {
-    console.log('[ComparecimentosService] Obtendo resumo do sistema');
-    const response = await apiClient.get<any>('/comparecimentos/resumo/sistema');
-
-    let parsedData: any;
-
     try {
-      if (typeof response.data === 'string') {
-        console.log('[ComparecimentosService] Fazendo parse da string JSON...');
-        parsedData = JSON.parse(response.data);
-      } else {
-        parsedData = response.data;
+      console.log('[ComparecimentosService] Obtendo resumo do sistema');
+
+      const response = await httpClient.get<ResumoSistemaResponse>(ENDPOINTS.RESUMO);
+
+      if (response.success && response.data) {
+        return response.data;
       }
-    } catch (parseError) {
-      console.error('[ComparecimentosService] Erro no parse do JSON:', parseError);
-      parsedData = null;
+
+      // Retornar estrutura padrão
+      return {
+        totalCustodiados: 0,
+        custodiadosEmConformidade: 0,
+        custodiadosInadimplentes: 0,
+        comparecimentosHoje: 0,
+        comparecimentosAtrasados: 0,
+        proximosComparecimentos7Dias: 0,
+        totalComparecimentosRegistrados: 0,
+        ultimaAtualizacao: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao obter resumo:', error);
+      return {
+        totalCustodiados: 0,
+        custodiadosEmConformidade: 0,
+        custodiadosInadimplentes: 0,
+        comparecimentosHoje: 0,
+        comparecimentosAtrasados: 0,
+        proximosComparecimentos7Dias: 0,
+        totalComparecimentosRegistrados: 0,
+        ultimaAtualizacao: new Date().toISOString()
+      };
     }
+  },
 
-    const defaultResumo: ResumoSistemaResponse = {
-      totalCustodiados: 0,
-      custodiadosEmConformidade: 0,
-      custodiadosInadimplentes: 0,
-      comparecimentosHoje: 0,
-      totalComparecimentos: 0,
-      comparecimentosEsteMes: 0,
-      totalMudancasEndereco: 0,
-      enderecosAtivos: 0,
-      custodiadosSemHistorico: 0,
-      custodiadosSemEnderecoAtivo: 0,
-      percentualConformidade: 0,
-      percentualInadimplencia: 0,
-      dataConsulta: new Date().toISOString(),
-      totalPessoas: 0,
-      emConformidade: 0,
-      inadimplentes: 0,
-      atrasados: 0,
-      proximos7Dias: 0,
-      proximosComparecimentos: [],
-      alertasUrgentes: []
-    };
+  /**
+   * Listar TODOS os comparecimentos com paginação
+   * Endpoint: GET /api/comparecimentos/todos
+   */
+  async listarTodos(params?: ListarComparecimentosParams): Promise<ApiResponse<any>> {
+    try {
+      console.log('[ComparecimentosService] Listando todos os comparecimentos:', params);
 
-    if (!response.success || !parsedData) {
-      return defaultResumo;
+      const queryParams = {
+        page: params?.page ?? 0,
+        size: params?.size ?? 50
+      };
+
+      const response = await httpClient.get<any>(
+        ENDPOINTS.TODOS,
+        queryParams
+      );
+
+      console.log('[ComparecimentosService] Resposta de listarTodos:', response);
+
+      // ✅ CASO 1: Resposta com estrutura completa ApiResponse com data.comparecimentos
+      if (response.success && response.data) {
+        // Se tem a estrutura: { success, message, data: { comparecimentos: [], paginaAtual, ... } }
+        if (response.data.comparecimentos && Array.isArray(response.data.comparecimentos)) {
+          console.log('[ComparecimentosService] Estrutura paginada detectada');
+          return {
+            success: true,
+            message: response.message || 'Comparecimentos listados com sucesso',
+            data: {
+              comparecimentos: response.data.comparecimentos,
+              paginaAtual: response.data.paginaAtual ?? 0,
+              totalPaginas: response.data.totalPaginas ?? 1,
+              totalItens: response.data.totalItens ?? response.data.comparecimentos.length,
+              itensPorPagina: response.data.itensPorPagina ?? response.data.comparecimentos.length,
+              temProxima: response.data.temProxima ?? false,
+              temAnterior: response.data.temAnterior ?? false
+            },
+            status: response.status,
+            timestamp: response.timestamp || new Date().toISOString()
+          };
+        }
+
+        // ✅ CASO 2: Array direto em response.data
+        if (Array.isArray(response.data)) {
+          console.log('[ComparecimentosService] Array direto detectado');
+          return {
+            success: true,
+            message: 'Comparecimentos listados com sucesso',
+            data: {
+              comparecimentos: response.data,
+              paginaAtual: queryParams.page,
+              totalPaginas: 1,
+              totalItens: response.data.length,
+              itensPorPagina: response.data.length,
+              temProxima: false,
+              temAnterior: false
+            },
+            status: response.status,
+            timestamp: response.timestamp || new Date().toISOString()
+          };
+        }
+
+        // ✅ CASO 3: Estrutura aninhada (response.data.data.comparecimentos)
+        if (response.data.data && response.data.data.comparecimentos) {
+          console.log('[ComparecimentosService] Estrutura aninhada detectada');
+          const nested = response.data.data;
+          return {
+            success: true,
+            message: response.message || 'Comparecimentos listados com sucesso',
+            data: {
+              comparecimentos: nested.comparecimentos,
+              paginaAtual: nested.paginaAtual ?? 0,
+              totalPaginas: nested.totalPaginas ?? 1,
+              totalItens: nested.totalItens ?? nested.comparecimentos.length,
+              itensPorPagina: nested.itensPorPagina ?? nested.comparecimentos.length,
+              temProxima: nested.temProxima ?? false,
+              temAnterior: nested.temAnterior ?? false
+            },
+            status: response.status,
+            timestamp: response.timestamp || new Date().toISOString()
+          };
+        }
+      }
+
+      console.warn('[ComparecimentosService] Estrutura de resposta não reconhecida');
+      return {
+        success: false,
+        message: response.message || 'Erro ao listar comparecimentos',
+        status: response.status || 500,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao listar todos:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao listar comparecimentos',
+        status: error.status || 500,
+        timestamp: new Date().toISOString()
+      };
     }
+  },
 
-    if (parsedData.success && parsedData.data) {
-      parsedData = parsedData.data;
+  /**
+   * Filtrar comparecimentos com múltiplos critérios
+   * Endpoint: GET /api/comparecimentos/filtrar
+   */
+  async filtrar(params: {
+    dataInicio?: string;
+    dataFim?: string;
+    tipoValidacao?: 'PRESENCIAL' | 'ONLINE' | 'CADASTRO_INICIAL';
+    page?: number;
+    size?: number;
+  }): Promise<ApiResponse<ListarComparecimentosResponse>> {
+    try {
+      console.log('[ComparecimentosService] Filtrando comparecimentos:', params);
+
+      const response = await httpClient.get<any>(
+        ENDPOINTS.FILTRAR,
+        params
+      );
+
+      console.log('[ComparecimentosService] Resposta de filtrar:', response);
+
+      if (response.success && response.data) {
+        // Se a resposta já tem a estrutura esperada
+        if (response.data.comparecimentos) {
+          return {
+            success: true,
+            message: response.message || 'Comparecimentos filtrados com sucesso',
+            data: response.data,
+            status: response.status,
+            timestamp: response.timestamp || new Date().toISOString()
+          };
+        }
+
+        // Se response.data é um array direto
+        if (Array.isArray(response.data)) {
+          return {
+            success: true,
+            message: 'Comparecimentos filtrados com sucesso',
+            data: {
+              comparecimentos: response.data,
+              paginaAtual: params?.page || 0,
+              totalPaginas: 1,
+              totalItens: response.data.length,
+              itensPorPagina: response.data.length,
+              temProxima: false,
+              temAnterior: false
+            },
+            status: response.status,
+            timestamp: response.timestamp || new Date().toISOString()
+          };
+        }
+      }
+
+      return {
+        success: false,
+        message: response.message || 'Erro ao filtrar comparecimentos',
+        status: response.status || 500,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('[ComparecimentosService] Erro ao filtrar:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao filtrar comparecimentos',
+        status: error.status || 500,
+        timestamp: new Date().toISOString()
+      };
     }
-
-    return parsedData || defaultResumo;
   }
 };
 
-// ===========================
 // Usuários Service
-// ===========================
 
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
@@ -596,9 +871,7 @@ export const usuariosService = {
   }
 };
 
-// ===========================
 // Interfaces de Auth
-// ===========================
 
 export interface LoginRequest {
   email: string;
@@ -704,9 +977,7 @@ export interface ReenviarConviteDTO {
   mensagemPersonalizada?: string;
 }
 
-// ===========================
 // Convites Service
-// ===========================
 
 export const convitesService = {
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
@@ -749,9 +1020,7 @@ export const convitesService = {
   }
 };
 
-// ===========================
 // Auth Service
-// ===========================
 
 export const authService = {
   async login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
@@ -983,9 +1252,7 @@ export const authService = {
   }
 };
 
-// ===========================
 // Status Service
-// ===========================
 
 export const statusService = {
   async verificarInadimplentes(): Promise<ApiResponse<StatusVerificacaoResponse>> {
@@ -1000,9 +1267,7 @@ export const statusService = {
   }
 };
 
-// ===========================
 // Setup Service
-// ===========================
 
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
@@ -1023,9 +1288,7 @@ export const setupService = {
   }
 };
 
-// ===========================
 // Test Service
-// ===========================
 
 export const testService = {
   async health(): Promise<HealthResponse> {

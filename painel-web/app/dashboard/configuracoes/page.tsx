@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { cn } from '@/lib/utils/cn';
 import { InputGroup } from '@/components/InputGroup';
 import { useAuth, usePermissions } from '@/contexts/AuthContext';
 import { useUserManagement } from '@/hooks/useUserManagement';
@@ -16,7 +15,6 @@ import {
   LogOut,
   Check,
   Loader2,
-  Shield,
   AlertCircle,
   CheckCircle,
   Mail,
@@ -145,15 +143,50 @@ export default function ConfiguracoesPage() {
     if (activeTab === 'convites' && isAdmin()) {
       carregarConvites();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const carregarConvites = async () => {
     setLoadingConvites(true);
     try {
+      console.log('[ConfiguracoesPage] Iniciando carregamento de convites');
+      
       const result = await listarConvites();
-      if (result.success && result.data) {
-        setConvites(result.data);
+      
+      console.log('[ConfiguracoesPage] Resultado completo:', result);
+      
+      if (result && result.success) {
+        if (Array.isArray(result.data)) {
+          console.log('[ConfiguracoesPage] Convites recebidos:', result.data.length);
+          setConvites(result.data);
+        } 
+        else if (result.data && typeof result.data === 'object') {
+          if (Array.isArray(result.data.data)) {
+            console.log('[ConfiguracoesPage] Array encontrado em result.data.data');
+            setConvites(result.data.data);
+          } else {
+            console.warn('[ConfiguracoesPage] result.data não é array:', result.data);
+            setConvites([]);
+          }
+        } 
+        else {
+          console.warn('[ConfiguracoesPage] result.data está vazio ou inválido');
+          setConvites([]);
+        }
+      } else {
+        console.warn('[ConfiguracoesPage] Resultado sem sucesso:', result);
+        setConvites([]);
       }
+    } catch (error) {
+      console.error('[ConfiguracoesPage] Erro ao carregar convites:', error);
+      setConvites([]);
+      
+      showToast({
+        type: 'error',
+        title: 'Erro ao carregar convites',
+        message: 'Não foi possível carregar a lista de convites',
+        duration: 3000
+      });
     } finally {
       setLoadingConvites(false);
     }
@@ -205,7 +238,7 @@ export default function ConfiguracoesPage() {
     const result = await alterarSenha({
       senhaAtual,
       novaSenha,
-      confirmarSenha
+      confirmaSenha: confirmarSenha  // ✅ CORRIGIDO: confirmaSenha ao invés de confirmarSenha
     });
 
     if (result.success) {
@@ -326,12 +359,11 @@ export default function ConfiguracoesPage() {
       <div className="flex border-b border-gray-200 mb-6">
         <button
           onClick={() => setActiveTab('perfil')}
-          className={cn(
-            'px-4 py-2 font-medium transition-colors relative',
+          className={`px-4 py-2 font-medium transition-colors relative ${
             activeTab === 'perfil'
               ? 'text-primary border-b-2 border-primary'
               : 'text-gray-500 hover:text-gray-700'
-          )}
+          }`}
         >
           <div className="flex items-center gap-2">
             <User className="w-4 h-4" />
@@ -341,15 +373,14 @@ export default function ConfiguracoesPage() {
 
         <button
           onClick={() => setActiveTab('seguranca')}
-          className={cn(
-            'px-4 py-2 font-medium transition-colors relative',
+          className={`px-4 py-2 font-medium transition-colors relative ${
             activeTab === 'seguranca'
               ? 'text-primary border-b-2 border-primary'
               : 'text-gray-500 hover:text-gray-700'
-          )}
+          }`}
         >
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
             <span>Segurança</span>
           </div>
         </button>
@@ -357,12 +388,11 @@ export default function ConfiguracoesPage() {
         {isAdmin() && (
           <button
             onClick={() => setActiveTab('convites')}
-            className={cn(
-              'px-4 py-2 font-medium transition-colors relative',
+            className={`px-4 py-2 font-medium transition-colors relative ${
               activeTab === 'convites'
                 ? 'text-primary border-b-2 border-primary'
                 : 'text-gray-500 hover:text-gray-700'
-            )}
+            }`}
           >
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
@@ -667,7 +697,7 @@ export default function ConfiguracoesPage() {
               <div className="flex justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
-            ) : convites.length === 0 ? (
+            ) : !Array.isArray(convites) || convites.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Mail className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Nenhum convite enviado ainda</p>
