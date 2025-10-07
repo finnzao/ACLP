@@ -40,6 +40,19 @@ class HttpClient {
     reject: (reason?: any) => void;
   }> = [];
 
+  // Lista de rotas públicas que não precisam de autenticação
+  private publicRoutes = [
+    '/auth/login',
+    '/auth/refresh',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/setup',
+    '/usuarios/convites/validar',
+    '/usuarios/convites/ativar',
+    '/health',
+    '/actuator'
+  ];
+
   constructor(config?: ClientConfig) {
     this.baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -51,19 +64,19 @@ class HttpClient {
 
     this.timeout = config?.timeout || 30000;
     this.retries = config?.retries || 3;
-    this.onUnauthorized = config?.onUnauthorized; //  NOVO
+    this.onUnauthorized = config?.onUnauthorized;
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[HttpClient] Inicializado com baseURL:', this.baseURL);
     }
   }
 
-  //  NOVO: Método para configurar callback de unauthorized
+  // Configurar callback de unauthorized
   setUnauthorizedHandler(handler: () => void) {
     this.onUnauthorized = handler;
   }
 
-  //  NOVO: Verificar se está autenticado
+  // Verificar se está autenticado
   private isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false;
 
@@ -71,10 +84,15 @@ class HttpClient {
     return !!token;
   }
 
-  //  NOVO: Obter token
+  // Obter token
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('access-token');
+  }
+
+  // Verificar se é rota pública
+  private isPublicRoute(endpoint: string): boolean {
+    return this.publicRoutes.some(route => endpoint.includes(route));
   }
 
   setAuthToken(token: string) {
@@ -165,7 +183,7 @@ class HttpClient {
     try {
       console.log('[HttpClient] Tentando renovar token...');
 
-      const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -265,7 +283,11 @@ class HttpClient {
       requireAuth = true
     } = config;
 
-    if (requireAuth && !this.isAuthenticated()) {
+    // Verificar se é rota pública
+    const isPublic = this.isPublicRoute(endpoint);
+
+    // Só bloquear se não for rota pública E requireAuth for true
+    if (!isPublic && requireAuth && !this.isAuthenticated()) {
       console.error('[HttpClient] Requisição bloqueada: usuário não autenticado');
 
       if (this.onUnauthorized) {
@@ -280,8 +302,8 @@ class HttpClient {
       };
     }
 
-    //  MIDDLEWARE: Garantir que o token está no header
-    if (requireAuth) {
+    // Só adicionar token se não for rota pública E requireAuth for true
+    if (!isPublic && requireAuth) {
       const token = this.getToken();
       if (token && !headers['Authorization']) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -299,7 +321,8 @@ class HttpClient {
       console.log(`[HttpClient] ${method} ${url}`, {
         headers: this.sanitizeHeadersForLog(requestHeaders),
         body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
-        requireAuth
+        requireAuth,
+        isPublic
       });
     }
 
@@ -329,7 +352,7 @@ class HttpClient {
         const response = await fetch(url, requestConfig);
         clearTimeout(timeoutId);
 
-        if (response.status === 401 && requireAuth) {
+        if (response.status === 401 && requireAuth && !isPublic) {
           console.warn('[HttpClient] Token expirado ou inválido (401)');
           return this.handleUnauthorized(config, endpoint);
         }

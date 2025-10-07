@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient } from '@/lib/http/client';
 
-// ===========================
 // Interfaces
-// ===========================
 
 interface LoginRequest {
   email: string;
@@ -95,51 +93,35 @@ interface TokenPayload {
   iss: string;
 }
 
-// ===========================
 // Helper para extrair dados
-// ===========================
-
-/**
- * Extrai dados de uma resposta que pode vir em diferentes formatos
- */
 function extractResponseData<T>(response: any): T | null {
-  // Se já tem os dados diretamente
   if (response && typeof response === 'object') {
-    // Verificar se tem success e data
     if ('data' in response && response.data) {
       return response.data as T;
     }
-    // Se a resposta já é o dado esperado
     return response as T;
   }
   return null;
 }
 
-/**
- * Verifica se a resposta indica sucesso
- */
+// Verificar se a resposta indica sucesso
 function isSuccessResponse(response: any): boolean {
   if (!response) return false;
   
-  // Se tem propriedade success
   if ('success' in response) {
     return response.success === true;
   }
   
-  // Se tem data com success
   if ('data' in response && response.data && typeof response.data === 'object') {
     if ('success' in response.data) {
       return response.data.success === true;
     }
   }
   
-  // Se chegou aqui e tem dados, considerar sucesso
   return true;
 }
 
-// ===========================
 // AuthService Class
-// ===========================
 
 class AuthService {
   private readonly ACCESS_TOKEN_KEY = 'access-token';
@@ -158,11 +140,12 @@ class AuthService {
         email: credentials.email,
         senha: credentials.senha,
         rememberMe: credentials.rememberMe
+      }, {
+        requireAuth: false
       });
 
       console.log('[AuthService] Resposta do login:', response);
 
-      // Verificar se foi sucesso
       if (!isSuccessResponse(response)) {
         return {
           success: false,
@@ -170,7 +153,6 @@ class AuthService {
         };
       }
 
-      // Extrair dados da resposta
       const loginData = extractResponseData<LoginResponseData>(response);
       
       if (!loginData) {
@@ -181,7 +163,6 @@ class AuthService {
         };
       }
 
-      // Verificar se tem os campos obrigatórios
       if (!loginData.accessToken || !loginData.refreshToken || !loginData.usuario) {
         console.error('[AuthService] Resposta sem campos obrigatórios:', loginData);
         return {
@@ -194,12 +175,10 @@ class AuthService {
       console.log('[AuthService] AccessToken:', loginData.accessToken.substring(0, 20) + '...');
       console.log('[AuthService] RefreshToken:', loginData.refreshToken);
       
-      // Salvar tokens
       this.setAccessToken(loginData.accessToken);
       this.setRefreshToken(loginData.refreshToken);
       this.setUserData(loginData.usuario);
       
-      // Configurar header de autenticação
       httpClient.setAuthToken(loginData.accessToken);
       
       console.log('[AuthService] Tokens salvos com sucesso');
@@ -237,16 +216,16 @@ class AuthService {
     console.log('[AuthService] Renovando token');
     
     try {
-      const response = await httpClient.post<any>('/auth/refresh', request);
+      const response = await httpClient.post<any>('/auth/refresh', request, {
+        requireAuth: false
+      });
 
       console.log('[AuthService] Resposta do refresh:', response);
 
-      // Verificar se foi sucesso
       if (!isSuccessResponse(response)) {
         return { success: false };
       }
 
-      // Extrair dados
       const refreshData = extractResponseData<RefreshTokenResponseData>(response);
       
       if (!refreshData || !refreshData.accessToken || !refreshData.refreshToken) {
@@ -291,7 +270,6 @@ class AuthService {
     try {
       const response = await httpClient.get<any>('/auth/me');
       
-      // Extrair dados do perfil
       const profileData = extractResponseData<GetProfileResponseData>(response);
       
       if (!profileData) {
@@ -327,9 +305,7 @@ class AuthService {
     }
   }
 
-  // ===========================
   // Métodos de armazenamento
-  // ===========================
 
   setAccessToken(token: string): void {
     if (typeof window !== 'undefined') {
@@ -384,9 +360,7 @@ class AuthService {
     httpClient.clearAuthToken();
   }
 
-  // ===========================
   // Métodos utilitários
-  // ===========================
 
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
@@ -439,9 +413,7 @@ class AuthService {
   }
 }
 
-// ===========================
 // Exportações
-// ===========================
 
 export const authService = new AuthService();
 

@@ -1234,7 +1234,11 @@ export const statusService = {
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
     console.log('[SetupService] Verificando status do setup');
-    const response = await apiClient.get<SetupStatusResponse>('/setup/status');
+    const response = await apiClient.get<SetupStatusResponse>(
+      '/setup/status',
+      undefined,
+      { requireAuth: false }
+    );
 
     return response.data || {
       setupRequired: true,
@@ -1246,7 +1250,9 @@ export const setupService = {
 
   async createAdmin(data: SetupAdminDTO): Promise<ApiResponse<any>> {
     console.log('[SetupService] Criando administrador inicial');
-    return await apiClient.post('/setup/admin', data);
+    return await apiClient.post('/setup/admin', data, {
+      requireAuth: false
+    });
   }
 };
 
@@ -1255,7 +1261,11 @@ export const testService = {
     console.log('[TestService] Verificando health');
 
     try {
-      const response = await apiClient.get<any>('/custodiados');
+      const response = await apiClient.get<any>(
+        '/custodiados',
+        undefined,
+        { requireAuth: false }
+      );
 
       if (response.success || response.status === 200) {
         return {
@@ -1269,7 +1279,11 @@ export const testService = {
     }
 
     try {
-      const response = await apiClient.get<any>('/status/info');
+      const response = await apiClient.get<any>(
+        '/status/info',
+        undefined,
+        { requireAuth: false }
+      );
 
       if (response.success) {
         return {
@@ -1293,7 +1307,11 @@ export const testService = {
     console.log('[TestService] Obtendo health da aplicação');
 
     try {
-      const response = await apiClient.get<AppInfoResponse>('/setup/health');
+      const response = await apiClient.get<AppInfoResponse>(
+        '/setup/health',
+        undefined,
+        { requireAuth: false }
+      );
 
       if (response.success && response.data) {
         return response.data;
@@ -1303,7 +1321,12 @@ export const testService = {
     }
 
     try {
-      const statusResponse = await apiClient.get<any>('/status/info');
+      const statusResponse = await apiClient.get<any>(
+        '/status/info',
+        undefined,
+        { requireAuth: false }
+      );
+      
       if (statusResponse.success) {
         return {
           name: 'Sistema de Controle de Comparecimento',

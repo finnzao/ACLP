@@ -41,33 +41,34 @@ export function useCustodiados() {
       const response = await custodiadosService.listar();
       console.log('[useCustodiados] Resposta recebida:', response);
 
-      // ✅ A resposta sempre é ApiResponse<CustodiadoResponse[]>
+
       if (response && typeof response === 'object') {
-        // Se tem a estrutura { success, message, data }
         if ('success' in response && 'data' in response) {
           if (response.success && Array.isArray(response.data)) {
             console.log('[useCustodiados] Custodiados carregados:', response.data.length);
-            setCustodiados(response); // ✅ Salvar a resposta completa
+            setCustodiados(response.data);
           } else {
             console.warn('[useCustodiados] API retornou erro ou dados inválidos');
             setError(response.message || 'Erro ao carregar dados');
-            setCustodiados(null);
+            setCustodiados([]);
           }
-        }
-        // Se for array direto (fallback)
-        else if (Array.isArray(response)) {
+        } else if (Array.isArray(response)) {
           console.log('[useCustodiados] Array direto recebido:', response.length);
           setCustodiados(response);
+        } else {
+          console.warn('[useCustodiados] Resposta inválida');
+          setError('Resposta inválida do servidor');
+          setCustodiados([]);
         }
       } else {
-        console.warn('[useCustodiados] Resposta inválida');
-        setError('Resposta inválida do servidor');
-        setCustodiados(null);
+        console.warn('[useCustodiados] Resposta nula ou indefinida');
+        setError('Nenhum dado recebido do servidor');
+        setCustodiados([]);
       }
     } catch (err) {
       console.error('[useCustodiados] Erro na requisição:', err);
       setError('Erro ao conectar com o servidor');
-      setCustodiados(null);
+      setCustodiados([]);
     } finally {
       setLoading(false);
     }
@@ -432,7 +433,7 @@ export function useResumoSistema() {
   const [error, setError] = useState<string | null>(null);
 
   const carregarResumo = useCallback(async () => {
-    
+
 
     try {
       setError(null);
