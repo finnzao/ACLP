@@ -25,7 +25,9 @@ import {
   RefreshCw,
   Copy,
   Trash2,
-  CheckCheck
+  CheckCheck,
+  Link as LinkIcon,
+  Calendar
 } from 'lucide-react';
 
 // Componente de validação de senha
@@ -79,14 +81,15 @@ type Tab = 'perfil' | 'seguranca' | 'convites';
 // Interface para Convite
 interface Convite {
   id: number;
-  email: string;
-  nome: string;
+  email: string | null;
   tipoUsuario: 'ADMIN' | 'USUARIO';
-  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO' | 'CANCELADO';
-  linkAtivacao: string;
+  status: 'PENDENTE' | 'ATIVADO' | 'EXPIRADO' | 'CANCELADO';
+  linkConvite: string;
   expiraEm: string;
   criadoEm: string;
-  criadoPor?: string;
+  criadoPorNome?: string;
+  comarca?: string;
+  departamento?: string;
 }
 
 // Componente Principal
@@ -99,6 +102,7 @@ export default function ConfiguracoesPage() {
     alterarSenha, 
     atualizarPerfil,
     criarConvite,
+    gerarLinkConvite,
     listarConvites,
     reenviarConvite,
     cancelarConvite
@@ -125,10 +129,16 @@ export default function ConfiguracoesPage() {
   // Estados de convites
   const [convites, setConvites] = useState<Convite[]>([]);
   const [loadingConvites, setLoadingConvites] = useState(false);
+  
+  // Estados para convite com email (antigo)
   const [novoConviteEmail, setNovoConviteEmail] = useState('');
-  const [novoConviteNome, setNovoConviteNome] = useState('');
   const [novoConviteTipo, setNovoConviteTipo] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
-  const [mostrarFormConvite, setMostrarFormConvite] = useState(false);
+  const [mostrarFormConviteEmail, setMostrarFormConviteEmail] = useState(false);
+  
+  // Estados para link genérico (novo)
+  const [tipoUsuarioLink, setTipoUsuarioLink] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
+  const [diasValidadeLink, setDiasValidadeLink] = useState(30);
+  const [mostrarFormGerarLink, setMostrarFormGerarLink] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -238,7 +248,7 @@ export default function ConfiguracoesPage() {
     const result = await alterarSenha({
       senhaAtual,
       novaSenha,
-      confirmaSenha: confirmarSenha  // ✅ CORRIGIDO: confirmaSenha ao invés de confirmarSenha
+      confirmaSenha: confirmarSenha
     });
 
     if (result.success) {
@@ -251,29 +261,52 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const handleCriarConvite = async () => {
-    if (!novoConviteEmail.trim() || !novoConviteNome.trim()) {
+  const handleCriarConviteEmail = async () => {
+    if (!novoConviteEmail.trim()) {
       showToast({
         type: 'error',
-        title: 'Campos obrigatórios',
-        message: 'Preencha nome e e-mail',
+        title: 'Campo obrigatório',
+        message: 'Preencha o e-mail',
         duration: 3000
       });
       return;
     }
 
     const result = await criarConvite({
-      nome: novoConviteNome,
       email: novoConviteEmail,
-      tipo: novoConviteTipo
+      tipoUsuario: novoConviteTipo
     });
 
     if (result.success) {
       setNovoConviteEmail('');
-      setNovoConviteNome('');
       setNovoConviteTipo('USUARIO');
-      setMostrarFormConvite(false);
+      setMostrarFormConviteEmail(false);
       carregarConvites();
+    }
+  };
+
+  const handleGerarLink = async () => {
+    const result = await gerarLinkConvite({
+      tipoUsuario: tipoUsuarioLink,
+      diasValidade: diasValidadeLink
+    });
+
+    if (result.success) {
+      setTipoUsuarioLink('USUARIO');
+      setDiasValidadeLink(30);
+      setMostrarFormGerarLink(false);
+      carregarConvites();
+      
+      // Copiar link automaticamente
+      if (result.data?.link) {
+        navigator.clipboard.writeText(result.data.link);
+        showToast({
+          type: 'success',
+          title: 'Link copiado!',
+          message: 'O link do convite foi copiado para a área de transferência',
+          duration: 5000
+        });
+      }
     }
   };
 
@@ -306,7 +339,7 @@ export default function ConfiguracoesPage() {
   const getStatusBadge = (status: string) => {
     const badges = {
       PENDENTE: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pendente' },
-      ACEITO: { color: 'bg-green-100 text-green-800', icon: CheckCheck, label: 'Aceito' },
+      ATIVADO: { color: 'bg-green-100 text-green-800', icon: CheckCheck, label: 'Ativado' },
       EXPIRADO: { color: 'bg-gray-100 text-gray-800', icon: XCircle, label: 'Expirado' },
       CANCELADO: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Cancelado' }
     };
@@ -600,97 +633,195 @@ export default function ConfiguracoesPage() {
       {/* Convites Tab */}
       {activeTab === 'convites' && isAdmin() && (
         <div className="space-y-6">
-          {/* Novo Convite */}
+          {/* Opções de Criar Convites */}
           <section className="bg-white p-6 rounded-xl shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <UserPlus className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-medium text-primary-dark">Novo Convite</h3>
-              </div>
-              <button
-                onClick={() => setMostrarFormConvite(!mostrarFormConvite)}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2"
-              >
-                <UserPlus className="w-4 h-4" />
-                Criar Convite
-              </button>
+            <div className="flex items-center gap-3 mb-4">
+              <UserPlus className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-medium text-primary-dark">Criar Convites</h3>
             </div>
 
-            {mostrarFormConvite && (
-              <div className="border-t pt-4 mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <InputGroup
-                    label="Nome"
-                    value={novoConviteNome}
-                    onChange={e => setNovoConviteNome(e.target.value)}
-                    placeholder="Nome do usuário"
-                  />
-                  <InputGroup
-                    label="E-mail"
-                    type="email"
-                    value={novoConviteEmail}
-                    onChange={e => setNovoConviteEmail(e.target.value)}
-                    placeholder="email@exemplo.com"
-                  />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card: Link Genérico */}
+              <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 hover:border-blue-500 transition-colors">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <LinkIcon className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900">Link Genérico</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Gere um link reutilizável para compartilhar por qualquer meio
+                    </p>
+                  </div>
                 </div>
+                
+                {!mostrarFormGerarLink ? (
+                  <button
+                    onClick={() => setMostrarFormGerarLink(true)}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    Gerar Link
+                  </button>
+                ) : (
+                  <div className="space-y-3 border-t pt-3 mt-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tipo de Usuário
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="USUARIO"
+                            checked={tipoUsuarioLink === 'USUARIO'}
+                            onChange={() => setTipoUsuarioLink('USUARIO')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Usuário</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="ADMIN"
+                            checked={tipoUsuarioLink === 'ADMIN'}
+                            onChange={() => setTipoUsuarioLink('ADMIN')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Administrador</span>
+                        </label>
+                      </div>
+                    </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo de Usuário
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Validade (dias)
+                      </label>
                       <input
-                        type="radio"
-                        value="USUARIO"
-                        checked={novoConviteTipo === 'USUARIO'}
-                        onChange={() => setNovoConviteTipo('USUARIO')}
-                        className="w-4 h-4"
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={diasValidadeLink}
+                        onChange={(e) => setDiasValidadeLink(parseInt(e.target.value) || 30)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       />
-                      <span>Usuário</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="ADMIN"
-                        checked={novoConviteTipo === 'ADMIN'}
-                        onChange={() => setNovoConviteTipo('ADMIN')}
-                        className="w-4 h-4"
-                      />
-                      <span>Administrador</span>
-                    </label>
+                    </div>
+
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setMostrarFormGerarLink(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleGerarLink}
+                        disabled={loading}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <LinkIcon className="w-4 h-4" />
+                        )}
+                        Gerar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Card: Convite com Email */}
+              <div className="border-2 border-dashed border-green-300 rounded-lg p-4 hover:border-green-500 transition-colors">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Mail className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900">Convite por Email</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Envie convite diretamente para um email específico
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex gap-2 justify-end">
+                {!mostrarFormConviteEmail ? (
                   <button
-                    onClick={() => setMostrarFormConvite(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    onClick={() => setMostrarFormConviteEmail(true)}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    Cancelar
+                    <Send className="w-4 h-4" />
+                    Enviar por Email
                   </button>
-                  <button
-                    onClick={handleCriarConvite}
-                    disabled={loading}
-                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Enviar Convite
-                  </button>
-                </div>
+                ) : (
+                  <div className="space-y-3 border-t pt-3 mt-3">
+                    <InputGroup
+                      label="E-mail"
+                      type="email"
+                      value={novoConviteEmail}
+                      onChange={e => setNovoConviteEmail(e.target.value)}
+                      placeholder="email@exemplo.com"
+                    />
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tipo de Usuário
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="USUARIO"
+                            checked={novoConviteTipo === 'USUARIO'}
+                            onChange={() => setNovoConviteTipo('USUARIO')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Usuário</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            value="ADMIN"
+                            checked={novoConviteTipo === 'ADMIN'}
+                            onChange={() => setNovoConviteTipo('ADMIN')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm">Administrador</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setMostrarFormConviteEmail(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleCriarConviteEmail}
+                        disabled={loading}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        Enviar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </section>
 
           {/* Lista de Convites */}
           <section className="bg-white p-6 rounded-xl shadow">
             <div className="flex items-center gap-3 mb-4">
               <Mail className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-medium text-primary-dark">Convites Enviados</h3>
+              <h3 className="text-lg font-medium text-primary-dark">Convites Criados</h3>
             </div>
 
             {loadingConvites ? (
@@ -700,7 +831,7 @@ export default function ConfiguracoesPage() {
             ) : !Array.isArray(convites) || convites.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Mail className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Nenhum convite enviado ainda</p>
+                <p>Nenhum convite criado ainda</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -712,35 +843,49 @@ export default function ConfiguracoesPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium">{convite.nome}</h4>
+                          {convite.email ? (
+                            <Mail className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <LinkIcon className="w-4 h-4 text-blue-500" />
+                          )}
+                          <h4 className="font-medium">
+                            {convite.email || 'Link Genérico'}
+                          </h4>
                           {getStatusBadge(convite.status)}
                         </div>
-                        <p className="text-sm text-gray-600">{convite.email}</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-sm text-gray-600">
                           Tipo: {convite.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
                           Expira em: {new Date(convite.expiraEm).toLocaleDateString('pt-BR')}
                         </p>
+                        {convite.comarca && (
+                          <p className="text-xs text-gray-500">
+                            Comarca: {convite.comarca}
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex gap-2">
                         {convite.status === 'PENDENTE' && (
                           <>
                             <button
-                              onClick={() => copiarLink(convite.linkAtivacao)}
+                              onClick={() => copiarLink(convite.linkConvite)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               title="Copiar link"
                             >
                               <Copy className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleReenviarConvite(convite.id)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Reenviar"
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                            </button>
+                            {convite.email && (
+                              <button
+                                onClick={() => handleReenviarConvite(convite.id)}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Reenviar"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleCancelarConvite(convite.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"

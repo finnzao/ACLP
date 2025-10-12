@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// painel-web/hooks/useUserManagement.ts
 import { useState, useCallback } from 'react';
 import { usuariosService, convitesService, authService } from '@/lib/api/services';
 import { useToast } from '@/components/Toast';
@@ -6,6 +8,11 @@ export interface AlterarSenhaData {
   senhaAtual: string;
   novaSenha: string;
   confirmaSenha: string;
+}
+
+export interface CriarConviteData {
+  email: string;
+  tipoUsuario: 'ADMIN' | 'USUARIO';
 }
 
 export function useUserManagement() {
@@ -156,25 +163,19 @@ export function useUserManagement() {
   /**
    * Criar convite de usuário (Admin)
    */
-  const criarConvite = useCallback(async (data: {
-    nome: string;
-    email: string;
-    tipo: 'ADMIN' | 'USUARIO';
-    departamento?: string;
-    telefone?: string;
-  }) => {
+  const criarConvite = useCallback(async (data: CriarConviteData) => {
     setLoading(true);
     setError(null);
 
     try {
+      console.log('[useUserManagement] Criando convite:', data);
+
       const result = await convitesService.criarConvite({
-        nome: data.nome,
         email: data.email,
-        tipoUsuario: data.tipo,
-        departamento: data.departamento,
-        telefone: data.telefone,
-        validadeHoras: 72
+        tipoUsuario: data.tipoUsuario
       });
+
+      console.log('[useUserManagement] Resultado:', result);
 
       if (result.success) {
         showToast({
@@ -210,7 +211,11 @@ export function useUserManagement() {
     setError(null);
 
     try {
+      console.log('[useUserManagement] Listando convites, status:', status);
+
       const result = await convitesService.listarConvites(status);
+
+      console.log('[useUserManagement] Resultado da listagem:', result);
 
       if (result.success) {
         return { success: true, data: result.data || [] };
@@ -220,6 +225,7 @@ export function useUserManagement() {
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao listar convites';
       setError(errorMsg);
+      console.error('[useUserManagement] Erro ao listar convites:', error);
       return { success: false, data: [] };
     } finally {
       setLoading(false);
@@ -234,6 +240,8 @@ export function useUserManagement() {
     setError(null);
 
     try {
+      console.log('[useUserManagement] Reenviando convite ID:', id);
+
       const result = await convitesService.reenviarConvite(id, {
         novaValidadeHoras: 72
       });
@@ -272,6 +280,8 @@ export function useUserManagement() {
     setError(null);
 
     try {
+      console.log('[useUserManagement] Cancelando convite ID:', id);
+
       const result = await convitesService.cancelarConvite(id, motivo);
 
       if (result.success) {

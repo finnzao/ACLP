@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// lib/services/index.ts
 export { authService, configureAuthHeaders, clearAuthHeaders } from '../authService';
 export { httpClient } from '@/lib/http/client';
-
+export { convitesService } from './convites';
 import { httpClient } from '@/lib/http/client';
 import { 
   CustodiadoDTO, 
