@@ -18,7 +18,8 @@ import {
   ChevronUp,
   Smartphone,
   Building,
-  Search
+  Search,
+  Users
 } from 'lucide-react';
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
@@ -60,6 +61,10 @@ export default function ConfirmarPresencaPage() {
   const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
+  
+  // Estado para lista de resultados de busca
+  const [resultadosBusca, setResultadosBusca] = useState<CustodiadoResponse[]>([]);
+  const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
     dataComparecimento: dateUtils.getCurrentDate(),
@@ -89,25 +94,59 @@ export default function ConfirmarPresencaPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Função para normalizar texto (remover acentos e converter para minúsculo)
+  const normalizarTexto = useCallback((texto: string): string => {
+    return texto
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }, []);
+
   const buscarPessoa = useCallback(async (numeroProcesso: string) => {
-    if (!numeroProcesso.trim()) return;
+    if (!numeroProcesso.trim()) {
+      setResultadosBusca([]);
+      setMostrarResultados(false);
+      return;
+    }
+
+    if (!custodiados || custodiados.length === 0) {
+      error('Dados não carregados', 'Aguarde o carregamento dos dados');
+      return;
+    }
 
     setEstado('buscando');
 
     try {
-      const pessoaEncontrada = custodiados.find(p =>
-        p.processo.toLowerCase().includes(numeroProcesso.toLowerCase()) ||
-        p.nome.toLowerCase().includes(numeroProcesso.toLowerCase())
-      );
+      const termoNormalizado = normalizarTexto(numeroProcesso);
+      
+      // Buscar todas as pessoas que correspondem ao critério
+      const pessoasEncontradas = custodiados.filter(p => {
+        const nomeNormalizado = normalizarTexto(p.nome);
+        const processoNormalizado = normalizarTexto(p.processo);
+        const cpfNormalizado = p.cpf ? normalizarTexto(p.cpf) : '';
+        
+        return nomeNormalizado.includes(termoNormalizado) ||
+               processoNormalizado.includes(termoNormalizado) ||
+               cpfNormalizado.includes(termoNormalizado);
+      });
 
-      if (pessoaEncontrada) {
-        setPessoa(pessoaEncontrada);
+      if (pessoasEncontradas.length > 0) {
+        setResultadosBusca(pessoasEncontradas);
+        setMostrarResultados(true);
         setEstado('inicial');
-        setExpandedSection('dados-pessoais');
-        success('Pessoa encontrada', `${pessoaEncontrada.nome} - ${pessoaEncontrada.processo}`);
+        
+        // Se houver apenas um resultado, selecionar automaticamente
+        if (pessoasEncontradas.length === 1) {
+          selecionarPessoa(pessoasEncontradas[0]);
+        } else {
+          success('Resultados encontrados', `${pessoasEncontradas.length} pessoa(s) encontrada(s)`);
+        }
       } else {
+        setResultadosBusca([]);
+        setMostrarResultados(false);
         setEstado('erro');
-        setMensagem('Pessoa não encontrada para o termo de busca informado.');
+        setMensagem('Nenhuma pessoa encontrada para o termo de busca informado.');
         error('Pessoa não encontrada', 'Verifique o número do processo ou nome da pessoa');
       }
     } catch (err) {
@@ -116,10 +155,19 @@ export default function ConfirmarPresencaPage() {
       setMensagem('Erro ao buscar pessoa. Tente novamente.');
       error('Erro na busca', 'Ocorreu um erro ao buscar a pessoa');
     }
-  }, [custodiados, success, error]);
+  }, [custodiados, success, error, normalizarTexto]);
+
+  // Função para selecionar uma pessoa da lista de resultados
+  const selecionarPessoa = useCallback((pessoaSelecionada: CustodiadoResponse) => {
+    setPessoa(pessoaSelecionada);
+    setMostrarResultados(false);
+    setExpandedSection('dados-pessoais');
+    success('Pessoa selecionada', `${pessoaSelecionada.nome} - ${pessoaSelecionada.processo}`);
+  }, [success]);
 
   useEffect(() => {
-    if (processo && custodiados.length > 0 && !pessoa) {
+    // Verificação com proteção contra null
+    if (processo && custodiados && custodiados.length > 0 && !pessoa) {
       buscarPessoa(processo);
     }
   }, [processo, custodiados, pessoa, buscarPessoa]);
@@ -302,6 +350,43 @@ export default function ConfirmarPresencaPage() {
     );
   };
 
+  // Componente para lista de resultados de busca
+  const ListaResultadosBusca = () => {
+    if (!mostrarResultados || resultadosBusca.length === 0) return null;
+
+    return (
+      <div className="mt-3 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto">
+        <div className="p-2 bg-gray-50 border-b">
+          <p className="text-xs font-medium text-gray-600">
+            {resultadosBusca.length} resultado(s) encontrado(s)
+          </p>
+        </div>
+        {resultadosBusca.map((resultado) => (
+          <button
+            key={resultado.id}
+            onClick={() => selecionarPessoa(resultado)}
+            className="w-full p-3 text-left hover:bg-blue-50 border-b border-gray-100 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-800 text-sm">{resultado.nome}</p>
+                <p className="text-xs text-gray-500">CPF: {resultado.cpf || 'Não informado'}</p>
+                <p className="text-xs text-gray-500">Processo: {resultado.processo}</p>
+              </div>
+              <span className={`px-2 py-1 rounded-full text-xs ${
+                resultado.status === 'EM_CONFORMIDADE'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {resultado.status === 'EM_CONFORMIDADE' ? 'Conforme' : 'Inadimplente'}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   if (loadingCustodiados) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
@@ -401,7 +486,11 @@ export default function ConfirmarPresencaPage() {
               <p className="text-gray-600 mb-4">{mensagem}</p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setEstado('inicial')}
+                  onClick={() => {
+                    setEstado('inicial');
+                    setResultadosBusca([]);
+                    setMostrarResultados(false);
+                  }}
                   className="flex-1 bg-gray-200 text-gray-700 py-2 rounded"
                 >
                   Tentar Novamente
@@ -423,21 +512,42 @@ export default function ConfirmarPresencaPage() {
                 title="Buscar Pessoa"
                 icon={<Search className="w-5 h-5 text-blue-600" />}
                 defaultExpanded={!pessoa}
+                badge={
+                  resultadosBusca.length > 0 ? (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      {resultadosBusca.length} encontrado(s)
+                    </span>
+                  ) : null
+                }
               >
                 <div className="space-y-3">
                   <input
                     type="text"
                     value={buscaProcesso}
-                    onChange={(e) => setBuscaProcesso(e.target.value)}
-                    placeholder="Número do processo ou nome"
+                    onChange={(e) => {
+                      setBuscaProcesso(e.target.value);
+                      if (e.target.value.trim()) {
+                        buscarPessoa(e.target.value);
+                      } else {
+                        setResultadosBusca([]);
+                        setMostrarResultados(false);
+                      }
+                    }}
+                    placeholder="Nome, CPF ou número do processo"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
-                  <button
-                    onClick={() => buscarPessoa(buscaProcesso)}
-                    className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm font-medium"
-                  >
-                    Buscar
-                  </button>
+                  
+                  {/* Lista de resultados da busca */}
+                  <ListaResultadosBusca />
+                  
+                  {!mostrarResultados && (
+                    <button
+                      onClick={() => buscarPessoa(buscaProcesso)}
+                      className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm font-medium"
+                    >
+                      Buscar
+                    </button>
+                  )}
                 </div>
               </MobileSection>
 
@@ -479,6 +589,19 @@ export default function ConfirmarPresencaPage() {
                         <p className="text-xs text-gray-500">Próximo Comparecimento</p>
                         <p className="font-medium text-gray-800">{dateUtils.formatToBR(pessoa.proximoComparecimento)}</p>
                       </div>
+                      <button
+                        onClick={() => {
+                          setPessoa(null);
+                          setEnderecoRespondido(false);
+                          setAtualizacaoEndereco({ houveAlteracao: false });
+                          setBuscaProcesso('');
+                          setResultadosBusca([]);
+                          setExpandedSection('busca');
+                        }}
+                        className="text-sm text-blue-600 underline"
+                      >
+                        Buscar outra pessoa
+                      </button>
                     </div>
                   </MobileSection>
 
@@ -665,18 +788,7 @@ export default function ConfirmarPresencaPage() {
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Validado por
-                        </label>
-                        <input
-                          type="text"
-                          value={formulario.validadoPor}
-                          onChange={(e) => handleInputChange('validadoPor', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          placeholder="Nome do servidor"
-                        />
-                      </div>
+
                     </div>
                   </MobileSection>
                 </>
@@ -715,6 +827,7 @@ export default function ConfirmarPresencaPage() {
     );
   }
 
+  // Versão Desktop continua igual, mas com as mesmas melhorias de busca
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
       <div className="max-w-4xl mx-auto">
@@ -802,6 +915,8 @@ export default function ConfirmarPresencaPage() {
                       setPessoa(null);
                       setBuscaProcesso('');
                       setEnderecoRespondido(false);
+                      setResultadosBusca([]);
+                      setMostrarResultados(false);
                     }}
                     className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium"
                   >
@@ -829,6 +944,8 @@ export default function ConfirmarPresencaPage() {
                     onClick={() => {
                       setEstado('inicial');
                       setMensagem('');
+                      setResultadosBusca([]);
+                      setMostrarResultados(false);
                     }}
                     className="bg-yellow-500 text-white px-6 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium"
                   >
@@ -851,22 +968,77 @@ export default function ConfirmarPresencaPage() {
                       <h3 className="text-lg font-semibold text-blue-900">Buscar Pessoa</h3>
                     </div>
 
-                    <div className="flex gap-4">
-                      <input
-                        type="text"
-                        value={buscaProcesso}
-                        onChange={(e) => setBuscaProcesso(e.target.value)}
-                        placeholder="Digite o número do processo ou nome da pessoa"
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                        onKeyPress={(e) => e.key === 'Enter' && buscarPessoa(buscaProcesso)}
-                      />
-                      <button
-                        onClick={() => buscarPessoa(buscaProcesso)}
-                        className="bg-blue-500 text-white px-8 py-3 rounded-lg hover:bg-blue-600 transition-all font-medium flex items-center gap-2"
-                      >
-                        <Search className="w-5 h-5" />
-                        Buscar
-                      </button>
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <input
+                          type="text"
+                          value={buscaProcesso}
+                          onChange={(e) => {
+                            setBuscaProcesso(e.target.value);
+                            if (e.target.value.trim()) {
+                              buscarPessoa(e.target.value);
+                            } else {
+                              setResultadosBusca([]);
+                              setMostrarResultados(false);
+                            }
+                          }}
+                          placeholder="Digite o nome, CPF ou número do processo"
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          onKeyPress={(e) => e.key === 'Enter' && buscarPessoa(buscaProcesso)}
+                        />
+                        <button
+                          onClick={() => buscarPessoa(buscaProcesso)}
+                          className="bg-blue-500 text-white px-8 py-3 rounded-lg hover:bg-blue-600 transition-all font-medium flex items-center gap-2"
+                        >
+                          <Search className="w-5 h-5" />
+                          Buscar
+                        </button>
+                      </div>
+
+                      {/* Lista de resultados para desktop */}
+                      {mostrarResultados && resultadosBusca.length > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                          <div className="p-3 bg-gray-50 border-b flex items-center justify-between">
+                            <p className="text-sm font-medium text-gray-700">
+                              <Users className="w-4 h-4 inline mr-2" />
+                              {resultadosBusca.length} resultado(s) encontrado(s)
+                            </p>
+                            <button
+                              onClick={() => {
+                                setMostrarResultados(false);
+                                setResultadosBusca([]);
+                              }}
+                              className="text-gray-500 hover:text-gray-700"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {resultadosBusca.map((resultado) => (
+                            <button
+                              key={resultado.id}
+                              onClick={() => selecionarPessoa(resultado)}
+                              className="w-full p-4 text-left hover:bg-blue-50 border-b border-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-gray-800">{resultado.nome}</p>
+                                  <div className="flex gap-4 mt-1">
+                                    <p className="text-sm text-gray-600">CPF: {resultado.cpf || 'Não informado'}</p>
+                                    <p className="text-sm text-gray-600">Processo: {resultado.processo}</p>
+                                  </div>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  resultado.status === 'EM_CONFORMIDADE'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {resultado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -879,11 +1051,11 @@ export default function ConfirmarPresencaPage() {
                       <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                         <User className="w-8 h-8" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <h2 className="text-2xl font-bold">{pessoa.nome}</h2>
                         <p className="text-primary-light">Processo: {pessoa.processo}</p>
                       </div>
-                      <div className="ml-auto">
+                      <div>
                         <span className={`px-4 py-2 rounded-full text-sm font-medium ${pessoa.status === 'EM_CONFORMIDADE'
                           ? 'bg-green-500 text-white'
                           : 'bg-red-500 text-white'
@@ -911,6 +1083,20 @@ export default function ConfirmarPresencaPage() {
                         <p className="text-primary-light font-medium">{dateUtils.formatToBR(pessoa.proximoComparecimento)}</p>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => {
+                        setPessoa(null);
+                        setEnderecoRespondido(false);
+                        setAtualizacaoEndereco({ houveAlteracao: false });
+                        setBuscaProcesso('');
+                        setResultadosBusca([]);
+                        setMostrarResultados(false);
+                      }}
+                      className="mt-4 text-sm text-white underline hover:text-primary-light transition-colors"
+                    >
+                      Buscar outra pessoa
+                    </button>
                   </div>
 
                   <div className="mb-8">
@@ -1134,27 +1320,27 @@ export default function ConfirmarPresencaPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ul className="space-y-2 text-blue-800">
                 <li className="flex items-start">
-                  <span className="mr-2">Certifique-se de que a pessoa realmente compareceu</span>
+                  <span className="mr-2">• Certifique-se de que a pessoa realmente compareceu</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">Sempre pergunte sobre mudança de endereço</span>
+                  <span className="mr-2">• Sempre pergunte sobre mudança de endereço</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">Registre o horário exato do atendimento</span>
+                  <span className="mr-2">• Registre o horário exato do atendimento</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">Adicione observações relevantes quando necessário</span>
+                  <span className="mr-2">• Adicione observações relevantes quando necessário</span>
                 </li>
               </ul>
               <ul className="space-y-2 text-blue-800">
                 <li className="flex items-start">
-                  <span className="mr-2">Esta ação atualiza automaticamente o status</span>
+                  <span className="mr-2">• Esta ação atualiza automaticamente o status</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">O próximo comparecimento será calculado automaticamente</span>
+                  <span className="mr-2">• O próximo comparecimento será calculado automaticamente</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="mr-2">Todos os dados são sincronizados em tempo real</span>
+                  <span className="mr-2">• Todos os dados são sincronizados em tempo real</span>
                 </li>
               </ul>
             </div>

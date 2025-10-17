@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // painel-web/hooks/useUserManagement.ts
 import { useState, useCallback } from 'react';
-import { usuariosService, convitesService, authService } from '@/lib/api/services';
+import { usuariosService, authService } from '@/lib/api/services';
 import { useToast } from '@/components/Toast';
+import { httpClient } from '@/lib/http/client';
 
 export interface AlterarSenhaData {
   senhaAtual: string;
@@ -13,6 +14,12 @@ export interface AlterarSenhaData {
 export interface CriarConviteData {
   email: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
+}
+
+export interface GerarLinkData {
+  tipoUsuario: 'ADMIN' | 'USUARIO';
+  quantidadeUsos?: number;
+  diasValidade?: number;
 }
 
 export function useUserManagement() {
@@ -161,35 +168,84 @@ export function useUserManagement() {
   }, [showToast]);
 
   /**
-   * Criar convite de usuário (Admin)
+   * Criar convite com email específico (Admin)
    */
   const criarConvite = useCallback(async (data: CriarConviteData) => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log('[useUserManagement] Criando convite:', data);
+      console.log('[useUserManagement] Criando convite com email:', data);
 
-      const result = await convitesService.criarConvite({
-        email: data.email,
-        tipoUsuario: data.tipoUsuario
-      });
+      const response = await httpClient.post<any>(
+        '/usuarios/convites',
+        data
+      );
 
-      console.log('[useUserManagement] Resultado:', result);
+      console.log('[useUserManagement] Resposta da API:', response);
 
-      if (result.success) {
+      if (response.success && response.data) {
         showToast({
           type: 'success',
           title: 'Convite Enviado',
           message: `Convite enviado para ${data.email}`,
           duration: 5000
         });
-        return { success: true, data: result.data };
+        return { success: true, data: response.data };
       } else {
-        throw new Error(result.message || 'Erro ao enviar convite');
+        throw new Error(response.message || 'Erro ao enviar convite');
       }
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao enviar convite';
+      setError(errorMsg);
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: errorMsg,
+        duration: 3000
+      });
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  /**
+   * ✅ NOVA FUNÇÃO: Gerar link genérico (Admin)
+   */
+  const gerarLinkConvite = useCallback(async (data: GerarLinkData) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log('[useUserManagement] Gerando link genérico:', data);
+
+      const payload = {
+        tipoUsuario: data.tipoUsuario,
+        quantidadeUsos: data.quantidadeUsos || 1,
+        diasValidade: data.diasValidade || 30
+      };
+
+      const response = await httpClient.post<any>(
+        '/usuarios/convites/gerar-link',
+        payload
+      );
+
+      console.log('[useUserManagement] Resposta do link genérico:', response);
+
+      if (response.success && response.data) {
+        showToast({
+          type: 'success',
+          title: 'Link Gerado',
+          message: 'Link de convite criado com sucesso',
+          duration: 5000
+        });
+        return { success: true, data: response.data };
+      } else {
+        throw new Error(response.message || 'Erro ao gerar link');
+      }
+    } catch (error: any) {
+      const errorMsg = error.message || 'Erro ao gerar link de convite';
       setError(errorMsg);
       showToast({
         type: 'error',
@@ -213,14 +269,22 @@ export function useUserManagement() {
     try {
       console.log('[useUserManagement] Listando convites, status:', status);
 
-      const result = await convitesService.listarConvites(status);
+      const params = status ? { status } : undefined;
+      
+      const response = await httpClient.get<any>(
+        '/usuarios/convites',
+        params
+      );
 
-      console.log('[useUserManagement] Resultado da listagem:', result);
+      console.log('[useUserManagement] Resposta da listagem:', response);
 
-      if (result.success) {
-        return { success: true, data: result.data || [] };
+      if (response.success) {
+        return { 
+          success: true, 
+          data: response.data || [] 
+        };
       } else {
-        throw new Error(result.message || 'Erro ao listar convites');
+        throw new Error(response.message || 'Erro ao listar convites');
       }
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao listar convites';
@@ -242,11 +306,12 @@ export function useUserManagement() {
     try {
       console.log('[useUserManagement] Reenviando convite ID:', id);
 
-      const result = await convitesService.reenviarConvite(id, {
-        novaValidadeHoras: 72
-      });
+      const response = await httpClient.post<any>(
+        `/usuarios/convites/${id}/reenviar`,
+        { novaValidadeHoras: 72 }
+      );
 
-      if (result.success) {
+      if (response.success) {
         showToast({
           type: 'success',
           title: 'Convite Reenviado',
@@ -255,7 +320,7 @@ export function useUserManagement() {
         });
         return { success: true };
       } else {
-        throw new Error(result.message || 'Erro ao reenviar convite');
+        throw new Error(response.message || 'Erro ao reenviar convite');
       }
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao reenviar convite';
@@ -282,9 +347,11 @@ export function useUserManagement() {
     try {
       console.log('[useUserManagement] Cancelando convite ID:', id);
 
-      const result = await convitesService.cancelarConvite(id, motivo);
+      const response = await httpClient.delete<any>(
+        `/usuarios/convites/${id}`
+      );
 
-      if (result.success) {
+      if (response.success) {
         showToast({
           type: 'success',
           title: 'Convite Cancelado',
@@ -293,7 +360,7 @@ export function useUserManagement() {
         });
         return { success: true };
       } else {
-        throw new Error(result.message || 'Erro ao cancelar convite');
+        throw new Error(response.message || 'Erro ao cancelar convite');
       }
     } catch (error: any) {
       const errorMsg = error.message || 'Erro ao cancelar convite';
@@ -316,6 +383,7 @@ export function useUserManagement() {
     alterarSenha,
     atualizarPerfil,
     criarConvite,
+    gerarLinkConvite, // ✅ Função adicionada
     listarConvites,
     reenviarConvite,
     cancelarConvite

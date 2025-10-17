@@ -42,6 +42,13 @@ const PUBLIC_ROUTES = [
   '/login', 
   '/api/auth/login',
   '/ativar',
+  '/invite',           // Rota de convite adicionada
+  '/cadastro',         // Rota de cadastro adicionada
+  '/api/auth/invite',  // API de convite adicionada
+  '/api/auth/accept-invite',  // API para aceitar convite
+  '/api/auth/validate-invite', // API para validar convite
+  '/api/auth/cadastro', // API de cadastro adicionada
+  '/api/auth/setup',    // API de setup inicial
   '/_next',
   '/favicon.ico',
   '/img',

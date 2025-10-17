@@ -290,22 +290,11 @@ export default function ConfiguracoesPage() {
       tipoUsuario: tipoUsuarioLink,
       diasValidade: diasValidadeLink
     });
-
+  
     if (result.success) {
-      setTipoUsuarioLink('USUARIO');
-      setDiasValidadeLink(30);
-      setMostrarFormGerarLink(false);
-      carregarConvites();
-      
-      // Copiar link automaticamente
+      // Sucesso - link gerado
       if (result.data?.link) {
         navigator.clipboard.writeText(result.data.link);
-        showToast({
-          type: 'success',
-          title: 'Link copiado!',
-          message: 'O link do convite foi copiado para a área de transferência',
-          duration: 5000
-        });
       }
     }
   };

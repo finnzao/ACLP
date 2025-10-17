@@ -1,4 +1,4 @@
-// painel-web/lib/api/services/convite.ts
+// painel-web/lib/api/services/convites.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient } from '@/lib/http/client';
 import type { ApiResponse } from '@/types/api';
@@ -6,6 +6,12 @@ import type { ApiResponse } from '@/types/api';
 export interface ConviteDTO {
   email: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
+}
+
+export interface GerarLinkDTO {
+  tipoUsuario: 'ADMIN' | 'USUARIO';
+  quantidadeUsos?: number;
+  diasValidade?: number;
 }
 
 export interface ConviteResponse {
@@ -23,9 +29,29 @@ export interface ConviteResponse {
   totalUsos?: number;
 }
 
+export interface ValidarTokenResponse {
+  valido: boolean;
+  email?: string;
+  tipoUsuario?: string;
+  comarca?: string;
+  departamento?: string;
+  expiraEm?: string;
+  criadoPorNome?: string;
+  mensagem?: string;
+  camposEditaveis?: string[];
+}
+
+export interface AtivarContaDTO {
+  token: string;
+  nome?: string;
+  senha: string;
+  confirmaSenha: string;
+  telefone?: string;
+}
+
 export const convitesService = {
   /**
-   * Criar novo convite
+   * Criar convite com email específico
    */
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
     console.log('[ConvitesService] Criando convite:', data);
@@ -38,7 +64,6 @@ export const convitesService = {
 
       console.log('[ConvitesService] Resposta:', response);
 
-      //  Garantir que message sempre seja string
       return {
         ...response,
         message: response.message || 'Convite criado com sucesso'
@@ -48,6 +73,95 @@ export const convitesService = {
       return {
         success: false,
         message: error.message || 'Erro ao criar convite',
+        status: error.status || 500,
+        timestamp: new Date().toISOString()
+      };
+    }
+  },
+
+  /**
+   * Gerar link genérico
+   */
+  async gerarLinkConvite(data: GerarLinkDTO): Promise<ApiResponse<ConviteResponse>> {
+    console.log('[ConvitesService] Gerando link genérico:', data);
+    
+    try {
+      const response = await httpClient.post<ConviteResponse>(
+        '/usuarios/convites/gerar-link',
+        data
+      );
+
+      console.log('[ConvitesService] Resposta:', response);
+
+      return {
+        ...response,
+        message: response.message || 'Link gerado com sucesso'
+      };
+    } catch (error: any) {
+      console.error('[ConvitesService] Erro ao gerar link:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao gerar link',
+        status: error.status || 500,
+        timestamp: new Date().toISOString()
+      };
+    }
+  },
+
+  /**
+   * Validar token de convite
+   */
+  async validarToken(token: string): Promise<ApiResponse<ValidarTokenResponse>> {
+    console.log('[ConvitesService] Validando token:', token.substring(0, 10) + '...');
+    
+    try {
+      const response = await httpClient.get<ValidarTokenResponse>(
+        `/usuarios/convites/validar/${token}`,
+        undefined,
+        { requireAuth: false }
+      );
+
+      console.log('[ConvitesService] Token validado:', response);
+
+      return {
+        ...response,
+        message: response.message || 'Token válido'
+      };
+    } catch (error: any) {
+      console.error('[ConvitesService] Erro ao validar token:', error);
+      return {
+        success: false,
+        message: error.message || 'Token inválido ou expirado',
+        status: error.status || 400,
+        timestamp: new Date().toISOString()
+      };
+    }
+  },
+
+  /**
+   * Ativar conta usando token
+   */
+  async ativarConta(data: AtivarContaDTO): Promise<ApiResponse<any>> {
+    console.log('[ConvitesService] Ativando conta');
+    
+    try {
+      const response = await httpClient.post<any>(
+        '/usuarios/convites/ativar',
+        data,
+        { requireAuth: false }
+      );
+
+      console.log('[ConvitesService] Conta ativada:', response);
+
+      return {
+        ...response,
+        message: response.message || 'Conta ativada com sucesso'
+      };
+    } catch (error: any) {
+      console.error('[ConvitesService] Erro ao ativar conta:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao ativar conta',
         status: error.status || 500,
         timestamp: new Date().toISOString()
       };
@@ -70,7 +184,6 @@ export const convitesService = {
 
       console.log('[ConvitesService] Resposta da listagem:', response);
 
-      //  Garantir que message sempre seja string
       return {
         ...response,
         message: response.message || 'Convites listados com sucesso',
@@ -100,7 +213,6 @@ export const convitesService = {
         data
       );
 
-      //  Garantir que message sempre seja string
       return {
         ...response,
         message: response.message || 'Convite reenviado com sucesso'
@@ -123,12 +235,10 @@ export const convitesService = {
     console.log('[ConvitesService] Cancelando convite:', id);
     
     try {
-      //  DELETE não aceita body, enviar como query param ou não enviar
       const response = await httpClient.delete<void>(
         `/usuarios/convites/${id}`
       );
 
-      //  Garantir que message sempre seja string
       return {
         ...response,
         message: response.message || 'Convite cancelado com sucesso'

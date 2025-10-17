@@ -477,11 +477,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           <p className="text-xs text-gray-500">
             Registro atualizado em: {dateUtils.formatToBR((dadosCompletos as any).atualizadoEm) || new Date().toLocaleString('pt-BR')}
           </p>
-          {dadosCompletos.id && (
-            <p className="text-xs text-gray-400 mt-1">
-              ID: {dadosCompletos.id}
-            </p>
-          )}
         </div>
       </div>
 
