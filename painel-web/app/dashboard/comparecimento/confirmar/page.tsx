@@ -19,7 +19,8 @@ import {
   Smartphone,
   Building,
   Search,
-  Users
+  Users,
+  X
 } from 'lucide-react';
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
@@ -61,7 +62,7 @@ export default function ConfirmarPresencaPage() {
   const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
-  
+
   // Estado para lista de resultados de busca
   const [resultadosBusca, setResultadosBusca] = useState<CustodiadoResponse[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -119,23 +120,23 @@ export default function ConfirmarPresencaPage() {
 
     try {
       const termoNormalizado = normalizarTexto(numeroProcesso);
-      
+
       // Buscar todas as pessoas que correspondem ao critério
       const pessoasEncontradas = custodiados.filter(p => {
         const nomeNormalizado = normalizarTexto(p.nome);
         const processoNormalizado = normalizarTexto(p.processo);
         const cpfNormalizado = p.cpf ? normalizarTexto(p.cpf) : '';
-        
+
         return nomeNormalizado.includes(termoNormalizado) ||
-               processoNormalizado.includes(termoNormalizado) ||
-               cpfNormalizado.includes(termoNormalizado);
+          processoNormalizado.includes(termoNormalizado) ||
+          cpfNormalizado.includes(termoNormalizado);
       });
 
       if (pessoasEncontradas.length > 0) {
         setResultadosBusca(pessoasEncontradas);
         setMostrarResultados(true);
         setEstado('inicial');
-        
+
         // Se houver apenas um resultado, selecionar automaticamente
         if (pessoasEncontradas.length === 1) {
           selecionarPessoa(pessoasEncontradas[0]);
@@ -213,7 +214,7 @@ export default function ConfirmarPresencaPage() {
         houveAlteracao: houve
       }));
       setEnderecoRespondido(true);
-      
+
       if (houve) {
         setTimeout(() => {
           setExpandedSection('endereco');
@@ -373,11 +374,10 @@ export default function ConfirmarPresencaPage() {
                 <p className="text-xs text-gray-500">CPF: {resultado.cpf || 'Não informado'}</p>
                 <p className="text-xs text-gray-500">Processo: {resultado.processo}</p>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                resultado.status === 'EM_CONFORMIDADE'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
+              <span className={`px-2 py-1 rounded-full text-xs ${resultado.status === 'EM_CONFORMIDADE'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+                }`}>
                 {resultado.status === 'EM_CONFORMIDADE' ? 'Conforme' : 'Inadimplente'}
               </span>
             </div>
@@ -536,10 +536,10 @@ export default function ConfirmarPresencaPage() {
                     placeholder="Nome, CPF ou número do processo"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
-                  
+
                   {/* Lista de resultados da busca */}
                   <ListaResultadosBusca />
-                  
+
                   {!mostrarResultados && (
                     <button
                       onClick={() => buscarPessoa(buscaProcesso)}
@@ -1027,11 +1027,10 @@ export default function ConfirmarPresencaPage() {
                                     <p className="text-sm text-gray-600">Processo: {resultado.processo}</p>
                                   </div>
                                 </div>
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  resultado.status === 'EM_CONFORMIDADE'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${resultado.status === 'EM_CONFORMIDADE'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                                  }`}>
                                   {resultado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
                                 </span>
                               </div>
@@ -1156,15 +1155,18 @@ export default function ConfirmarPresencaPage() {
                             </label>
                             <textarea
                               value={atualizacaoEndereco.motivoAlteracao || ''}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const value = e.target.value.slice(0, 500);
                                 setAtualizacaoEndereco(prev => ({
                                   ...prev,
-                                  motivoAlteracao: e.target.value
-                                }))
-                              }
-                              rows={3}
-                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                              placeholder="Ex: Mudança por questões familiares, trabalho, etc."
+                                  motivoAlteracao: value
+                                }));
+                              }}
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+                              placeholder="Mínimo 10 caracteres. Ex: Mudança familiar, trabalho..."
+                              minLength={10}
+                              maxLength={500}
                             />
                           </div>
 

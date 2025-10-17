@@ -608,11 +608,14 @@ function OriginalRegistrarPage() {
                 <input
                   type="text"
                   value={formData.logradouro}
-                  onChange={(e) => handleInputChange('logradouro', e.target.value.slice(0, 100))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${errors.logradouro ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                  onChange={(e) => {
+                    const value = e.target.value.slice(0, 200);
+                    handleInputChange('logradouro', value);
+                  }}
+                  className="w-full px-4 py-3 border rounded-lg"
                   placeholder="Rua, Avenida, etc."
-                  maxLength={100}
+                  maxLength={200}
+                  minLength={5}
                   disabled={isSubmitting}
                 />
                 {errors.logradouro && <p className="text-red-500 text-sm mt-1">{errors.logradouro}</p>}
@@ -622,7 +625,7 @@ function OriginalRegistrarPage() {
                 mask="numeroEndereco"
                 label="Número"
                 value={formData.numero || ''}
-                onChange={(value) => handleInputChange('numero', value)}
+                onChange={(value) => handleInputChange('numero', value.slice(0, 20))}
                 disabled={isSubmitting}
               />
 
@@ -631,10 +634,13 @@ function OriginalRegistrarPage() {
                 <input
                   type="text"
                   value={formData.complemento || ''}
-                  onChange={(e) => handleInputChange('complemento', e.target.value.slice(0, 50))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  onChange={(e) => {
+                    const value = e.target.value.slice(0, 100);
+                    handleInputChange('complemento', value);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                   placeholder="Apto, Casa, etc."
-                  maxLength={50}
+                  maxLength={100}
                   disabled={isSubmitting}
                 />
               </div>
@@ -646,11 +652,14 @@ function OriginalRegistrarPage() {
                 <input
                   type="text"
                   value={formData.bairro}
-                  onChange={(e) => handleInputChange('bairro', e.target.value.slice(0, 50))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${errors.bairro ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                  onChange={(e) => {
+                    const value = e.target.value.slice(0, 100);
+                    handleInputChange('bairro', value);
+                  }}
+                  className="w-full px-4 py-3 border rounded-lg"
                   placeholder="Nome do bairro"
-                  maxLength={50}
+                  maxLength={100}
+                  minLength={2}
                   disabled={isSubmitting}
                 />
                 {errors.bairro && <p className="text-red-500 text-sm mt-1">{errors.bairro}</p>}
@@ -663,11 +672,14 @@ function OriginalRegistrarPage() {
                 <input
                   type="text"
                   value={formData.cidade}
-                  onChange={(e) => handleInputChange('cidade', e.target.value.slice(0, 50))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${errors.cidade ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                  onChange={(e) => {
+                    const value = e.target.value.slice(0, 100);
+                    handleInputChange('cidade', value);
+                  }}
+                  className="w-full px-4 py-3 border rounded-lg"
                   placeholder="Nome da cidade"
-                  maxLength={50}
+                  maxLength={100}
+                  minLength={2}
                   disabled={isSubmitting}
                 />
                 {errors.cidade && <p className="text-red-500 text-sm mt-1">{errors.cidade}</p>}

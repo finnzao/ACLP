@@ -165,102 +165,217 @@ export const ValidationDocuments = (cpf?: string, rg?: string): {
   return { isValid: true };
 };
 
+// Validação de validadoPor: 5-100 caracteres
+export const ValidationValidadoPor = (validadoPor: string): { isValid: boolean; error?: string } => {
+  const trimmed = validadoPor?.trim();
+  
+  if (!trimmed) {
+    return { isValid: false, error: 'Campo "Validado por" é obrigatório' };
+  }
+  
+  if (trimmed.length < 5) {
+    return { isValid: false, error: 'Campo "Validado por" deve ter no mínimo 5 caracteres' };
+  }
+  
+  if (trimmed.length > 100) {
+    return { isValid: false, error: 'Campo "Validado por" deve ter no máximo 100 caracteres' };
+  }
+  
+  return { isValid: true };
+};
+
+// Validação de observações: 10-500 caracteres (opcional)
+export const ValidationObservacoes = (observacoes?: string): { isValid: boolean; error?: string } => {
+  if (!observacoes?.trim()) {
+    return { isValid: true }; // Campo opcional
+  }
+  
+  const trimmed = observacoes.trim();
+  
+  if (trimmed.length < 10) {
+    return { isValid: false, error: 'Observações deve ter no mínimo 10 caracteres' };
+  }
+  
+  if (trimmed.length > 500) {
+    return { isValid: false, error: 'Observações deve ter no máximo 500 caracteres' };
+  }
+  
+  return { isValid: true };
+};
+
+// Validação de motivo de mudança de endereço: 10-500 caracteres (condicional)
+export const ValidationMotivoMudanca = (motivo?: string, mudancaEndereco?: boolean): { isValid: boolean; error?: string } => {
+  if (!mudancaEndereco) {
+    return { isValid: true }; // Não obrigatório se não há mudança
+  }
+  
+  if (!motivo?.trim()) {
+    return { isValid: false, error: 'Motivo da mudança de endereço é obrigatório' };
+  }
+  
+  const trimmed = motivo.trim();
+  
+  if (trimmed.length < 10) {
+    return { isValid: false, error: 'Motivo da mudança deve ter no mínimo 10 caracteres' };
+  }
+  
+  if (trimmed.length > 500) {
+    return { isValid: false, error: 'Motivo da mudança deve ter no máximo 500 caracteres' };
+  }
+  
+  return { isValid: true };
+};
+
+// Validação de anexos: 3-1000 caracteres (opcional)
+export const ValidationAnexos = (anexos?: string): { isValid: boolean; error?: string } => {
+  if (!anexos?.trim()) {
+    return { isValid: true }; // Campo opcional
+  }
+  
+  const trimmed = anexos.trim();
+  
+  if (trimmed.length < 3) {
+    return { isValid: false, error: 'Anexos deve ter no mínimo 3 caracteres' };
+  }
+  
+  if (trimmed.length > 1000) {
+    return { isValid: false, error: 'Anexos deve ter no máximo 1000 caracteres' };
+  }
+  
+  return { isValid: true };
+};
+
 export const ValidationComparecimentoForm = (data: ComparecimentoFormData): FormValidation => {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
 
+  // Validação de nome: 2-150 caracteres
   if (!data.nome?.trim()) {
     errors.nome = 'Nome é obrigatório';
-  } else if (data.nome.trim().length < 2 || data.nome.trim().length > 150) {
-    errors.nome = 'Nome deve ter entre 2 e 150 caracteres';
+  } else if (data.nome.trim().length < 2) {
+    errors.nome = 'Nome deve ter no mínimo 2 caracteres';
+  } else if (data.nome.trim().length > 150) {
+    errors.nome = 'Nome deve ter no máximo 150 caracteres';
   }
 
+  // Validação de CPF
   if (data.cpf?.trim() && !ValidationCPF(data.cpf)) {
     errors.cpf = 'CPF deve ter o formato 000.000.000-00';
   }
 
+  // Validação de RG: máximo 20 caracteres
   if (data.rg?.trim() && data.rg.trim().length > 20) {
     errors.rg = 'RG deve ter no máximo 20 caracteres';
   }
 
+  // Validação de contato
   if (!data.contato?.trim()) {
     errors.contato = 'Contato é obrigatório';
   } else if (!ValidationPhone(data.contato)) {
     errors.contato = 'Contato deve ter formato válido de telefone';
   }
 
+  // Validação de processo
   if (!data.processo?.trim()) {
     errors.processo = 'Processo é obrigatório';
   } else if (!ValidationProcessNumber(data.processo)) {
     errors.processo = 'Processo deve ter o formato 0000000-00.0000.0.00.0000';
   }
 
+  // Validação de vara: máximo 100 caracteres
   if (!data.vara?.trim()) {
     errors.vara = 'Vara é obrigatória';
   } else if (data.vara.trim().length > 100) {
     errors.vara = 'Vara deve ter no máximo 100 caracteres';
   }
 
+  // Validação de comarca: máximo 100 caracteres
   if (!data.comarca?.trim()) {
     errors.comarca = 'Comarca é obrigatória';
   } else if (data.comarca.trim().length > 100) {
     errors.comarca = 'Comarca deve ter no máximo 100 caracteres';
   }
 
+  // Validação de data de decisão
   if (!data.decisao) {
     errors.decisao = 'Data da decisão é obrigatória';
   }
 
+  // Validação de periodicidade
   if (!data.periodicidade || data.periodicidade < 1) {
     errors.periodicidade = 'Periodicidade é obrigatória';
   }
 
+  // Validação de data de comparecimento inicial
   if (!data.dataComparecimentoInicial) {
     errors.dataComparecimentoInicial = 'Data do comparecimento inicial é obrigatória';
   }
 
-  if (data.observacoes?.trim() && data.observacoes.trim().length > 500) {
-    errors.observacoes = 'Observações deve ter no máximo 500 caracteres';
+  // Validação de observações: 10-500 caracteres (opcional)
+  const obsValidation = ValidationObservacoes(data.observacoes);
+  if (!obsValidation.isValid) {
+    errors.observacoes = obsValidation.error!;
   }
 
+  // Validação de CEP: 8-9 caracteres
   if (!data.endereco?.cep?.trim()) {
     errors.cep = 'CEP é obrigatório';
   } else if (!ValidationCEP(data.endereco.cep)) {
     errors.cep = 'CEP deve ter o formato 00000-000';
   }
 
+  // Validação de logradouro: 5-200 caracteres
   if (!data.endereco?.logradouro?.trim()) {
     errors.logradouro = 'Logradouro é obrigatório';
-  } else if (data.endereco.logradouro.trim().length < 5 || data.endereco.logradouro.trim().length > 200) {
-    errors.logradouro = 'Logradouro deve ter entre 5 e 200 caracteres';
+  } else if (data.endereco.logradouro.trim().length < 5) {
+    errors.logradouro = 'Logradouro deve ter no mínimo 5 caracteres';
+  } else if (data.endereco.logradouro.trim().length > 200) {
+    errors.logradouro = 'Logradouro deve ter no máximo 200 caracteres';
   }
 
-  if (data.endereco?.numero?.trim() && data.endereco.numero.trim().length > 20) {
-    errors.numero = 'Número deve ter no máximo 20 caracteres';
+  // Validação de número: 1-20 caracteres (opcional)
+  if (data.endereco?.numero?.trim()) {
+    if (data.endereco.numero.trim().length > 20) {
+      errors.numero = 'Número deve ter no máximo 20 caracteres';
+    }
   }
 
-  if (data.endereco?.complemento?.trim() && data.endereco.complemento.trim().length > 100) {
-    errors.complemento = 'Complemento deve ter no máximo 100 caracteres';
+  // Validação de complemento: 3-100 caracteres (opcional)
+  if (data.endereco?.complemento?.trim()) {
+    const compTrimmed = data.endereco.complemento.trim();
+    if (compTrimmed.length < 3) {
+      errors.complemento = 'Complemento deve ter no mínimo 3 caracteres';
+    } else if (compTrimmed.length > 100) {
+      errors.complemento = 'Complemento deve ter no máximo 100 caracteres';
+    }
   }
 
+  // Validação de bairro: 2-100 caracteres
   if (!data.endereco?.bairro?.trim()) {
     errors.bairro = 'Bairro é obrigatório';
-  } else if (data.endereco.bairro.trim().length < 2 || data.endereco.bairro.trim().length > 100) {
-    errors.bairro = 'Bairro deve ter entre 2 e 100 caracteres';
+  } else if (data.endereco.bairro.trim().length < 2) {
+    errors.bairro = 'Bairro deve ter no mínimo 2 caracteres';
+  } else if (data.endereco.bairro.trim().length > 100) {
+    errors.bairro = 'Bairro deve ter no máximo 100 caracteres';
   }
 
+  // Validação de cidade: 2-100 caracteres
   if (!data.endereco?.cidade?.trim()) {
     errors.cidade = 'Cidade é obrigatória';
-  } else if (data.endereco.cidade.trim().length < 2 || data.endereco.cidade.trim().length > 100) {
-    errors.cidade = 'Cidade deve ter entre 2 e 100 caracteres';
+  } else if (data.endereco.cidade.trim().length < 2) {
+    errors.cidade = 'Cidade deve ter no mínimo 2 caracteres';
+  } else if (data.endereco.cidade.trim().length > 100) {
+    errors.cidade = 'Cidade deve ter no máximo 100 caracteres';
   }
 
+  // Validação de estado: 2 caracteres
   if (!data.endereco?.estado?.trim()) {
     errors.estado = 'Estado é obrigatório';
   } else if (!ValidationEstado(data.endereco.estado)) {
     errors.estado = 'Estado deve ser uma sigla válida com 2 letras maiúsculas';
   }
 
+  // Validação de documentos
   const docValidation = ValidationDocuments(data.cpf, data.rg);
   if (!docValidation.isValid) {
     errors.documentos = docValidation.error!;

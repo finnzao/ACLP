@@ -11,7 +11,7 @@ interface EnderecoFormProps {
   disabled?: boolean;
   showTitle?: boolean;
   className?: string;
-  required?: boolean; // Novo prop para indicar se é obrigatório
+  required?: boolean;
 }
 
 export default function EnderecoForm({

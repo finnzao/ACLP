@@ -4,11 +4,16 @@ import { useState, useCallback } from 'react';
 import { comparecimentosService } from '@/lib/api/services';
 import { ComparecimentoDTO, ComparecimentoResponse, ResumoSistemaResponse } from '@/types/api';
 import { useToastHelpers } from '@/components/Toast';
+import { 
+  ValidationValidadoPor, 
+  ValidationObservacoes, 
+  ValidationMotivoMudanca 
+} from '@/lib/utils/validation';
 
 interface RegistrarComparecimentoData {
   custodiadoId: number;
   dataComparecimento: string;
-  horaComparecimento: string; // Será convertido para HH:mm:ss
+  horaComparecimento: string;
   tipoValidacao: string;
   observacoes?: string;
   validadoPor: string;
@@ -26,19 +31,16 @@ interface RegistrarComparecimentoData {
 }
 
 interface UseComparecimentosReturn {
-  // Estados
   loading: boolean;
   error: string | null;
   comparecimentos: ComparecimentoResponse[];
   resumo: ResumoSistemaResponse | null;
   
-  // Operações
   registrarComparecimento: (data: RegistrarComparecimentoData) => Promise<{ success: boolean; message: string; data?: any }>;
   buscarPorCustodiado: (custodiadoId: number) => Promise<ComparecimentoResponse[]>;
   buscarComparecimentosHoje: () => Promise<ComparecimentoResponse[]>;
   obterResumoSistema: () => Promise<ResumoSistemaResponse | null>;
   
-  // Utilitários
   formatarHoraParaAPI: (hora: string) => string;
   validarDadosComparecimento: (data: RegistrarComparecimentoData) => { isValid: boolean; errors: string[] };
   limparEstados: () => void;
@@ -52,32 +54,23 @@ export function useComparecimentos(): UseComparecimentosReturn {
   
   const { success, error: showError } = useToastHelpers();
 
-  /**
-   * Formatar hora para o formato HH:mm:ss esperado pela API
-   */
   const formatarHoraParaAPI = useCallback((hora: string): string => {
     if (!hora) return '00:00:00';
     
-    // Se já está no formato HH:mm:ss, retorna como está
     if (hora.match(/^\d{2}:\d{2}:\d{2}$/)) {
       return hora;
     }
     
-    // Se está no formato HH:mm, adiciona :00
     if (hora.match(/^\d{2}:\d{2}$/)) {
       return `${hora}:00`;
     }
     
-    // Se está em outro formato, tenta converter
     const [hours, minutes] = hora.split(':');
     const h = hours?.padStart(2, '0') || '00';
     const m = minutes?.padStart(2, '0') || '00';
     return `${h}:${m}:00`;
   }, []);
 
-  /**
-   * Validar dados antes do envio
-   */
   const validarDadosComparecimento = useCallback((data: RegistrarComparecimentoData): { isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
 
@@ -97,26 +90,92 @@ export function useComparecimentos(): UseComparecimentosReturn {
       errors.push('Tipo de validação é obrigatório');
     }
 
-    if (!data.validadoPor?.trim()) {
-      errors.push('Nome do validador é obrigatório');
+    // Validação de validadoPor: 5-100 caracteres
+    const validadoPorValidation = ValidationValidadoPor(data.validadoPor);
+    if (!validadoPorValidation.isValid) {
+      errors.push(validadoPorValidation.error!);
+    }
+
+    // Validação de observações: 10-500 caracteres (opcional)
+    const observacoesValidation = ValidationObservacoes(data.observacoes);
+    if (!observacoesValidation.isValid) {
+      errors.push(observacoesValidation.error!);
+    }
+
+    // Validação de motivo de mudança: 10-500 caracteres (condicional)
+    const motivoValidation = ValidationMotivoMudanca(
+      data.motivoMudancaEndereco, 
+      data.mudancaEndereco
+    );
+    if (!motivoValidation.isValid) {
+      errors.push(motivoValidation.error!);
     }
 
     // Validar endereço se houver mudança
     if (data.mudancaEndereco && data.novoEndereco) {
       if (!data.novoEndereco.cep?.trim()) {
         errors.push('CEP é obrigatório para mudança de endereço');
+      } else {
+        const cepLimpo = data.novoEndereco.cep.replace(/\D/g, '');
+        if (cepLimpo.length < 8 || cepLimpo.length > 9) {
+          errors.push('CEP deve ter entre 8 e 9 dígitos');
+        }
       }
+
       if (!data.novoEndereco.logradouro?.trim()) {
         errors.push('Logradouro é obrigatório para mudança de endereço');
+      } else {
+        const logradouroTrimmed = data.novoEndereco.logradouro.trim();
+        if (logradouroTrimmed.length < 5) {
+          errors.push('Logradouro deve ter no mínimo 5 caracteres');
+        } else if (logradouroTrimmed.length > 200) {
+          errors.push('Logradouro deve ter no máximo 200 caracteres');
+        }
       }
+
+      // Validação de número: 1-20 caracteres (opcional)
+      if (data.novoEndereco.numero?.trim()) {
+        if (data.novoEndereco.numero.trim().length > 20) {
+          errors.push('Número deve ter no máximo 20 caracteres');
+        }
+      }
+
+      // Validação de complemento: 3-100 caracteres (opcional)
+      if (data.novoEndereco.complemento?.trim()) {
+        const compTrimmed = data.novoEndereco.complemento.trim();
+        if (compTrimmed.length < 3) {
+          errors.push('Complemento deve ter no mínimo 3 caracteres');
+        } else if (compTrimmed.length > 100) {
+          errors.push('Complemento deve ter no máximo 100 caracteres');
+        }
+      }
+
       if (!data.novoEndereco.bairro?.trim()) {
         errors.push('Bairro é obrigatório para mudança de endereço');
+      } else {
+        const bairroTrimmed = data.novoEndereco.bairro.trim();
+        if (bairroTrimmed.length < 2) {
+          errors.push('Bairro deve ter no mínimo 2 caracteres');
+        } else if (bairroTrimmed.length > 100) {
+          errors.push('Bairro deve ter no máximo 100 caracteres');
+        }
       }
+
       if (!data.novoEndereco.cidade?.trim()) {
         errors.push('Cidade é obrigatória para mudança de endereço');
+      } else {
+        const cidadeTrimmed = data.novoEndereco.cidade.trim();
+        if (cidadeTrimmed.length < 2) {
+          errors.push('Cidade deve ter no mínimo 2 caracteres');
+        } else if (cidadeTrimmed.length > 100) {
+          errors.push('Cidade deve ter no máximo 100 caracteres');
+        }
       }
+
       if (!data.novoEndereco.estado?.trim()) {
         errors.push('Estado é obrigatório para mudança de endereço');
+      } else if (data.novoEndereco.estado.trim().length !== 2) {
+        errors.push('Estado deve ter exatamente 2 caracteres');
       }
     }
 
@@ -126,13 +185,9 @@ export function useComparecimentos(): UseComparecimentosReturn {
     };
   }, []);
 
-  /**
-   * Registrar comparecimento
-   */
   const registrarComparecimento = useCallback(async (data: RegistrarComparecimentoData) => {
     console.log('[useComparecimentos] Iniciando registro de comparecimento:', data);
 
-    // Validar dados
     const validacao = validarDadosComparecimento(data);
     if (!validacao.isValid) {
       const errorMessage = `Dados inválidos: ${validacao.errors.join(', ')}`;
@@ -145,17 +200,16 @@ export function useComparecimentos(): UseComparecimentosReturn {
     setError(null);
 
     try {
-      // Preparar dados para API
       const dadosAPI: ComparecimentoDTO = {
         custodiadoId: data.custodiadoId,
         dataComparecimento: data.dataComparecimento,
-        horaComparecimento: formatarHoraParaAPI(data.horaComparecimento), // ✅ Formato correto HH:mm:ss
+        horaComparecimento: formatarHoraParaAPI(data.horaComparecimento),
         tipoValidacao: data.tipoValidacao,
-        observacoes: data.observacoes || '',
+        observacoes: data.observacoes?.trim() || '',
         validadoPor: data.validadoPor.trim(),
-        anexos: '', // Campo obrigatório na API
+        anexos: '',
         mudancaEndereco: data.mudancaEndereco || false,
-        motivoMudancaEndereco: data.motivoMudancaEndereco,
+        motivoMudancaEndereco: data.motivoMudancaEndereco?.trim(),
         novoEndereco: data.mudancaEndereco && data.novoEndereco ? {
           cep: data.novoEndereco.cep.trim(),
           logradouro: data.novoEndereco.logradouro.trim(),
@@ -169,7 +223,6 @@ export function useComparecimentos(): UseComparecimentosReturn {
 
       console.log('[useComparecimentos] Dados preparados para API:', dadosAPI);
 
-      // Chamar serviço
       const resultado = await comparecimentosService.registrar(dadosAPI);
 
       console.log('[useComparecimentos] Resposta da API:', resultado);
@@ -193,14 +246,12 @@ export function useComparecimentos(): UseComparecimentosReturn {
       
       let errorMessage = 'Erro interno do sistema';
       
-      // Tratar diferentes tipos de erro
       if (err?.response?.data?.message) {
         errorMessage = err.response.data.message;
       } else if (err?.message) {
         errorMessage = err.message;
       }
       
-      // Mensagens específicas para problemas comuns
       if (errorMessage.includes('hora') || errorMessage.includes('time')) {
         errorMessage = `Formato de hora inválido. Use HH:mm (ex: 14:30). Erro: ${errorMessage}`;
       }
@@ -214,9 +265,6 @@ export function useComparecimentos(): UseComparecimentosReturn {
     }
   }, [validarDadosComparecimento, formatarHoraParaAPI, success, showError]);
 
-  /**
-   * Buscar comparecimentos por custodiado
-   */
   const buscarPorCustodiado = useCallback(async (custodiadoId: number): Promise<ComparecimentoResponse[]> => {
     if (custodiadoId <= 0) {
       return [];
@@ -242,9 +290,6 @@ export function useComparecimentos(): UseComparecimentosReturn {
     }
   }, [showError]);
 
-  /**
-   * Buscar comparecimentos de hoje
-   */
   const buscarComparecimentosHoje = useCallback(async (): Promise<ComparecimentoResponse[]> => {
     setLoading(true);
     setError(null);
@@ -265,9 +310,6 @@ export function useComparecimentos(): UseComparecimentosReturn {
     }
   }, [showError]);
 
-  /**
-   * Obter resumo do sistema
-   */
   const obterResumoSistema = useCallback(async (): Promise<ResumoSistemaResponse | null> => {
     setLoading(true);
     setError(null);
@@ -289,9 +331,6 @@ export function useComparecimentos(): UseComparecimentosReturn {
     }
   }, [showError]);
 
-  /**
-   * Limpar estados
-   */
   const limparEstados = useCallback(() => {
     setError(null);
     setComparecimentos([]);
@@ -299,19 +338,16 @@ export function useComparecimentos(): UseComparecimentosReturn {
   }, []);
 
   return {
-    // Estados
     loading,
     error,
     comparecimentos,
     resumo,
 
-    // Operações
     registrarComparecimento,
     buscarPorCustodiado,
     buscarComparecimentosHoje,
     obterResumoSistema,
 
-    // Utilitários
     formatarHoraParaAPI,
     validarDadosComparecimento,
     limparEstados
