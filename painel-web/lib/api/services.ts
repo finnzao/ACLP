@@ -832,16 +832,48 @@ export const usuariosService = {
     return await apiClient.post<UsuarioResponse>('/usuarios', data);
   },
 
+  /**
+   * Atualizar usuário
+   */
   async atualizar(id: number, data: Partial<UsuarioDTO>): Promise<ApiResponse<UsuarioResponse>> {
-    console.log(`[UsuariosService] Atualizando usuário ID: ${id}`, data);
-    return await apiClient.put<UsuarioResponse>(`/usuarios/${id}`, data);
+    console.log(`[UsuariosService] Atualizando usuário ID: ${id}`);
+    console.log('[UsuariosService] Dados recebidos:', data);
+    
+    // Filtrar campos undefined/null para não enviar ao backend
+    const dadosLimpos: Record<string, any> = {};
+    
+    Object.entries(data).forEach(([key, value]) => {
+
+      if (value !== undefined && value !== null) {
+        dadosLimpos[key] = value;
+      }
+    });
+    
+    console.log('[UsuariosService] Dados limpos a serem enviados:', dadosLimpos);
+    
+    try {
+      const response = await apiClient.put<UsuarioResponse>(
+        `/usuarios/${id}`, 
+        dadosLimpos
+      );
+      
+      console.log('[UsuariosService] Resposta da API:', response);
+      
+      return response;
+    } catch (error: any) {
+      console.error('[UsuariosService] Erro ao atualizar:', error);
+      
+      // Log detalhado do erro
+      if (error.response) {
+        console.error('[UsuariosService] Status:', error.response.status);
+        console.error('[UsuariosService] Data:', error.response.data);
+        console.error('[UsuariosService] Headers:', error.response.headers);
+      }
+      
+      throw error;
+    }
   }
 };
-
-// ===========================
-// Demais Interfaces e Services (Auth, Convites, Status, Setup, Test)
-// Mantidos exatamente como no código original
-// ===========================
 
 export interface LoginRequest {
   email: string;

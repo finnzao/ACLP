@@ -11,6 +11,13 @@ export interface AlterarSenhaData {
   confirmaSenha: string;
 }
 
+export interface AtualizarPerfilData {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  departamento?: string;
+}
+
 export interface CriarConviteData {
   email: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
@@ -118,13 +125,9 @@ export function useUserManagement() {
 
   /**
    * Atualizar perfil do usuário
+   * Envia APENAS os campos que foram fornecidos
    */
-  const atualizarPerfil = useCallback(async (data: {
-    nome: string;
-    email: string;
-    telefone?: string;
-    departamento?: string;
-  }) => {
+  const atualizarPerfil = useCallback(async (data: AtualizarPerfilData) => {
     setLoading(true);
     setError(null);
 
@@ -138,8 +141,13 @@ export function useUserManagement() {
 
       const userId = profileResult.data.id;
 
-      // Atualizar usuário
+      console.log('[useUserManagement] Atualizando perfil do usuário:', userId);
+      console.log('[useUserManagement] Dados enviados:', data);
+
+      // Atualizar usuário - enviar apenas os campos fornecidos
       const result = await usuariosService.atualizar(userId, data);
+
+      console.log('[useUserManagement] Resultado da atualização:', result);
 
       if (result.success) {
         showToast({
@@ -153,13 +161,27 @@ export function useUserManagement() {
         throw new Error(result.message || 'Erro ao atualizar perfil');
       }
     } catch (error: any) {
-      const errorMsg = error.message || 'Erro ao atualizar perfil';
+      console.error('[useUserManagement] Erro ao atualizar perfil:', error);
+      
+      let errorMsg = 'Erro ao atualizar perfil';
+      
+      // Tratar erros de validação do backend
+      if (error.response?.data?.fieldErrors) {
+        const fieldErrors = error.response.data.fieldErrors;
+        const errorMessages = Object.entries(fieldErrors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .join(', ');
+        errorMsg = `Erros de validação: ${errorMessages}`;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
       setError(errorMsg);
       showToast({
         type: 'error',
         title: 'Erro',
         message: errorMsg,
-        duration: 3000
+        duration: 5000
       });
       return { success: false };
     } finally {
@@ -211,7 +233,7 @@ export function useUserManagement() {
   }, [showToast]);
 
   /**
-   * ✅ NOVA FUNÇÃO: Gerar link genérico (Admin)
+   * Gerar link genérico (Admin)
    */
   const gerarLinkConvite = useCallback(async (data: GerarLinkData) => {
     setLoading(true);
@@ -237,7 +259,7 @@ export function useUserManagement() {
         showToast({
           type: 'success',
           title: 'Link Gerado',
-          message: 'Link de convite criado com sucesso',
+          message: 'Link de convite criado e copiado para área de transferência',
           duration: 5000
         });
         return { success: true, data: response.data };
@@ -377,13 +399,104 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
+  /**
+   * Atualizar perfil com confirmação de senha
+   */
+  const atualizarPerfilComSenha = useCallback(async (
+    data: AtualizarPerfilData,
+    senhaAtual: string
+  ) => {
+    if (!senhaAtual || !senhaAtual.trim()) {
+      showToast({
+        type: 'error',
+        title: 'Senha obrigatória',
+        message: 'Digite sua senha atual para confirmar a operação',
+        duration: 3000
+      });
+      return { success: false };
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log('[useUserManagement] Atualizando perfil com senha');
+
+      // Obter ID do usuário atual
+      const profileResult = await authService.getProfile();
+      
+      if (!profileResult.success || !profileResult.data) {
+        throw new Error('Não foi possível obter dados do usuário');
+      }
+
+      const userId = profileResult.data.id;
+
+      // Adicionar senha atual aos dados
+      const dadosComSenha = {
+        ...data,
+        senhaAtual // Backend irá validar a senha
+      };
+
+      console.log('[useUserManagement] Dados a serem enviados:', {
+        ...dadosComSenha,
+        senhaAtual: '***' // Não logar senha
+      });
+
+      const result = await usuariosService.atualizar(userId, dadosComSenha);
+
+      if (result.success) {
+        showToast({
+          type: 'success',
+          title: 'Perfil Atualizado',
+          message: 'Suas informações foram atualizadas com sucesso',
+          duration: 3000
+        });
+        return { success: true, data: result.data };
+      } else {
+        // Verificar se o erro é de senha incorreta
+        if (result.message?.toLowerCase().includes('senha')) {
+          throw new Error('Senha atual incorreta');
+        }
+        throw new Error(result.message || 'Erro ao atualizar perfil');
+      }
+    } catch (error: any) {
+      console.error('[useUserManagement] Erro ao atualizar perfil:', error);
+      
+      let errorMsg = 'Erro ao atualizar perfil';
+      
+      if (error.message?.toLowerCase().includes('senha')) {
+        errorMsg = 'Senha atual incorreta';
+      } else if (error.response?.data?.fieldErrors) {
+        const fieldErrors = error.response.data.fieldErrors;
+        const errorMessages = Object.entries(fieldErrors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .join(', ');
+        errorMsg = `Erros de validação: ${errorMessages}`;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      setError(errorMsg);
+      showToast({
+        type: 'error',
+        title: 'Erro',
+        message: errorMsg,
+        duration: 5000
+      });
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
   return {
     loading,
     error,
     alterarSenha,
     atualizarPerfil,
+    atualizarPerfilComSenha,
     criarConvite,
-    gerarLinkConvite, // ✅ Função adicionada
+    gerarLinkConvite,
     listarConvites,
     reenviarConvite,
     cancelarConvite

@@ -27,7 +27,8 @@ import {
   Trash2,
   CheckCheck,
   Link as LinkIcon,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 
 // Componente de validação de senha
@@ -75,6 +76,9 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   );
 };
 
+// Modal de confirmação de senha removido - não é mais necessário
+// O backend valida através do token JWT
+
 // Tipo para abas
 type Tab = 'perfil' | 'seguranca' | 'convites';
 
@@ -100,7 +104,7 @@ export default function ConfiguracoesPage() {
   const { 
     loading, 
     alterarSenha, 
-    atualizarPerfil,
+    atualizarPerfilComSenha,
     criarConvite,
     gerarLinkConvite,
     listarConvites,
@@ -115,8 +119,10 @@ export default function ConfiguracoesPage() {
   // Estados do perfil
   const [nomeUsuario, setNomeUsuario] = useState(user?.nome || '');
   const [emailUsuario, setEmailUsuario] = useState(user?.email || '');
-  const [telefoneUsuario, setTelefoneUsuario] = useState(user?.telefone || '');
   const [departamentoUsuario, setDepartamentoUsuario] = useState(user?.departamento || '');
+  
+  // Modal de confirmação de senha
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   
   // Estados de segurança
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -130,12 +136,12 @@ export default function ConfiguracoesPage() {
   const [convites, setConvites] = useState<Convite[]>([]);
   const [loadingConvites, setLoadingConvites] = useState(false);
   
-  // Estados para convite com email (antigo)
+  // Estados para convite com email
   const [novoConviteEmail, setNovoConviteEmail] = useState('');
   const [novoConviteTipo, setNovoConviteTipo] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
   const [mostrarFormConviteEmail, setMostrarFormConviteEmail] = useState(false);
   
-  // Estados para link genérico (novo)
+  // Estados para link genérico
   const [tipoUsuarioLink, setTipoUsuarioLink] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
   const [diasValidadeLink, setDiasValidadeLink] = useState(30);
   const [mostrarFormGerarLink, setMostrarFormGerarLink] = useState(false);
@@ -144,7 +150,6 @@ export default function ConfiguracoesPage() {
     if (user) {
       setNomeUsuario(user.nome || '');
       setEmailUsuario(user.email || '');
-      setTelefoneUsuario(user.telefone || '');
       setDepartamentoUsuario(user.departamento || '');
     }
   }, [user]);
@@ -159,32 +164,21 @@ export default function ConfiguracoesPage() {
   const carregarConvites = async () => {
     setLoadingConvites(true);
     try {
-      console.log('[ConfiguracoesPage] Iniciando carregamento de convites');
-      
       const result = await listarConvites();
-      
-      console.log('[ConfiguracoesPage] Resultado completo:', result);
       
       if (result && result.success) {
         if (Array.isArray(result.data)) {
-          console.log('[ConfiguracoesPage] Convites recebidos:', result.data.length);
           setConvites(result.data);
-        } 
-        else if (result.data && typeof result.data === 'object') {
+        } else if (result.data && typeof result.data === 'object') {
           if (Array.isArray(result.data.data)) {
-            console.log('[ConfiguracoesPage] Array encontrado em result.data.data');
             setConvites(result.data.data);
           } else {
-            console.warn('[ConfiguracoesPage] result.data não é array:', result.data);
             setConvites([]);
           }
-        } 
-        else {
-          console.warn('[ConfiguracoesPage] result.data está vazio ou inválido');
+        } else {
           setConvites([]);
         }
       } else {
-        console.warn('[ConfiguracoesPage] Resultado sem sucesso:', result);
         setConvites([]);
       }
     } catch (error) {
@@ -202,7 +196,7 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfileClick = () => {
     if (!user) return;
 
     if (!nomeUsuario.trim()) {
@@ -225,17 +219,47 @@ export default function ConfiguracoesPage() {
       return;
     }
 
+    // Verificar se houve alterações
+    const houveAlteracao = 
+      nomeUsuario !== user.nome ||
+      emailUsuario !== user.email ||
+      departamentoUsuario !== user.departamento;
+
+    if (!houveAlteracao) {
+      showToast({
+        type: 'info',
+        title: 'Nenhuma alteração',
+        message: 'Não há alterações para salvar',
+        duration: 3000
+      });
+      return;
+    }
+
+    // Abrir modal de confirmação de senha
+    setShowPasswordModal(true);
+  };
+
+  const handleConfirmPassword = async (senha: string) => {
+    if (!user) return;
+
     setIsSaving(true);
 
     try {
-      const result = await atualizarPerfil({
-        nome: nomeUsuario,
-        email: emailUsuario,
-        telefone: telefoneUsuario,
-        departamento: departamentoUsuario
-      });
+      // Preparar dados alterados
+      const dadosAtualizacao: {
+        nome?: string;
+        email?: string;
+        departamento?: string;
+      } = {};
+
+      if (nomeUsuario !== user.nome) dadosAtualizacao.nome = nomeUsuario;
+      if (emailUsuario !== user.email) dadosAtualizacao.email = emailUsuario;
+      if (departamentoUsuario !== user.departamento) dadosAtualizacao.departamento = departamentoUsuario;
+
+      const result = await atualizarPerfilComSenha(dadosAtualizacao, senha);
 
       if (result.success) {
+        setShowPasswordModal(false);
         setShowSaveSuccess(true);
         setTimeout(() => setShowSaveSuccess(false), 3000);
       }
@@ -292,10 +316,13 @@ export default function ConfiguracoesPage() {
     });
   
     if (result.success) {
-      // Sucesso - link gerado
       if (result.data?.link) {
         navigator.clipboard.writeText(result.data.link);
       }
+      carregarConvites();
+      setMostrarFormGerarLink(false);
+      setTipoUsuarioLink('USUARIO');
+      setDiasValidadeLink(30);
     }
   };
 
@@ -377,6 +404,14 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
+      {/* Modal de Confirmação de Senha */}
+      <PasswordConfirmModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onConfirm={handleConfirmPassword}
+        loading={isSaving}
+      />
+
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
         <button
@@ -447,23 +482,32 @@ export default function ConfiguracoesPage() {
                 onChange={e => setEmailUsuario(e.target.value)}
                 placeholder="Email"
               />
-              <InputGroup 
-                label="Telefone"
-                value={telefoneUsuario} 
-                onChange={e => setTelefoneUsuario(e.target.value)} 
-                placeholder="(00) 00000-0000" 
-              />
-              <InputGroup 
-                label="Departamento"
-                value={departamentoUsuario} 
-                onChange={e => setDepartamentoUsuario(e.target.value)} 
-                placeholder="Departamento" 
-              />
+              <div className="md:col-span-2">
+                <InputGroup 
+                  label="Departamento"
+                  value={departamentoUsuario} 
+                  onChange={e => setDepartamentoUsuario(e.target.value)} 
+                  placeholder="Departamento" 
+                />
+              </div>
+            </div>
+
+            {/* Info sobre senha */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Lock className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800">Segurança</p>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Ao salvar alterações, você precisará confirmar sua senha atual por segurança.
+                  </p>
+                </div>
+              </div>
             </div>
             
             <div className="flex justify-end mt-6">
               <button 
-                onClick={handleSaveProfile}
+                onClick={handleSaveProfileClick}
                 disabled={isSaving}
                 className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
