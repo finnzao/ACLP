@@ -64,7 +64,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = !!user;
 
-  // Verificar se o token está expirado
   const isTokenExpired = (token: string): boolean => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
@@ -72,7 +71,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const currentTime = Date.now();
       const timeUntilExpiry = expirationTime - currentTime;
       
-      // Considera expirado se falta menos de 1 minuto
       return timeUntilExpiry < 60000;
     } catch (error) {
       console.error('[AuthContext] Erro ao verificar expiração do token:', error);
@@ -80,7 +78,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Limpar autenticação completamente
   const clearAuthData = () => {
     console.log('[AuthContext] Limpando dados de autenticação');
     authService.clearAuth();
@@ -101,7 +98,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      // Verificar se o token está expirado
       if (isTokenExpired(accessToken)) {
         console.log('[AuthContext] Token expirado, tentando renovar');
         
@@ -114,10 +110,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (refreshResult.success && refreshResult.data) {
               console.log('[AuthContext] Token renovado com sucesso');
               
-              // Atualizar token no httpClient
               httpClient.setAuthToken(refreshResult.data.accessToken);
               
-              // Atualizar cookie
               const maxAge = refreshResult.data.expiresIn || 3600;
               document.cookie = `auth-token=${refreshResult.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
             } else {
@@ -139,7 +133,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
       } else {
-        // Token válido, configurar no httpClient
         console.log('[AuthContext] Token válido, configurando no httpClient');
         httpClient.setAuthToken(accessToken);
       }
@@ -168,7 +161,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error: any) {
       console.error('[AuthContext] Erro ao carregar usuário:', error);
       
-      // Se for erro 401, limpar autenticação
       if (error.message?.includes('401') || error.message?.includes('expirada')) {
         console.log('[AuthContext] Sessão expirada, limpando autenticação');
         clearAuthData();
@@ -178,7 +170,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Configurar interceptor de eventos de expiração
   useEffect(() => {
     const handleTokenExpired = () => {
       console.log('[AuthContext] Evento de token expirado recebido');
@@ -196,7 +187,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     loadUser();
 
-    // Verificar expiração do token a cada 1 minuto
     const intervalId = setInterval(() => {
       const token = authService.getAccessToken();
       
@@ -218,7 +208,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const now = Date.now() / 1000;
       
-      // Token expirado
       if (decoded.exp < now) {
         console.log('[AuthContext] Token expirado detectado no intervalo');
         
@@ -248,7 +237,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           router.push('/login');
         }
       }
-      // Token próximo de expirar (menos de 5 minutos)
       else if ((decoded.exp - now) < 300) {
         console.log('[AuthContext] Token próximo de expirar, renovando...');
         
@@ -268,7 +256,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           });
         }
       }
-    }, 60000); // Verificar a cada 1 minuto
+    }, 60000);
 
     return () => clearInterval(intervalId);
   }, [router]);
@@ -332,7 +320,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('[AuthContext] Erro no logout:', error);
     } finally {
-      // Sempre limpar dados locais, independente do resultado do servidor
       clearAuthData();
       console.log('[AuthContext] Dados locais limpos após logout');
       router.push('/login');

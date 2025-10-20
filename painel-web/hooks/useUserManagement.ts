@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// painel-web/hooks/useUserManagement.ts
 import { useState, useCallback } from 'react';
-import { usuariosService, authService } from '@/lib/api/services';
+import { authService } from '@/lib/api/authService';
 import { useToast } from '@/components/Toast';
 import { httpClient } from '@/lib/http/client';
 
@@ -34,11 +33,7 @@ export function useUserManagement() {
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  /**
-   * Alterar senha do usuário atual
-   */
   const alterarSenha = useCallback(async (data: AlterarSenhaData) => {
-    // Validações
     if (!data.senhaAtual) {
       showToast({
         type: 'error',
@@ -69,7 +64,6 @@ export function useUserManagement() {
       return { success: false };
     }
 
-    // Validar força da senha
     const hasUpperCase = /[A-Z]/.test(data.novaSenha);
     const hasLowerCase = /[a-z]/.test(data.novaSenha);
     const hasNumber = /[0-9]/.test(data.novaSenha);
@@ -123,29 +117,15 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
-  /**
-   * Atualizar perfil do usuário
-   * Envia APENAS os campos que foram fornecidos
-   */
   const atualizarPerfil = useCallback(async (data: AtualizarPerfilData) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Obter ID do usuário atual
-      const profileResult = await authService.getProfile();
-      
-      if (!profileResult.success || !profileResult.data) {
-        throw new Error('Não foi possível obter dados do usuário');
-      }
-
-      const userId = profileResult.data.id;
-
-      console.log('[useUserManagement] Atualizando perfil do usuário:', userId);
+      console.log('[useUserManagement] Atualizando perfil');
       console.log('[useUserManagement] Dados enviados:', data);
 
-      // Atualizar usuário - enviar apenas os campos fornecidos
-      const result = await usuariosService.atualizar(userId, data);
+      const result = await authService.updateProfile(data);
 
       console.log('[useUserManagement] Resultado da atualização:', result);
 
@@ -165,7 +145,6 @@ export function useUserManagement() {
       
       let errorMsg = 'Erro ao atualizar perfil';
       
-      // Tratar erros de validação do backend
       if (error.response?.data?.fieldErrors) {
         const fieldErrors = error.response.data.fieldErrors;
         const errorMessages = Object.entries(fieldErrors)
@@ -189,9 +168,6 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
-  /**
-   * Criar convite com email específico (Admin)
-   */
   const criarConvite = useCallback(async (data: CriarConviteData) => {
     setLoading(true);
     setError(null);
@@ -232,9 +208,6 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
-  /**
-   * Gerar link genérico (Admin)
-   */
   const gerarLinkConvite = useCallback(async (data: GerarLinkData) => {
     setLoading(true);
     setError(null);
@@ -281,9 +254,6 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
-  /**
-   * Listar convites
-   */
   const listarConvites = useCallback(async (status?: string) => {
     setLoading(true);
     setError(null);
@@ -318,9 +288,6 @@ export function useUserManagement() {
     }
   }, []);
 
-  /**
-   * Reenviar convite
-   */
   const reenviarConvite = useCallback(async (id: number) => {
     setLoading(true);
     setError(null);
@@ -359,10 +326,7 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
-  /**
-   * Cancelar convite
-   */
-  const cancelarConvite = useCallback(async (id: number, motivo?: string) => {
+  const cancelarConvite = useCallback(async (id: number) => {
     setLoading(true);
     setError(null);
 
@@ -399,102 +363,11 @@ export function useUserManagement() {
     }
   }, [showToast]);
 
-  /**
-   * Atualizar perfil com confirmação de senha
-   */
-  const atualizarPerfilComSenha = useCallback(async (
-    data: AtualizarPerfilData,
-    senhaAtual: string
-  ) => {
-    if (!senhaAtual || !senhaAtual.trim()) {
-      showToast({
-        type: 'error',
-        title: 'Senha obrigatória',
-        message: 'Digite sua senha atual para confirmar a operação',
-        duration: 3000
-      });
-      return { success: false };
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      console.log('[useUserManagement] Atualizando perfil com senha');
-
-      // Obter ID do usuário atual
-      const profileResult = await authService.getProfile();
-      
-      if (!profileResult.success || !profileResult.data) {
-        throw new Error('Não foi possível obter dados do usuário');
-      }
-
-      const userId = profileResult.data.id;
-
-      // Adicionar senha atual aos dados
-      const dadosComSenha = {
-        ...data,
-        senhaAtual // Backend irá validar a senha
-      };
-
-      console.log('[useUserManagement] Dados a serem enviados:', {
-        ...dadosComSenha,
-        senhaAtual: '***' // Não logar senha
-      });
-
-      const result = await usuariosService.atualizar(userId, dadosComSenha);
-
-      if (result.success) {
-        showToast({
-          type: 'success',
-          title: 'Perfil Atualizado',
-          message: 'Suas informações foram atualizadas com sucesso',
-          duration: 3000
-        });
-        return { success: true, data: result.data };
-      } else {
-        // Verificar se o erro é de senha incorreta
-        if (result.message?.toLowerCase().includes('senha')) {
-          throw new Error('Senha atual incorreta');
-        }
-        throw new Error(result.message || 'Erro ao atualizar perfil');
-      }
-    } catch (error: any) {
-      console.error('[useUserManagement] Erro ao atualizar perfil:', error);
-      
-      let errorMsg = 'Erro ao atualizar perfil';
-      
-      if (error.message?.toLowerCase().includes('senha')) {
-        errorMsg = 'Senha atual incorreta';
-      } else if (error.response?.data?.fieldErrors) {
-        const fieldErrors = error.response.data.fieldErrors;
-        const errorMessages = Object.entries(fieldErrors)
-          .map(([field, message]) => `${field}: ${message}`)
-          .join(', ');
-        errorMsg = `Erros de validação: ${errorMessages}`;
-      } else if (error.message) {
-        errorMsg = error.message;
-      }
-      
-      setError(errorMsg);
-      showToast({
-        type: 'error',
-        title: 'Erro',
-        message: errorMsg,
-        duration: 5000
-      });
-      return { success: false };
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
-
   return {
     loading,
     error,
     alterarSenha,
     atualizarPerfil,
-    atualizarPerfilComSenha,
     criarConvite,
     gerarLinkConvite,
     listarConvites,

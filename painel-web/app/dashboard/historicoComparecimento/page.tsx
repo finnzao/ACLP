@@ -18,9 +18,6 @@ import {
   FileText,
   RefreshCw,
   MapPin,
-  Clock,
-  CheckCircle,
-  AlertCircle
 } from 'lucide-react';
 
 interface HistoricoFormatado extends ComparecimentoResponse {
@@ -72,7 +69,7 @@ export default function HistoricoPage() {
 
     try {
       console.log('[HistoricoPage] Carregando históricos...');
-      
+
       // Buscar todos os comparecimentos usando o endpoint com paginação
       const response = await comparecimentosService.listarTodos({
         page: 0,
@@ -82,8 +79,8 @@ export default function HistoricoPage() {
       console.log('[HistoricoPage] Resposta recebida:', response);
 
       if (response.success && response.data) {
-        const historicosData = Array.isArray(response.data) 
-          ? response.data 
+        const historicosData = Array.isArray(response.data)
+          ? response.data
           : response.data.comparecimentos || [];
 
         // Formatar dados
@@ -185,8 +182,8 @@ export default function HistoricoPage() {
         const nomeNormalizado = normalizarTexto(item.custodiadoNomeCompleto || '');
         const validadorNormalizado = normalizarTexto(item.validadoPor || '');
 
-        matchTexto = nomeNormalizado.includes(termoNormalizado) || 
-                     validadorNormalizado.includes(termoNormalizado);
+        matchTexto = nomeNormalizado.includes(termoNormalizado) ||
+          validadorNormalizado.includes(termoNormalizado);
       }
 
       const matchTipo = filtroTipoValidacao === 'todos' || item.tipoValidacao === filtroTipoValidacao;
@@ -236,9 +233,6 @@ export default function HistoricoPage() {
   }, [historicos, filtrarDados, ordenarDados]);
 
   const totalFiltrados = dadosFiltrados.length;
-  const totalPresencial = dadosFiltrados.filter(d => d.tipoValidacao === 'PRESENCIAL').length;
-  const totalOnline = dadosFiltrados.filter(d => d.tipoValidacao === 'ONLINE').length;
-  const totalCadastroInicial = dadosFiltrados.filter(d => d.tipoValidacao === 'CADASTRO_INICIAL').length;
 
   const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -304,11 +298,10 @@ export default function HistoricoPage() {
               <h3 className="font-semibold text-gray-800 text-sm">{item.custodiadoNomeCompleto}</h3>
             </div>
           </div>
-          <span className={`px-2 py-1 rounded text-xs font-medium ${
-            item.tipoValidacao === 'PRESENCIAL' ? 'bg-green-100 text-green-800' :
+          <span className={`px-2 py-1 rounded text-xs font-medium ${item.tipoValidacao === 'PRESENCIAL' ? 'bg-green-100 text-green-800' :
             item.tipoValidacao === 'ONLINE' ? 'bg-blue-100 text-blue-800' :
-            'bg-purple-100 text-purple-800'
-          }`}>
+              'bg-purple-100 text-purple-800'
+            }`}>
             {item.tipoValidacaoFormatado}
           </span>
         </div>
@@ -329,10 +322,13 @@ export default function HistoricoPage() {
             </div>
           )}
           {item.mudancaEndereco && (
-            <div className="flex items-center gap-2 text-xs text-green-600">
+            <button
+              onClick={() => router.push(`/dashboard/historicoComparecimento/enderecos/${item.custodiadoId}`)}
+              className="flex items-center gap-2 text-xs text-green-600 hover:text-green-700 transition-colors"
+            >
               <MapPin className="w-3.5 h-3.5" />
-              <span>Mudança de endereço registrada</span>
-            </div>
+              <span>Ver histórico de endereços</span>
+            </button>
           )}
         </div>
       </div>
@@ -396,24 +392,7 @@ export default function HistoricoPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-4 gap-2 mt-3">
-                <div className="bg-gray-50 p-2 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-primary">{totalFiltrados}</p>
-                  <p className="text-xs text-gray-600">Total</p>
-                </div>
-                <div className="bg-gray-50 p-2 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-green-500">{totalPresencial}</p>
-                  <p className="text-xs text-gray-600">Presencial</p>
-                </div>
-                <div className="bg-gray-50 p-2 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-blue-500">{totalOnline}</p>
-                  <p className="text-xs text-gray-600">Online</p>
-                </div>
-                <div className="bg-gray-50 p-2 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-purple-500">{totalCadastroInicial}</p>
-                  <p className="text-xs text-gray-600">Cadastro</p>
-                </div>
-              </div>
+
 
               {showFilters && (
                 <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-3 animate-in slide-in-from-top-2">
@@ -538,25 +517,6 @@ export default function HistoricoPage() {
                 Atualizar
               </button>
               <ExportButton dados={historicos as any} dadosFiltrados={dadosFiltrados as any} filterInfo={exportFilterInfo} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-primary">
-              <p className="text-sm text-text-muted">Total de Registros</p>
-              <p className="text-2xl font-bold text-primary-dark">{totalFiltrados}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-green-500">
-              <p className="text-sm text-text-muted">Presencial</p>
-              <p className="text-2xl font-bold text-green-600">{totalPresencial}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-blue-500">
-              <p className="text-sm text-text-muted">Online</p>
-              <p className="text-2xl font-bold text-blue-600">{totalOnline}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-purple-500">
-              <p className="text-sm text-text-muted">Cadastro Inicial</p>
-              <p className="text-2xl font-bold text-purple-600">{totalCadastroInicial}</p>
             </div>
           </div>
 
@@ -701,11 +661,10 @@ export default function HistoricoPage() {
                         {item.horaFormatada}
                       </td>
                       <td className="p-3 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          item.tipoValidacao === 'PRESENCIAL' ? 'bg-green-100 text-green-800' :
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.tipoValidacao === 'PRESENCIAL' ? 'bg-green-100 text-green-800' :
                           item.tipoValidacao === 'ONLINE' ? 'bg-blue-100 text-blue-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>
+                            'bg-purple-100 text-purple-800'
+                          }`}>
                           {item.tipoValidacaoFormatado}
                         </span>
                       </td>
@@ -719,13 +678,18 @@ export default function HistoricoPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
+
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           {item.mudancaEndereco && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                            <button
+                              onClick={() => router.push(`/dashboard/historicoComparecimento/enderecos/${item.custodiadoId}`)}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs hover:bg-green-200 transition-colors cursor-pointer"
+                              title="Ver histórico de endereços"
+                            >
                               <MapPin className="w-3 h-3" />
                               Mudança
-                            </span>
+                            </button>
                           )}
                           {item.anexos && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
@@ -735,6 +699,7 @@ export default function HistoricoPage() {
                           )}
                         </div>
                       </td>
+
                     </tr>
                   ))}
                 </tbody>

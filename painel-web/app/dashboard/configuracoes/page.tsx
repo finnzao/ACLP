@@ -27,11 +27,9 @@ import {
   Trash2,
   CheckCheck,
   Link as LinkIcon,
-  Calendar,
-  X
+  Calendar
 } from 'lucide-react';
 
-// Componente de validação de senha
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   const calculateStrength = () => {
     let strength = 0;
@@ -76,13 +74,8 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   );
 };
 
-// Modal de confirmação de senha removido - não é mais necessário
-// O backend valida através do token JWT
-
-// Tipo para abas
 type Tab = 'perfil' | 'seguranca' | 'convites';
 
-// Interface para Convite
 interface Convite {
   id: number;
   email: string | null;
@@ -96,7 +89,6 @@ interface Convite {
   departamento?: string;
 }
 
-// Componente Principal
 export default function ConfiguracoesPage() {
   const { user, logout } = useAuth();
   const { isAdmin } = usePermissions();
@@ -104,7 +96,7 @@ export default function ConfiguracoesPage() {
   const { 
     loading, 
     alterarSenha, 
-    atualizarPerfilComSenha,
+    atualizarPerfil,
     criarConvite,
     gerarLinkConvite,
     listarConvites,
@@ -116,15 +108,10 @@ export default function ConfiguracoesPage() {
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Estados do perfil
   const [nomeUsuario, setNomeUsuario] = useState(user?.nome || '');
   const [emailUsuario, setEmailUsuario] = useState(user?.email || '');
   const [departamentoUsuario, setDepartamentoUsuario] = useState(user?.departamento || '');
   
-  // Modal de confirmação de senha
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  
-  // Estados de segurança
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
@@ -132,16 +119,13 @@ export default function ConfiguracoesPage() {
   const [mostrarNovaSenha, setMostrarNovaSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
-  // Estados de convites
   const [convites, setConvites] = useState<Convite[]>([]);
   const [loadingConvites, setLoadingConvites] = useState(false);
   
-  // Estados para convite com email
   const [novoConviteEmail, setNovoConviteEmail] = useState('');
   const [novoConviteTipo, setNovoConviteTipo] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
   const [mostrarFormConviteEmail, setMostrarFormConviteEmail] = useState(false);
   
-  // Estados para link genérico
   const [tipoUsuarioLink, setTipoUsuarioLink] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
   const [diasValidadeLink, setDiasValidadeLink] = useState(30);
   const [mostrarFormGerarLink, setMostrarFormGerarLink] = useState(false);
@@ -158,7 +142,6 @@ export default function ConfiguracoesPage() {
     if (activeTab === 'convites' && isAdmin()) {
       carregarConvites();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const carregarConvites = async () => {
@@ -196,7 +179,7 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const handleSaveProfileClick = () => {
+  const handleSaveProfile = async () => {
     if (!user) return;
 
     if (!nomeUsuario.trim()) {
@@ -219,7 +202,6 @@ export default function ConfiguracoesPage() {
       return;
     }
 
-    // Verificar se houve alterações
     const houveAlteracao = 
       nomeUsuario !== user.nome ||
       emailUsuario !== user.email ||
@@ -235,17 +217,9 @@ export default function ConfiguracoesPage() {
       return;
     }
 
-    // Abrir modal de confirmação de senha
-    setShowPasswordModal(true);
-  };
-
-  const handleConfirmPassword = async (senha: string) => {
-    if (!user) return;
-
     setIsSaving(true);
 
     try {
-      // Preparar dados alterados
       const dadosAtualizacao: {
         nome?: string;
         email?: string;
@@ -256,10 +230,9 @@ export default function ConfiguracoesPage() {
       if (emailUsuario !== user.email) dadosAtualizacao.email = emailUsuario;
       if (departamentoUsuario !== user.departamento) dadosAtualizacao.departamento = departamentoUsuario;
 
-      const result = await atualizarPerfilComSenha(dadosAtualizacao, senha);
+      const result = await atualizarPerfil(dadosAtualizacao);
 
       if (result.success) {
-        setShowPasswordModal(false);
         setShowSaveSuccess(true);
         setTimeout(() => setShowSaveSuccess(false), 3000);
       }
@@ -373,7 +346,6 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-primary mb-2">Configurações</h2>
@@ -396,7 +368,6 @@ export default function ConfiguracoesPage() {
         </button>
       </div>
 
-      {/* Success Message */}
       {showSaveSuccess && (
         <div className="fixed top-4 right-4 bg-green-500 text-white p-3 rounded-lg shadow-lg z-30 flex items-center gap-2 animate-in slide-in-from-top-2">
           <Check className="w-5 h-5" />
@@ -404,15 +375,6 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
-      {/* Modal de Confirmação de Senha */}
-      <PasswordConfirmModal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        onConfirm={handleConfirmPassword}
-        loading={isSaving}
-      />
-
-      {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
         <button
           onClick={() => setActiveTab('perfil')}
@@ -459,7 +421,6 @@ export default function ConfiguracoesPage() {
         )}
       </div>
 
-      {/* Perfil Tab */}
       {activeTab === 'perfil' && (
         <div className="space-y-6">
           <section className="bg-white p-6 rounded-xl shadow">
@@ -491,23 +452,10 @@ export default function ConfiguracoesPage() {
                 />
               </div>
             </div>
-
-            {/* Info sobre senha */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <Lock className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Segurança</p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Ao salvar alterações, você precisará confirmar sua senha atual por segurança.
-                  </p>
-                </div>
-              </div>
-            </div>
             
             <div className="flex justify-end mt-6">
               <button 
-                onClick={handleSaveProfileClick}
+                onClick={handleSaveProfile}
                 disabled={isSaving}
                 className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -528,7 +476,6 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
-      {/* Segurança Tab */}
       {activeTab === 'seguranca' && (
         <div className="space-y-6">
           <section className="bg-white p-6 rounded-xl shadow">
@@ -627,16 +574,16 @@ export default function ConfiguracoesPage() {
                 <p className="text-sm font-medium text-blue-800">Requisitos de senha:</p>
                 <ul className="text-xs text-blue-700 mt-1 space-y-1">
                   <li className={novaSenha.length >= 8 ? 'text-green-600' : ''}>
-                    • Mínimo de 8 caracteres
+                    Mínimo de 8 caracteres
                   </li>
                   <li className={/[a-z]/.test(novaSenha) && /[A-Z]/.test(novaSenha) ? 'text-green-600' : ''}>
-                    • Letras maiúsculas e minúsculas
+                    Letras maiúsculas e minúsculas
                   </li>
                   <li className={/[0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
-                    • Pelo menos um número
+                    Pelo menos um número
                   </li>
                   <li className={/[^a-zA-Z0-9]/.test(novaSenha) ? 'text-green-600' : ''}>
-                    • Pelo menos um caractere especial
+                    Pelo menos um caractere especial
                   </li>
                 </ul>
               </div>
@@ -663,10 +610,8 @@ export default function ConfiguracoesPage() {
         </div>
       )}
 
-      {/* Convites Tab */}
       {activeTab === 'convites' && isAdmin() && (
         <div className="space-y-6">
-          {/* Opções de Criar Convites */}
           <section className="bg-white p-6 rounded-xl shadow">
             <div className="flex items-center gap-3 mb-4">
               <UserPlus className="w-5 h-5 text-primary" />
@@ -674,7 +619,6 @@ export default function ConfiguracoesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Card: Link Genérico */}
               <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 hover:border-blue-500 transition-colors">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
@@ -764,7 +708,6 @@ export default function ConfiguracoesPage() {
                 )}
               </div>
 
-              {/* Card: Convite com Email */}
               <div className="border-2 border-dashed border-green-300 rounded-lg p-4 hover:border-green-500 transition-colors">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -850,7 +793,6 @@ export default function ConfiguracoesPage() {
             </div>
           </section>
 
-          {/* Lista de Convites */}
           <section className="bg-white p-6 rounded-xl shadow">
             <div className="flex items-center gap-3 mb-4">
               <Mail className="w-5 h-5 text-primary" />

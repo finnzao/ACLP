@@ -4,3 +4,4 @@ export { useComparecimentos } from './useComparecimentos';
 export { useAddressValidation } from './useAddressValidation';
 export { useConfirmDialog } from './useConfirmDialog';
 export { useUserManagement } from './useUserManagement';
+export { useHistoricoEndereco } from './useHistoricoEndereco';

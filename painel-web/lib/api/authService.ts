@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient } from '@/lib/http/client';
 
-// Interfaces
-
 interface LoginRequest {
   email: string;
   senha: string;
@@ -75,6 +73,13 @@ interface GetProfileResponseData {
   };
 }
 
+interface UpdateProfileRequest {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  departamento?: string;
+}
+
 interface ChangePasswordRequest {
   senhaAtual: string;
   novaSenha: string;
@@ -93,7 +98,6 @@ interface TokenPayload {
   iss: string;
 }
 
-// Helper para extrair dados
 function extractResponseData<T>(response: any): T | null {
   if (response && typeof response === 'object') {
     if ('data' in response && response.data) {
@@ -104,7 +108,6 @@ function extractResponseData<T>(response: any): T | null {
   return null;
 }
 
-// Verificar se a resposta indica sucesso
 function isSuccessResponse(response: any): boolean {
   if (!response) return false;
   
@@ -120,8 +123,6 @@ function isSuccessResponse(response: any): boolean {
   
   return true;
 }
-
-// AuthService Class
 
 class AuthService {
   private readonly ACCESS_TOKEN_KEY = 'access-token';
@@ -172,8 +173,6 @@ class AuthService {
       }
 
       console.log('[AuthService] Login bem-sucedido, salvando tokens');
-      console.log('[AuthService] AccessToken:', loginData.accessToken.substring(0, 20) + '...');
-      console.log('[AuthService] RefreshToken:', loginData.refreshToken);
       
       this.setAccessToken(loginData.accessToken);
       this.setRefreshToken(loginData.refreshToken);
@@ -234,7 +233,6 @@ class AuthService {
       }
 
       console.log('[AuthService] Token renovado com sucesso');
-      console.log('[AuthService] Novo AccessToken:', refreshData.accessToken.substring(0, 20) + '...');
       
       this.setAccessToken(refreshData.accessToken);
       this.setRefreshToken(refreshData.refreshToken);
@@ -268,7 +266,7 @@ class AuthService {
     console.log('[AuthService] Buscando perfil do usuário');
     
     try {
-      const response = await httpClient.get<any>('/auth/me');
+      const response = await httpClient.get<any>('/auth/perfil');
       
       const profileData = extractResponseData<GetProfileResponseData>(response);
       
@@ -283,6 +281,30 @@ class AuthService {
     }
   }
 
+  async updateProfile(data: UpdateProfileRequest): Promise<{ 
+    success: boolean; 
+    message?: string;
+    data?: any;
+  }> {
+    console.log('[AuthService] Atualizando perfil');
+    
+    try {
+      const response = await httpClient.put<any>('/auth/perfil', data);
+      
+      return {
+        success: isSuccessResponse(response),
+        message: response?.message,
+        data: response?.data
+      };
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao atualizar perfil:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao atualizar perfil'
+      };
+    }
+  }
+
   async alterarSenha(data: ChangePasswordRequest): Promise<{ 
     success: boolean; 
     message?: string 
@@ -290,7 +312,7 @@ class AuthService {
     console.log('[AuthService] Alterando senha');
     
     try {
-      const response = await httpClient.put<any>('/auth/change-password', data);
+      const response = await httpClient.put<any>('/auth/perfil/senha', data);
       
       return {
         success: isSuccessResponse(response),
@@ -305,7 +327,31 @@ class AuthService {
     }
   }
 
-  // Métodos de armazenamento
+  async desativarConta(): Promise<{ 
+    success: boolean; 
+    message?: string 
+  }> {
+    console.log('[AuthService] Desativando conta');
+    
+    try {
+      const response = await httpClient.delete<any>('/auth/perfil');
+      
+      if (isSuccessResponse(response)) {
+        this.clearAuth();
+      }
+      
+      return {
+        success: isSuccessResponse(response),
+        message: response?.message
+      };
+    } catch (error: any) {
+      console.error('[AuthService] Erro ao desativar conta:', error);
+      return {
+        success: false,
+        message: error.message || 'Erro ao desativar conta'
+      };
+    }
+  }
 
   setAccessToken(token: string): void {
     if (typeof window !== 'undefined') {
@@ -360,8 +406,6 @@ class AuthService {
     httpClient.clearAuthToken();
   }
 
-  // Métodos utilitários
-
   isAuthenticated(): boolean {
     return !!this.getAccessToken();
   }
@@ -412,8 +456,6 @@ class AuthService {
     return new Date(decoded.exp * 1000);
   }
 }
-
-// Exportações
 
 export const authService = new AuthService();
 
