@@ -1,7 +1,7 @@
 // painel-web/app/dashboard/historicoComparecimento/enderecos/[id]/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useHistoricoEndereco } from '@/hooks/useHistoricoEndereco';
 import { custodiadosService } from '@/lib/api/services';
@@ -28,31 +28,31 @@ export default function HistoricoEnderecosPage() {
   const [custodiado, setCustodiado] = useState<CustodiadoResponse | null>(null);
   const [loadingCustodiado, setLoadingCustodiado] = useState(true);
 
-  useEffect(() => {
-    if (custodiadoId) {
-      carregarDados();
-    }
-  }, [custodiadoId]);
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     try {
       setLoadingCustodiado(true);
       
-      // Buscar dados do custodiado
+      // Buscar dados do custodiado - buscarPorId retorna CustodiadoResponse diretamente
       const custodiadoData = await custodiadosService.buscarPorId(custodiadoId);
+      
       if (custodiadoData) {
-        setCustodiado(custodiadoData);
+        setCustodiado(custodiadoData.data);
       }
-
+      
       // Buscar histórico de endereços
       await buscarHistorico(custodiadoId);
-      
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
       setLoadingCustodiado(false);
     }
-  };
+  }, [custodiadoId, buscarHistorico]);
+
+  useEffect(() => {
+    if (custodiadoId) {
+      carregarDados();
+    }
+  }, [custodiadoId, carregarDados]);
 
   const formatarData = (data: string) => {
     return new Date(data).toLocaleDateString('pt-BR', {
