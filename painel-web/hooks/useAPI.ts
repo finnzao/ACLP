@@ -241,7 +241,7 @@ export function useCustodiados() {
   }, []);
 
   return {
-    custodiados, // ✅ Pode ser ListarCustodiadosResponse ou CustodiadoResponse[]
+    custodiados,
     loading,
     error,
     // Operações CRUD
