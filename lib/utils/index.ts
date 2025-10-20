@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export const dateUtils = {
     formatToBR: (date: string | Date): string => {
         const dateObj = typeof date === 'string' ? new Date(date) : date;

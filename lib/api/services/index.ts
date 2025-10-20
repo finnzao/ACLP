@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// lib/services/index.ts
 export { authService, configureAuthHeaders, clearAuthHeaders } from '../authService';
 export { httpClient } from '@/lib/http/client';
 

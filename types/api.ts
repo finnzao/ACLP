@@ -260,7 +260,10 @@ export interface UsuarioResponse {
 }
 
 export interface EstatisticasComparecimentoResponse {
-  periodo?: string;
+  periodo?: {
+    dataInicio?: string;
+    dataFim?: string;
+  };
   totalComparecimentos: number;
   comparecimentosPresenciais: number;
   comparecimentosOnline: number;

@@ -231,6 +231,7 @@ export const convitesService = {
   /**
    * Cancelar convite
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async cancelarConvite(id: number, motivo?: string): Promise<ApiResponse<void>> {
     console.log('[ConvitesService] Cancelando convite:', id);
     

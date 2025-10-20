@@ -1,7 +1,6 @@
-// painel-web/components/Toast.tsx
 'use client';
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -34,6 +33,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: (id: string) => 
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setIsLeaving(true);
+    setTimeout(() => {
+      onClose(toast.id);
+    }, 300);
+  }, [toast.id, onClose]);
+
   useEffect(() => {
     // Animar entrada
     const timer = setTimeout(() => setIsVisible(true), 10);
@@ -48,14 +54,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: (id: string) => 
       }, toast.duration);
       return () => clearTimeout(timer);
     }
-  }, [toast.duration]);
-
-  const handleClose = () => {
-    setIsLeaving(true);
-    setTimeout(() => {
-      onClose(toast.id);
-    }, 300);
-  };
+  }, [toast.duration, handleClose]);
 
   const icons = {
     success: CheckCircle,
@@ -153,26 +152,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     </ToastContext.Provider>
   );
 }
-
-// Helpers para tipos específicos de toast
-export const toast = {
-  success: (title: string, message: string, duration?: number) => {
-    const context = useContext(ToastContext);
-    context?.showToast({ type: 'success', title, message, duration });
-  },
-  error: (title: string, message: string, duration?: number) => {
-    const context = useContext(ToastContext);
-    context?.showToast({ type: 'error', title, message, duration });
-  },
-  warning: (title: string, message: string, duration?: number) => {
-    const context = useContext(ToastContext);
-    context?.showToast({ type: 'warning', title, message, duration });
-  },
-  info: (title: string, message: string, duration?: number) => {
-    const context = useContext(ToastContext);
-    context?.showToast({ type: 'info', title, message, duration });
-  }
-};
 
 // Hook personalizado para facilitar o uso
 export function useToastHelpers() {

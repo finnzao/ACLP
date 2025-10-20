@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -193,7 +194,7 @@ export default function DashboardPage() {
     const baseInadimplencia = resumoData.percentualInadimplencia || 25;
     const baseComparecimentos = resumoData.comparecimentosEsteMes || 50;
     
-    const tendencia = meses.map((mes, index) => {
+    const tendencia = meses.map((mes) => {
       // Simular variação gradual baseada nos dados reais
       const variacao = (Math.random() - 0.5) * 10; // ±5%
       return {
