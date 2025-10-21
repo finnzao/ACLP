@@ -275,38 +275,143 @@ export interface EstatisticasComparecimentoResponse {
 }
 
 export interface ResumoSistemaResponse {
+  // Dados principais
   totalCustodiados: number;
   custodiadosEmConformidade: number;
   custodiadosInadimplentes: number;
   comparecimentosHoje: number;
-  comparecimentosAtrasados?: number;
-  proximosComparecimentos7Dias?: number;
-  totalComparecimentos?: number;
-  totalComparecimentosRegistrados?: number;
-  comparecimentosEsteMes?: number;
-  totalMudancasEndereco?: number;
-  enderecosAtivos?: number;
-  custodiadosSemHistorico?: number;
-  custodiadosSemEnderecoAtivo?: number;
-  percentualConformidade?: number;
-  percentualInadimplencia?: number;
-  dataConsulta?: string;
-  ultimaAtualizacao?: string;
+  totalComparecimentos: number;
+  comparecimentosEsteMes: number;
+  totalMudancasEndereco: number;
+  enderecosAtivos: number;
+  custodiadosSemHistorico: number;
+  custodiadosSemEnderecoAtivo: number;
+  percentualConformidade: number;
+  percentualInadimplencia: number;
+  dataConsulta: string;
+  
+  // Relatório dos últimos meses
+  relatorioUltimosMeses?: {
+    mesesAnalisados: number;
+    periodoInicio: string;
+    periodoFim: string;
+    totalComparecimentos: number;
+    comparecimentosPresenciais: number;
+    comparecimentosOnline: number;
+    mudancasEndereco: number;
+    mediaComparecimentosMensal: number;
+    percentualPresencial: number;
+    percentualOnline: number;
+  };
+  
+  // Tendência de conformidade
+  tendenciaConformidade?: Array<{
+    mes: string;
+    mesNome: string;
+    totalCustodiados: number;
+    emConformidade: number;
+    inadimplentes: number;
+    taxaConformidade: number;
+    taxaInadimplencia: number;
+    totalComparecimentos: number;
+  }>;
+  
+  // Próximos comparecimentos
+  proximosComparecimentos?: {
+    diasAnalisados: number;
+    totalPrevistoProximosDias: number;
+    totalAtrasados: number;
+    comparecimentosHoje: number;
+    comparecimentosAmanha: number;
+    detalhesPorDia: Array<{
+      data: string;
+      diaSemana: string;
+      totalPrevisto: number;
+      custodiados: Array<{
+        id: number;
+        nome: string;
+        processo: string;
+        periodicidade: string;
+        diasAtraso: number;
+      }>;
+    }>;
+    custodiadosAtrasados: Array<{
+      id: number;
+      nome: string;
+      processo: string;
+      periodicidade: string;
+      diasAtraso: number;
+      dataUltimoComparecimento?: string;
+      dataProximoComparecimento?: string;
+      vara?: string;
+      comarca?: string;
+      contato?: string;
+      enderecoAtual?: string;
+    }>;
+  };
+  
+  // Análise de comparecimentos
+  analiseComparecimentos?: {
+    comparecimentosUltimos30Dias: number;
+    comparecimentosOnlineUltimos30Dias: number;
+    comparecimentosPresenciaisUltimos30Dias: number;
+    taxaOnlineUltimos30Dias: number;
+    comparecimentosPorDiaSemana: Record<string, number>;
+    comparecimentosPorHora: Record<string, number>;
+  };
+  
+  // Análise de atrasos
   analiseAtrasos?: {
     totalCustodiadosAtrasados: number;
     totalAtrasados30Dias: number;
     totalAtrasados60Dias: number;
     totalAtrasados90Dias: number;
+    totalAtrasadosMais90Dias: number;
     mediaDiasAtraso: number;
+    distribuicaoAtrasos: Record<string, number>;
+    custodiadosAtrasados30Dias: Array<any>;
+    custodiadosAtrasados60Dias: Array<any>;
+    custodiadosAtrasados90Dias: Array<{
+      id: number;
+      nome: string;
+      processo: string;
+      periodicidade: string;
+      diasAtraso: number;
+      dataUltimoComparecimento: string;
+      dataProximoComparecimento: string;
+      vara: string;
+      comarca: string;
+      contato: string;
+      enderecoAtual: string;
+    }>;
+    custodiadosAtrasadosMais90Dias: Array<{
+      id: number;
+      nome: string;
+      processo: string;
+      periodicidade: string;
+      diasAtraso: number;
+      dataUltimoComparecimento: string;
+      dataProximoComparecimento: string;
+      vara: string;
+      comarca: string;
+      contato: string;
+      enderecoAtual: string;
+    }>;
+    custodiadoMaiorAtraso?: {
+      id: number;
+      nome: string;
+      processo: string;
+      periodicidade: string;
+      diasAtraso: number;
+      dataUltimoComparecimento: string;
+      dataProximoComparecimento: string;
+      vara: string;
+      comarca: string;
+      contato: string;
+      enderecoAtual: string;
+    };
+    dataAnalise: string;
   };
-  totalPessoas?: number;
-  emConformidade?: number;
-  inadimplentes?: number;
-  atrasados?: number;
-  proximos7Dias?: number;
-  proximosComparecimentos?: CustodiadoResponse[];
-  alertasUrgentes?: CustodiadoResponse[];
-  pessoasAtrasadas?: CustodiadoResponse[];
 }
 
 export interface EstatisticasEnderecoResponse {

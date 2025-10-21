@@ -63,7 +63,6 @@ export default function ConfirmarPresencaPage() {
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
 
-  // Estado para lista de resultados de busca
   const [resultadosBusca, setResultadosBusca] = useState<CustodiadoResponse[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
@@ -95,7 +94,6 @@ export default function ConfirmarPresencaPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Função para normalizar texto (remover acentos e converter para minúsculo)
   const normalizarTexto = useCallback((texto: string): string => {
     return texto
       .normalize('NFD')
@@ -104,10 +102,11 @@ export default function ConfirmarPresencaPage() {
       .trim();
   }, []);
 
-  const buscarPessoa = useCallback(async (numeroProcesso: string) => {
-    if (!numeroProcesso.trim()) {
-      setResultadosBusca([]);
-      setMostrarResultados(false);
+  const buscarPessoa = useCallback(async () => {
+    const numeroProcesso = buscaProcesso.trim();
+
+    if (!numeroProcesso) {
+      error('Campo vazio', 'Digite um termo para buscar');
       return;
     }
 
@@ -117,11 +116,12 @@ export default function ConfirmarPresencaPage() {
     }
 
     setEstado('buscando');
+    setMostrarResultados(false);
+    setResultadosBusca([]);
 
     try {
       const termoNormalizado = normalizarTexto(numeroProcesso);
 
-      // Buscar todas as pessoas que correspondem ao critério
       const pessoasEncontradas = custodiados.filter(p => {
         const nomeNormalizado = normalizarTexto(p.nome);
         const processoNormalizado = normalizarTexto(p.processo);
@@ -132,33 +132,24 @@ export default function ConfirmarPresencaPage() {
           cpfNormalizado.includes(termoNormalizado);
       });
 
+      setEstado('inicial');
+
       if (pessoasEncontradas.length > 0) {
         setResultadosBusca(pessoasEncontradas);
         setMostrarResultados(true);
-        setEstado('inicial');
-
-        // Se houver apenas um resultado, selecionar automaticamente
-        if (pessoasEncontradas.length === 1) {
-          selecionarPessoa(pessoasEncontradas[0]);
-        } else {
-          success('Resultados encontrados', `${pessoasEncontradas.length} pessoa(s) encontrada(s)`);
-        }
+        success('Resultados encontrados', `${pessoasEncontradas.length} pessoa(s) encontrada(s)`);
       } else {
         setResultadosBusca([]);
         setMostrarResultados(false);
-        setEstado('erro');
-        setMensagem('Nenhuma pessoa encontrada para o termo de busca informado.');
-        error('Pessoa não encontrada', 'Verifique o número do processo ou nome da pessoa');
+        error('Pessoa não encontrada', 'Nenhuma pessoa encontrada para o termo de busca informado');
       }
     } catch (err) {
       console.error('Erro ao buscar pessoa:', err);
-      setEstado('erro');
-      setMensagem('Erro ao buscar pessoa. Tente novamente.');
+      setEstado('inicial');
       error('Erro na busca', 'Ocorreu um erro ao buscar a pessoa');
     }
-  }, [custodiados, success, error, normalizarTexto]);
+  }, [buscaProcesso, custodiados, success, error, normalizarTexto]);
 
-  // Função para selecionar uma pessoa da lista de resultados
   const selecionarPessoa = useCallback((pessoaSelecionada: CustodiadoResponse) => {
     setPessoa(pessoaSelecionada);
     setMostrarResultados(false);
@@ -167,9 +158,8 @@ export default function ConfirmarPresencaPage() {
   }, [success]);
 
   useEffect(() => {
-    // Verificação com proteção contra null
     if (processo && custodiados && custodiados.length > 0 && !pessoa) {
-      buscarPessoa(processo);
+      buscarPessoa();
     }
   }, [processo, custodiados, pessoa, buscarPessoa]);
 
@@ -351,7 +341,6 @@ export default function ConfirmarPresencaPage() {
     );
   };
 
-  // Componente para lista de resultados de busca
   const ListaResultadosBusca = () => {
     if (!mostrarResultados || resultadosBusca.length === 0) return null;
 
@@ -385,6 +374,12 @@ export default function ConfirmarPresencaPage() {
         ))}
       </div>
     );
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      buscarPessoa();
+    }
   };
 
   if (loadingCustodiados) {
@@ -524,30 +519,20 @@ export default function ConfirmarPresencaPage() {
                   <input
                     type="text"
                     value={buscaProcesso}
-                    onChange={(e) => {
-                      setBuscaProcesso(e.target.value);
-                      if (e.target.value.trim()) {
-                        buscarPessoa(e.target.value);
-                      } else {
-                        setResultadosBusca([]);
-                        setMostrarResultados(false);
-                      }
-                    }}
+                    onChange={(e) => setBuscaProcesso(e.target.value)}
+                    onKeyPress={handleKeyPress}
                     placeholder="Nome, CPF ou número do processo"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
 
-                  {/* Lista de resultados da busca */}
                   <ListaResultadosBusca />
 
-                  {!mostrarResultados && (
-                    <button
-                      onClick={() => buscarPessoa(buscaProcesso)}
-                      className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm font-medium"
-                    >
-                      Buscar
-                    </button>
-                  )}
+                  <button
+                    onClick={buscarPessoa}
+                    className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+                  >
+                    Buscar
+                  </button>
                 </div>
               </MobileSection>
 
@@ -787,8 +772,6 @@ export default function ConfirmarPresencaPage() {
                           placeholder="Adicione observações se necessário..."
                         />
                       </div>
-
-
                     </div>
                   </MobileSection>
                 </>
@@ -827,7 +810,6 @@ export default function ConfirmarPresencaPage() {
     );
   }
 
-  // Versão Desktop continua igual, mas com as mesmas melhorias de busca
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
       <div className="max-w-4xl mx-auto">
@@ -973,21 +955,13 @@ export default function ConfirmarPresencaPage() {
                         <input
                           type="text"
                           value={buscaProcesso}
-                          onChange={(e) => {
-                            setBuscaProcesso(e.target.value);
-                            if (e.target.value.trim()) {
-                              buscarPessoa(e.target.value);
-                            } else {
-                              setResultadosBusca([]);
-                              setMostrarResultados(false);
-                            }
-                          }}
+                          onChange={(e) => setBuscaProcesso(e.target.value)}
                           placeholder="Digite o nome, CPF ou número do processo"
                           className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          onKeyPress={(e) => e.key === 'Enter' && buscarPessoa(buscaProcesso)}
+                          onKeyPress={handleKeyPress}
                         />
                         <button
-                          onClick={() => buscarPessoa(buscaProcesso)}
+                          onClick={buscarPessoa}
                           className="bg-blue-500 text-white px-8 py-3 rounded-lg hover:bg-blue-600 transition-all font-medium flex items-center gap-2"
                         >
                           <Search className="w-5 h-5" />
@@ -995,7 +969,6 @@ export default function ConfirmarPresencaPage() {
                         </button>
                       </div>
 
-                      {/* Lista de resultados para desktop */}
                       {mostrarResultados && resultadosBusca.length > 0 && (
                         <div className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
                           <div className="p-3 bg-gray-50 border-b flex items-center justify-between">

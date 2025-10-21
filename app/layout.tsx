@@ -2,7 +2,7 @@ import './globals.css';
 import { Metadata } from 'next';
 import { ToastProvider } from '@/components/Toast';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ApiProvider, ApiStatusIndicator } from '@/contexts/ApiContext';
+import { ApiProvider } from '@/contexts/ApiContext';
 // import DebugApiStatus from '@/components/DebugApiStatus';
 
 export const metadata: Metadata = {
@@ -25,8 +25,7 @@ export default function RootLayout({
           <AuthProvider>
             <ToastProvider>
               {children}
-              {process.env.NODE_ENV === 'development' && <ApiStatusIndicator />}
-              
+            
             </ToastProvider>
           </AuthProvider>
         </ApiProvider>
