@@ -117,7 +117,7 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
-export interface CustodiadoResponse {
+export interface CustodiadoDTO {
   id: number;
   nome: string;
   cpf?: string;
@@ -146,10 +146,12 @@ export interface CustodiadoResponse {
   cidadeEstado?: string;
 }
 
+export type CustodiadoResponse = ApiResponse<CustodiadoDTO>;
+
 export interface ListarCustodiadosResponse {
   success: boolean;
   message: string;
-  data: CustodiadoResponse[];
+  data: CustodiadoDTO[];
   timestamp?: string;
   total?: number;
 }
@@ -164,7 +166,7 @@ export function isListarCustodiadosResponse(data: any): data is ListarCustodiado
   );
 }
 
-export function isCustodiadoResponse(data: any): data is CustodiadoResponse {
+export function isCustodiadoResponse(data: any): data is CustodiadoDTO {
   return (
     data &&
     typeof data === 'object' &&
@@ -289,7 +291,7 @@ export interface ResumoSistemaResponse {
   percentualConformidade: number;
   percentualInadimplencia: number;
   dataConsulta: string;
-  
+
   // Relatório dos últimos meses
   relatorioUltimosMeses?: {
     mesesAnalisados: number;
@@ -303,7 +305,7 @@ export interface ResumoSistemaResponse {
     percentualPresencial: number;
     percentualOnline: number;
   };
-  
+
   // Tendência de conformidade
   tendenciaConformidade?: Array<{
     mes: string;
@@ -315,7 +317,7 @@ export interface ResumoSistemaResponse {
     taxaInadimplencia: number;
     totalComparecimentos: number;
   }>;
-  
+
   // Próximos comparecimentos
   proximosComparecimentos?: {
     diasAnalisados: number;
@@ -349,7 +351,7 @@ export interface ResumoSistemaResponse {
       enderecoAtual?: string;
     }>;
   };
-  
+
   // Análise de comparecimentos
   analiseComparecimentos?: {
     comparecimentosUltimos30Dias: number;
@@ -359,7 +361,7 @@ export interface ResumoSistemaResponse {
     comparecimentosPorDiaSemana: Record<string, number>;
     comparecimentosPorHora: Record<string, number>;
   };
-  
+
   // Análise de atrasos
   analiseAtrasos?: {
     totalCustodiadosAtrasados: number;
@@ -503,14 +505,18 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
+  success: boolean;
+  message: string;
   accessToken: string;
   refreshToken: string;
+  tokenType: string;
   expiresIn: number;
+  sessionId: string;
   usuario: {
     id: number;
     nome: string;
     email: string;
-    tipo: string;
+    tipo: 'ADMIN' | 'USUARIO';
     departamento?: string;
     telefone?: string;
     ultimoLogin?: string;
@@ -519,6 +525,11 @@ export interface LoginResponse {
 
 export interface RefreshTokenRequest {
   refreshToken: string;
+}
+
+export interface LogoutRequest {
+  refreshToken: string;
+  logoutAllDevices?: boolean;
 }
 
 export interface RefreshTokenResponse {
@@ -533,27 +544,107 @@ export interface AlterarSenhaRequest {
   confirmaSenha: string;
 }
 
+export interface LogoutRequest {
+  refreshToken: string;
+  logoutAllDevices?: boolean;
+}
+
+
+export interface ResetSenhaRequest {
+  email: string;
+}
+
+export interface ConfirmarResetRequest {
+  token: string;
+  novaSenha: string;
+  confirmaSenha: string;
+}
+
 export interface ConviteDTO {
   nome: string;
   email: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
   departamento?: string;
   telefone?: string;
+  escopo?: string;
   validadeHoras?: number;
+  mensagemPersonalizada?: string;
 }
 
 export interface ConviteResponse {
   id: number;
-  nome: string;
+  token: string;
   email: string;
+  nome: string;
   tipoUsuario: string;
+  linkAtivacao: string;
+  expiraEm: string;
+  horasValidade: number;
+  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO' | 'CANCELADO';
+  criadoPor?: string;
+  criadoEm: string;
+  aceitoEm?: string;
   departamento?: string;
   telefone?: string;
+}
+
+export interface ValidarTokenConviteResponse {
+  valido: boolean;
+  status: 'VALID' | 'INVALID' | 'EXPIRED' | 'ALREADY_USED' | 'TOO_MANY_ATTEMPTS';
+  email?: string;
+  nome?: string;
+  tipoUsuario?: string;
+  departamento?: string;
+  expiraEm?: string;
+  horasRestantes?: number;
+  message: string;
+}
+
+export interface AtivarContaDTO {
   token: string;
-  dataExpiracao: string;
-  status: string;
-  criadoEm: string;
-  criadoPor: string;
+  senha: string;
+  confirmaSenha: string;
+  habilitarMFA?: boolean;
+}
+
+export interface ValidarTokenResponse {
+  valido: boolean;
+  email?: string;
+  tipoUsuario?: string;
+  comarca?: string;
+  departamento?: string;
+  expiraEm?: string;
+  criadoPorNome?: string;
+  mensagem?: string;
+  camposEditaveis?: string[];
+}
+
+export interface ReenviarConviteDTO {
+  novaValidadeHoras?: number;
+  mensagemPersonalizada?: string;
+}
+
+export interface GerarLinkDTO {
+  tipoUsuario: 'ADMIN' | 'USUARIO';
+  quantidadeUsos?: number;
+  diasValidade?: number;
+}
+
+export interface SolicitarNovoConviteDTO {
+  email: string;
+  nome?: string;
+  mensagem?: string;
+}
+
+export interface AtivarContaResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    id: string;
+    nome: string;
+    email: string;
+    tipo: string;
+  };
 }
 
 export interface AceitarConviteRequest {

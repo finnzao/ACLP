@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient as api } from '@/lib/http/client';
-import { ApiResponse } from '@/types/api';
+import { ApiResponse, AtivarContaDTO, AtivarContaResponse, SolicitarNovoConviteDTO } from '@/types/api';
 
 // Tipos específicos para ativação
 export interface ValidarTokenResponse {
@@ -20,29 +20,12 @@ export interface ValidarTokenResponse {
   };
 }
 
-export interface AtivarContaDTO {
-  token: string;
-  senha: string;
-  confirmaSenha: string;
+export interface AtivarConta extends AtivarContaDTO {
   aceitouTermos: boolean;
 }
 
-export interface AtivarContaResponse {
-  success: boolean;
-  message: string;
-  data?: {
-    id: string;
-    nome: string;
-    email: string;
-    tipo: string;
-  };
-}
 
-export interface SolicitarNovoConviteDTO {
-  email: string;
-  nome?: string;
-  mensagem?: string;
-}
+
 
 // Serviço de Ativação
 export const ativacaoService = {
@@ -98,7 +81,7 @@ export const ativacaoService = {
    * Ativar conta com nova senha
    * @param data Dados para ativação
    */
-  ativarConta: async (data: AtivarContaDTO): Promise<AtivarContaResponse> => {
+  ativarConta: async (data: AtivarConta): Promise<AtivarContaResponse> => {
     try {
       // Validações locais antes de enviar
       if (data.senha !== data.confirmaSenha) {
@@ -244,7 +227,7 @@ export function useAtivacao() {
     }
   }, []);
 
-  const ativarConta = useCallback(async (data: AtivarContaDTO) => {
+  const ativarConta = useCallback(async (data: AtivarConta) => {
     setLoading(true);
     setError(null);
 

@@ -80,7 +80,6 @@ export const custodiadosService = {
 
       let parsedData: any;
 
-      // ✅ Parse seguro da resposta
       try {
         if (typeof response.data === 'string') {
           const trimmedData = response.data.trim();
@@ -597,7 +596,6 @@ export const comparecimentosService = {
 
       console.log('[ComparecimentosService] Resposta recebida:', response);
 
-      // ✅ EXTRAIR OS DADOS CORRETAMENTE
       if (response.success && response.data) {
         // Caso 1: Se response.data tem a estrutura { success, data: {...} }
         if (response.data.data && typeof response.data.data === 'object') {
@@ -622,7 +620,7 @@ export const comparecimentosService = {
         }
       }
 
-      // ✅ Se não encontrou dados válidos, retornar estrutura padrão
+
       console.warn('[ComparecimentosService] Dados não encontrados na resposta, retornando estrutura padrão');
       return {
         totalCustodiados: 0,
