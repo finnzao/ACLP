@@ -24,45 +24,29 @@ import {
   HealthResponse,
   AppInfoResponse,
   ResumoSistemaResponse,
-  ListarCustodiadosResponse
+  ListarCustodiadosResponse,
+  CustodiadoData,
 } from '@/types/api';
+import { StatusComparecimento } from '@/types/api copy';
 // Hook para custodiados
 export function useCustodiados() {
-  const [custodiados, setCustodiados] = useState<ListarCustodiadosResponse | CustodiadoResponse[] | null>(null);
+  const [custodiados, setCustodiados] = useState<CustodiadoData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCustodiados = async () => {
     try {
       setLoading(true);
-      setError(null);
-      console.log('[useCustodiados] Buscando custodiados...');
-
-      const response = await custodiadosService.listar();
+      setError(null);  
+      const response: ListarCustodiadosResponse = await custodiadosService.listar();
       console.log('[useCustodiados] Resposta recebida:', response);
-
-
-      if (response && typeof response === 'object') {
-        if ('success' in response && 'data' in response) {
-          if (response.success && Array.isArray(response.data)) {
-            console.log('[useCustodiados] Custodiados carregados:', response.data.length);
-            setCustodiados(response.data);
-          } else {
-            console.warn('[useCustodiados] API retornou erro ou dados inválidos');
-            setError(response.message || 'Erro ao carregar dados');
-            setCustodiados([]);
-          }
-        } else if (Array.isArray(response)) {
-          console.log('[useCustodiados] Array direto recebido:', response.length);
-          setCustodiados(response);
-        } else {
-          console.warn('[useCustodiados] Resposta inválida');
-          setError('Resposta inválida do servidor');
-          setCustodiados([]);
-        }
+  
+      if (response.success && Array.isArray(response.data)) {
+        console.log('[useCustodiados] Custodiados carregados:', response.data.length);
+        setCustodiados(response.data);
       } else {
-        console.warn('[useCustodiados] Resposta nula ou indefinida');
-        setError('Nenhum dado recebido do servidor');
+        console.warn('[useCustodiados] API retornou erro ou dados inválidos');
+        setError(response.message || 'Erro ao carregar dados');
         setCustodiados([]);
       }
     } catch (err) {
@@ -208,7 +192,7 @@ export function useCustodiados() {
   }, []);
 
   // Buscar por status
-  const buscarPorStatus = useCallback(async (status: 'EM_CONFORMIDADE' | 'INADIMPLENTE') => {
+  const buscarPorStatus = useCallback(async (status: StatusComparecimento) => {
     try {
       console.log(`[useCustodiados] Buscando por status: ${status}`);
       const result = await custodiadosService.buscarPorStatus(status);

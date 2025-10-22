@@ -208,7 +208,7 @@ export interface MobileSectionProps {
 }
 
 // Estados possíveis da página
-export type EstadoPagina = 'inicial' | 'buscando' | 'confirmando' | 'sucesso' | 'erro';
+export type EstadoPagina = 'inicial' | 'buscando' | 'confirmando' | 'sucesso' | 'erro' | 'processando';
 
 // Utilitários de data
 export const dateUtils = {

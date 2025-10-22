@@ -23,6 +23,7 @@ import type {
   ListarCustodiadosResponse,
   ListarComparecimentosParams,
   ListarComparecimentosResponse,
+  ValidarConviteResponse,
 } from '@/types/api';
 
 const ENDPOINTS = {
@@ -953,19 +954,10 @@ export interface ConviteResponse {
   telefone?: string;
 }
 
-export interface ValidarTokenConviteResponse {
-  valido: boolean;
-  status: 'VALID' | 'INVALID' | 'EXPIRED' | 'ALREADY_USED' | 'TOO_MANY_ATTEMPTS';
-  email?: string;
-  nome?: string;
-  tipoUsuario?: string;
-  departamento?: string;
-  expiraEm?: string;
-  horasRestantes?: number;
-  message: string;
-}
+
 
 export interface AtivarContaDTO {
+  nome?:string;
   token: string;
   senha: string;
   confirmaSenha: string;
@@ -989,9 +981,9 @@ export const convitesService = {
     return await apiClient.get<ConviteResponse[]>('/usuarios/convites', params);
   },
 
-  async validarToken(token: string): Promise<ApiResponse<ValidarTokenConviteResponse>> {
+  async validarToken(token: string): Promise<ApiResponse<ValidarConviteResponse>> {
     console.log('[ConvitesService] Validando token de convite');
-    return await apiClient.get<ValidarTokenConviteResponse>(`/usuarios/convites/validar/${token}`);
+    return await apiClient.get<ValidarConviteResponse>(`/usuarios/convites/validar/${token}`);
   },
 
   async ativarConta(data: AtivarContaDTO): Promise<ApiResponse<{
