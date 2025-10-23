@@ -198,8 +198,7 @@ export default function InvitePage() {
         token,
         senha,
         confirmaSenha: confirmarSenha,
-        nome,
-        telefone
+        nome
       });
 
       if (result.success) {

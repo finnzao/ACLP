@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, User, FileText, ChevronRight, Loader2, Filter, X, Calendar } from 'lucide-react';
 import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
+import { StatusFiltro } from '@/constants/status';
 
 export default function BuscarPage() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function BuscarPage() {
   const [resultados, setResultados] = useState<Comparecimento[]>([]);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState<'todos' | 'em conformidade' | 'inadimplente'>('todos');
+  const [filtroStatus, setFiltroStatus] = useState<StatusFiltro>('todos');
   const [hasSearched, setHasSearched] = useState(false);
 
   const handleBusca = () => {
@@ -36,7 +37,7 @@ export default function BuscarPage() {
         item.cpf.includes(termo)
       );
 
-      // Aplicar filtro de status
+      // ✅ Aplicar filtro de status com tipos corretos
       if (filtroStatus !== 'todos') {
         resultadosFiltrados = resultadosFiltrados.filter(item => item.status === filtroStatus);
       }
@@ -57,10 +58,19 @@ export default function BuscarPage() {
     setHasSearched(false);
   };
 
+  // ✅ Função auxiliar para verificar status
+  const isEmConformidade = (status: string): boolean => {
+    return status === 'EM_CONFORMIDADE' || status === 'em conformidade';
+  };
+
   const getStatusColor = (status: string) => {
-    return status === 'em conformidade' 
+    return isEmConformidade(status)
       ? 'bg-green-100 text-green-800' 
       : 'bg-red-100 text-red-800';
+  };
+
+  const getStatusLabel = (status: string) => {
+    return isEmConformidade(status) ? 'Em Conformidade' : 'Inadimplente';
   };
 
   const getUrgencyInfo = (data: string) => {
@@ -151,9 +161,9 @@ export default function BuscarPage() {
                   Todos
                 </button>
                 <button
-                  onClick={() => setFiltroStatus('em conformidade')}
+                  onClick={() => setFiltroStatus('EM_CONFORMIDADE')}
                   className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    filtroStatus === 'em conformidade'
+                    filtroStatus === 'EM_CONFORMIDADE'
                       ? 'bg-green-500 text-white'
                       : 'bg-white text-gray-600 border border-gray-300'
                   }`}
@@ -161,9 +171,9 @@ export default function BuscarPage() {
                   Conformidade
                 </button>
                 <button
-                  onClick={() => setFiltroStatus('inadimplente')}
+                  onClick={() => setFiltroStatus('INADIMPLENTE')}
                   className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    filtroStatus === 'inadimplente'
+                    filtroStatus === 'INADIMPLENTE'
                       ? 'bg-red-500 text-white'
                       : 'bg-white text-gray-600 border border-gray-300'
                   }`}
@@ -239,7 +249,7 @@ export default function BuscarPage() {
 
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pessoa.status)}`}>
-                          {pessoa.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente'}
+                          {getStatusLabel(pessoa.status)}
                         </span>
                       </div>
                     </div>

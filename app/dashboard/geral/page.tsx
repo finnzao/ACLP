@@ -11,6 +11,8 @@ import ExportButton from '@/components/ExportButton';
 import { useToast } from '@/components/Toast';
 import {
   Search,
+  AlertTriangle,
+  Clock,
   ChevronLeft,
   ChevronRight,
   X,
@@ -98,47 +100,13 @@ export default function GeralPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const todosOsDados = useMemo((): CustodiadoFormatado[] => {
-    if (!custodiadosBackend) {
-      console.warn('[GeralPage] custodiadosBackend está vazio');
+  
+  const dadosExtraidos = useMemo((): CustodiadoData[] => {
+
+    if (loadingBackend || !custodiadosBackend) {
       return [];
     }
 
-    // Função para transformar CustodiadoData em CustodiadoFormatado
-    const transformarCustodiado = (custodiado: CustodiadoData): CustodiadoFormatado => ({
-      id: custodiado.id,
-      nome: custodiado.nome,
-      cpf: custodiado.cpf || '',
-      rg: custodiado.rg || '',
-      contato: custodiado.contato,
-      processo: custodiado.processo,
-      vara: custodiado.vara,
-      comarca: custodiado.comarca,
-      decisao: custodiado.dataDecisao,
-      periodicidade: custodiado.periodicidade,
-      status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
-      primeiroComparecimento: custodiado.dataComparecimentoInicial,
-      dataComparecimentoInicial: custodiado.dataComparecimentoInicial,
-      ultimoComparecimento: custodiado.ultimoComparecimento,
-      proximoComparecimento: custodiado.proximoComparecimento,
-      endereco: custodiado.endereco ? {
-        cep: custodiado.endereco.cep,
-        logradouro: custodiado.endereco.logradouro,
-        numero: custodiado.endereco.numero,
-        complemento: custodiado.endereco.complemento,
-        bairro: custodiado.endereco.bairro,
-        cidade: custodiado.endereco.cidade,
-        estado: custodiado.endereco.estado
-      } : undefined,
-      observacoes: custodiado.observacoes,
-      atrasado: custodiado.inadimplente || custodiado.atrasado,
-      diasAtraso: custodiado.diasAtraso,
-      comparecimentoHoje: custodiado.comparecimentoHoje,
-      enderecoCompleto: custodiado.endereco?.enderecoCompleto || '',
-      cidadeEstado: custodiado.endereco ? `${custodiado.endereco.cidade} - ${custodiado.endereco.estado}` : ''
-    });
-
-    // Type guard para verificar estrutura ApiResponse
     const isApiResponse = (data: any): data is { success: boolean; data: CustodiadoData[] } => {
       return (
         data &&
@@ -149,54 +117,99 @@ export default function GeralPage() {
       );
     };
 
-    // CASO 1: Estrutura ApiResponse { success, message, data: [] }
+    // CASO 1: Estrutura ApiResponse { success, data: [] }
     if (isApiResponse(custodiadosBackend)) {
-      console.log('[GeralPage] Estrutura ApiResponse detectada');
-
-      if (!custodiadosBackend.success) {
-        console.warn('[GeralPage] API retornou success=false');
-        return [];
+      if (custodiadosBackend.success && Array.isArray(custodiadosBackend.data)) {
+        console.log('[GeralPage] Dados extraídos da ApiResponse:', custodiadosBackend.data.length);
+        return custodiadosBackend.data;
       }
-
-      if (!custodiadosBackend.data || !Array.isArray(custodiadosBackend.data)) {
-        console.warn('[GeralPage] data não é um array válido');
-        return [];
-      }
-
-      if (custodiadosBackend.data.length === 0) {
-        console.info('[GeralPage] Nenhum custodiado encontrado');
-        return [];
-      }
-
-      console.log('[GeralPage] Processando', custodiadosBackend.data.length, 'custodiados');
-      return custodiadosBackend.data.map(transformarCustodiado);
+      console.warn('[GeralPage] ApiResponse com success=false ou data inválido');
+      return [];
     }
 
     // CASO 2: Array direto de CustodiadoData
     if (Array.isArray(custodiadosBackend)) {
       console.log('[GeralPage] Array direto detectado:', custodiadosBackend.length);
-      return custodiadosBackend.map(transformarCustodiado);
+      return custodiadosBackend;
     }
 
-    // CASO 3: Objeto desconhecido - tentar encontrar array
+    // CASO 3: Objeto com array em alguma propriedade
     if (typeof custodiadosBackend === 'object') {
-      console.log('[GeralPage] Objeto desconhecido, procurando array...');
-
-      const possibleKeys = ['data', 'custodiados', 'items', 'results'];
-
+      const possibleKeys = ['data', 'custodiados', 'items', 'results', 'content'];
+      
       for (const key of possibleKeys) {
         if (key in custodiadosBackend && Array.isArray((custodiadosBackend as any)[key])) {
           const arrayData = (custodiadosBackend as any)[key];
           console.log(`[GeralPage] Array encontrado em '${key}':`, arrayData.length);
-          return arrayData.map(transformarCustodiado);
+          return arrayData;
         }
       }
     }
 
-    console.error('[GeralPage] Estrutura não reconhecida:', typeof custodiadosBackend);
+    console.warn('[GeralPage] Estrutura não reconhecida');
     return [];
-  }, [custodiadosBackend]);
+  }, [custodiadosBackend, loadingBackend]);
 
+  const todosOsDados = useMemo((): CustodiadoFormatado[] => {
+    if (dadosExtraidos.length === 0) {
+      return [];
+    }
+
+    console.log('[GeralPage]Transformando', dadosExtraidos.length, 'custodiados');
+
+    const transformarCustodiado = (custodiado: CustodiadoData): CustodiadoFormatado => {
+      // Função auxiliar para garantir string
+      const ensureString = (value: string | undefined | null): string => value || '';
+      
+      // Função auxiliar para processar proximoComparecimento
+      const processarProximoComparecimento = (valor: string | Date | undefined): string => {
+        if (!valor) return '';
+        if (typeof valor === 'string') return valor;
+        if (valor instanceof Date) return valor.toISOString().split('T')[0];
+        return '';
+      };
+
+      return {
+        id: custodiado.id ?? 0,
+        nome: custodiado.nome,
+        cpf: custodiado.cpf || '',
+        rg: custodiado.rg || '',
+        contato: custodiado.contato,
+        processo: custodiado.processo,
+        vara: custodiado.vara,
+        comarca: custodiado.comarca,
+        decisao: custodiado.dataDecisao,
+        periodicidade: custodiado.periodicidade,
+        status: custodiado.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
+        primeiroComparecimento: ensureString(custodiado.dataComparecimentoInicial),
+        dataComparecimentoInicial: ensureString(custodiado.dataComparecimentoInicial),
+        ultimoComparecimento: ensureString(custodiado.ultimoComparecimento),
+        proximoComparecimento: processarProximoComparecimento(custodiado.proximoComparecimento),
+        endereco: custodiado.endereco ? {
+          cep: custodiado.endereco.cep,
+          logradouro: custodiado.endereco.logradouro,
+          numero: custodiado.endereco.numero,
+          complemento: custodiado.endereco.complemento,
+          bairro: custodiado.endereco.bairro,
+          cidade: custodiado.endereco.cidade,
+          estado: custodiado.endereco.estado
+        } : undefined,
+        observacoes: custodiado.observacoes,
+        atrasado: custodiado.inadimplente || custodiado.atrasado,
+        diasAtraso: custodiado.diasAtraso,
+        comparecimentoHoje: custodiado.comparecimentoHoje,
+        // Construir enderecoCompleto manualmente se não existir
+        enderecoCompleto: custodiado.enderecoCompleto || (custodiado.endereco 
+          ? `${custodiado.endereco.logradouro}${custodiado.endereco.numero ? ', ' + custodiado.endereco.numero : ''}, ${custodiado.endereco.bairro}, ${custodiado.endereco.cidade} - ${custodiado.endereco.estado}`
+          : ''),
+        cidadeEstado: custodiado.cidadeEstado || (custodiado.endereco 
+          ? `${custodiado.endereco.cidade} - ${custodiado.endereco.estado}` 
+          : '')
+      };
+    };
+
+    return dadosExtraidos.map(transformarCustodiado);
+  }, [dadosExtraidos]);
 
   useEffect(() => {
     const busca = searchParams.get('busca');
@@ -241,6 +254,7 @@ export default function GeralPage() {
   }, []);
 
   const getDaysUntil = useCallback((date: string): number => {
+    if (!date) return 0;
     const today = new Date();
     const targetDate = new Date(date);
     const diffTime = targetDate.getTime() - today.getTime();
@@ -248,10 +262,12 @@ export default function GeralPage() {
   }, []);
 
   const isToday = useCallback((date: string): boolean => {
+    if (!date) return false;
     return date === new Date().toISOString().split('T')[0];
   }, []);
 
   const isOverdue = useCallback((date: string): boolean => {
+    if (!date) return false;
     const today = new Date();
     const targetDate = new Date(date);
     const diffTime = targetDate.getTime() - today.getTime();
@@ -430,7 +446,7 @@ export default function GeralPage() {
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-600">
             <Calendar className="w-3.5 h-3.5" />
-            <span>Próximo: {new Date(item.proximoComparecimento).toLocaleDateString('pt-BR')}</span>
+            <span>Próximo: {item.proximoComparecimento ? new Date(item.proximoComparecimento).toLocaleDateString('pt-BR') : '-'}</span>
           </div>
           {item.cidadeEstado && (
             <div className="flex items-center gap-2 text-xs text-gray-600">
@@ -618,8 +634,325 @@ export default function GeralPage() {
         </>
       ) : (
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          {/* Desktop version - continue igual ao original mas usando os dados corrigidos */}
-          {/* Restante do código desktop permanece igual */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-3xl font-bold text-primary mb-2">Painel Geral de Comparecimentos</h2>
+              <p className="text-text-muted">Gerencie todos os comparecimentos em um só lugar</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Atualizar
+              </button>
+              <ExportButton dados={todosOsDados} dadosFiltrados={dadosFiltrados} filterInfo={exportFilterInfo} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-primary">
+              <p className="text-sm text-text-muted">Total de Custodiados</p>
+              <p className="text-2xl font-bold text-primary-dark">{totalFiltrados}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-secondary">
+              <p className="text-sm text-text-muted">Em Conformidade</p>
+              <p className="text-2xl font-bold text-secondary">{totalEmConformidade}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-danger">
+              <p className="text-sm text-text-muted">Inadimplentes</p>
+              <p className="text-2xl font-bold text-danger">{totalInadimplentes}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-warning">
+              <p className="text-sm text-text-muted">Hoje</p>
+              <p className="text-2xl font-bold text-warning">{totalHoje}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-red-500">
+              <p className="text-sm text-text-muted">Atrasados</p>
+              <p className="text-2xl font-bold text-red-500">{totalAtrasados}</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow mb-6">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Search className="w-4 h-4 inline mr-1" />
+                  Buscar
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nome ou processo"
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={filtroStatus}
+                  onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'em conformidade' | 'inadimplente')}
+                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="em conformidade">Em Conformidade</option>
+                  <option value="inadimplente">Inadimplente</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Urgência</label>
+                <select
+                  value={filtroUrgencia}
+                  onChange={(e) => setFiltroUrgencia(e.target.value as 'todos' | 'hoje' | 'atrasados' | 'proximos')}
+                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="hoje">Hoje</option>
+                  <option value="atrasados">Atrasados</option>
+                  <option value="proximos">Próximos 7 dias</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
+                <select
+                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  value={colunaOrdenacao}
+                  onChange={(e) => setColunaOrdenacao(e.target.value)}
+                >
+                  <option value="nome">Nome</option>
+                  <option value="status">Status</option>
+                  <option value="proximoComparecimento">Próximo Comparecimento</option>
+                  <option value="ultimoComparecimento">Último Comparecimento</option>
+                  <option value="decisao">Data da Decisão</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
+                <select
+                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  value={ordem}
+                  onChange={(e) => setOrdem(e.target.value as 'asc' | 'desc')}
+                >
+                  <option value="asc">Crescente</option>
+                  <option value="desc">Decrescente</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+                <input
+                  type="date"
+                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+                <input
+                  type="date"
+                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                />
+              </div>
+
+              {hasActiveFilters && (
+                <div className="flex items-end">
+                  <button
+                    onClick={limparFiltros}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Limpar Filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'custodiado' : 'custodiados'})
+                  {totalFiltrados > 0 && (
+                    <span className="text-sm text-gray-600 ml-2">
+                      • Página {currentPage} de {totalPages} • Mostrando {startIndex + 1}-{Math.min(endIndex, totalFiltrados)} de {totalFiltrados}
+                    </span>
+                  )}
+                </h3>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-3 text-left">Nome / CPF</th>
+                    <th className="p-3 text-left">Processo / Vara</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center">Último</th>
+                    <th className="p-3 text-center">Próximo</th>
+                    <th className="p-3 text-center">Urgência</th>
+                    <th className="p-3 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dadosPaginados.map((item, index) => {
+                    const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
+                    const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
+                    const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
+
+                    return (
+                      <tr
+                        key={item.id || index}
+                        className={`border-b border-border hover:bg-gray-50 transition-colors ${atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''}`}
+                      >
+                        <td className="p-3">
+                          <div>
+                            <p className="font-medium text-text-base">{item.nome}</p>
+                            <p className="text-sm text-text-muted">{item.cpf}</p>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <p className="text-sm font-mono text-text-muted">{item.processo}</p>
+                          <p className="text-xs text-text-muted">{item.vara}</p>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                            {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center text-sm">
+                          {item.ultimoComparecimento ? new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR') : '-'}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className={`text-sm font-medium ${atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'}`}>
+                            {item.proximoComparecimento ? new Date(item.proximoComparecimento).toLocaleDateString('pt-BR') : '-'}
+                          </div>
+                          <div className="text-xs text-text-muted">
+                            {atrasado ? `${Math.abs(diasRestantes)} dias atraso` : hoje ? 'Hoje' : diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          {atrasado && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                              <AlertTriangle className="w-3 h-3" />
+                              Urgente
+                            </span>
+                          )}
+                          {hoje && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                              <Clock className="w-3 h-3" />
+                              Hoje
+                            </span>
+                          )}
+                          {!atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                              <Clock className="w-3 h-3" />
+                              Próximo
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => setSelecionado(item)}
+                            className="bg-primary text-white px-3 py-1 rounded text-sm hover:bg-primary-dark transition-colors"
+                          >
+                            Visualizar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Mostrando {startIndex + 1} a {Math.min(endIndex, totalFiltrados)} de {totalFiltrados} resultados
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="flex items-center gap-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Anterior
+                    </button>
+
+                    <div className="flex gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`px-3 py-2 text-sm rounded-lg ${currentPage === pageNum ? 'bg-primary text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center gap-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Próxima
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {dadosFiltrados.length === 0 && (
+              <div className="p-8 text-center">
+                <div className="text-gray-400 mb-4">
+                  <Search className="w-12 h-12 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
+                <p className="text-gray-500 mb-4">
+                  {filtroUrgencia === 'hoje' && totalHoje === 0 ? 'Não há comparecimentos agendados para hoje.' :
+                    filtroUrgencia === 'atrasados' && totalAtrasados === 0 ? 'Não há comparecimentos em atraso.' :
+                      'Tente ajustar os filtros ou termos de busca'}
+                </p>
+                <button onClick={limparFiltros} className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors">
+                  Limpar Filtros
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="text-center text-xs text-gray-500 mt-4">
+            Dados carregados do servidor em {new Date().toLocaleTimeString('pt-BR')}
+          </div>
         </div>
       )}
 
@@ -629,7 +962,7 @@ export default function GeralPage() {
           onClose={() => setSelecionado(null)}
           onEditar={(item) => {
             setSelecionado(null);
-            setEditando(item as CustodiadoFormatado);
+            setEditando(item as unknown as CustodiadoFormatado);
           }}
           onExcluir={async () => {
             setSelecionado(null);

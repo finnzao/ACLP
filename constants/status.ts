@@ -28,4 +28,6 @@ export const STATUS_LABELS = {
   'INADIMPLENTE': 'Inadimplente'
 } as const;
 
+export type StatusFiltro = 'todos' | 'EM_CONFORMIDADE' | 'INADIMPLENTE';
+
 export type StatusType = keyof typeof STATUS_LABELS;

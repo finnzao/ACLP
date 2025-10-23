@@ -630,7 +630,7 @@ export const comparecimentosService = {
         comparecimentosHoje: 0,
         comparecimentosAtrasados: 0,
         proximosComparecimentos7Dias: 0,
-        totalComparecimentosRegistrados: 0,
+        totalComparecimentos: 0,
         ultimaAtualizacao: new Date().toISOString()
       };
     } catch (error: any) {
@@ -644,7 +644,7 @@ export const comparecimentosService = {
         comparecimentosHoje: 0,
         comparecimentosAtrasados: 0,
         proximosComparecimentos7Dias: 0,
-        totalComparecimentosRegistrados: 0,
+        totalComparecimentos: 0,
         ultimaAtualizacao: new Date().toISOString()
       };
     }
