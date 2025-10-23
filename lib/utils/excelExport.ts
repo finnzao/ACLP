@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Comparecimento } from '@/types';
+import { CustodiadoData } from '@/types/api';
 import { formatarPeriodicidade } from './periodicidade';
 
 export interface ExportOptions {
@@ -15,30 +15,40 @@ export interface ExportOptions {
   };
 }
 
-export interface ExportData extends Comparecimento {
+/**
+ * Tipo para dados de exportação
+ * Usa o tipo correto CustodiadoData e adiciona campos calculados
+ */
+export type ExportData = CustodiadoData & {
   diasAtraso?: number;
   statusUrgencia?: string;
-}
+};
 
 // Utilitários de data para cálculos
 const dateUtils = {
-  formatToBR: (date: string | Date): string => {
+  formatToBR: (date?: string | Date): string => {
+    if (!date) return '';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return '';
     return dateObj.toLocaleDateString('pt-BR');
   },
 
-  getDaysUntil: (date: string): number => {
+  getDaysUntil: (date?: string | Date): number => {
+    if (!date) return 0;
     const today = new Date();
-    const targetDate = new Date(date);
+    const targetDate = typeof date === 'string' ? new Date(date) : date;
     const diffTime = targetDate.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   },
 
-  isToday: (date: string): boolean => {
-    return date === new Date().toISOString().split('T')[0];
+  isToday: (date?: string | Date): boolean => {
+    if (!date) return false;
+    const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+    return dateStr === new Date().toISOString().split('T')[0];
   },
 
-  isOverdue: (date: string): boolean => {
+  isOverdue: (date?: string | Date): boolean => {
+    if (!date) return false;
     return dateUtils.getDaysUntil(date) < 0;
   }
 };
@@ -46,7 +56,7 @@ const dateUtils = {
 /**
  * Prepara os dados para exportação, adicionando campos calculados
  */
-export function prepareExportData(dados: Comparecimento[]): ExportData[] {
+export function prepareExportData(dados: CustodiadoData[]): ExportData[] {
   return dados.map(item => {
     const diasRestantes = dateUtils.getDaysUntil(item.proximoComparecimento);
     const isHoje = dateUtils.isToday(item.proximoComparecimento);
@@ -78,20 +88,20 @@ export function prepareExportData(dados: Comparecimento[]): ExportData[] {
 export function convertToSheetData(dados: ExportData[]) {
   return dados.map((item, index) => ({
     '#': index + 1,
-    'Nome': item.nome,
-    'CPF': item.cpf,
-    'RG': item.rg,
-    'Contato': item.contato,
-    'Processo': item.processo,
-    'Vara': item.vara,
-    'Comarca': item.comarca,
-    'Data da Decisão': dateUtils.formatToBR(item.decisao),
+    'Nome': item.nome || '',
+    'CPF': item.cpf || '',
+    'RG': item.rg || '',
+    'Contato': item.contato || '',
+    'Processo': item.processo || '',
+    'Vara': item.vara || '',
+    'Comarca': item.comarca || '',
+    'Data da Decisão': dateUtils.formatToBR(item.dataDecisao),
     'Periodicidade': formatarPeriodicidade(item.periodicidade),
-    'Status': item.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente',
-    'Primeiro Comparecimento': dateUtils.formatToBR(item.primeiroComparecimento),
+    'Status': formatStatus(item.status),
+    'Primeiro Comparecimento': dateUtils.formatToBR(item.dataComparecimentoInicial),
     'Último Comparecimento': dateUtils.formatToBR(item.ultimoComparecimento),
     'Próximo Comparecimento': dateUtils.formatToBR(item.proximoComparecimento),
-    'Status de Urgência': item.statusUrgencia,
+    'Status de Urgência': item.statusUrgencia || 'Normal',
     'Dias em Atraso': item.diasAtraso || 0,
     // Adicionar dados de endereço
     'Endereço Completo': formatarEnderecoCompleto(item.endereco)
@@ -99,9 +109,27 @@ export function convertToSheetData(dados: ExportData[]) {
 }
 
 /**
+ * Formata status para exibição
+ */
+function formatStatus(status?: string): string {
+  if (!status) return '';
+  
+  // Aceitar tanto enum quanto string
+  if (status === 'EM_CONFORMIDADE' || status === 'em conformidade') {
+    return 'Em Conformidade';
+  }
+  
+  if (status === 'INADIMPLENTE' || status === 'inadimplente') {
+    return 'Inadimplente';
+  }
+  
+  return status;
+}
+
+/**
  * Formatar endereço completo para exibição
  */
-function formatarEnderecoCompleto(endereco: Comparecimento['endereco']): string {
+function formatarEnderecoCompleto(endereco?: CustodiadoData['endereco']): string {
   if (!endereco) return '';
 
   const partes: string[] = [];
@@ -128,7 +156,7 @@ function formatarEnderecoCompleto(endereco: Comparecimento['endereco']): string 
 export function createFilterInfo(filterInfo?: ExportOptions['filterInfo']) {
   if (!filterInfo) return [];
 
-  const info = [];
+  const info: [string, string][] = [];
 
   if (filterInfo.filtro) {
     info.push(['Busca:', filterInfo.filtro]);
@@ -238,7 +266,7 @@ export function formatWorksheet(worksheet: XLSX.WorkSheet, dataLength: number) {
 /**
  * Função principal para exportar dados para Excel
  */
-export function exportToExcel(dados: Comparecimento[], options: ExportOptions = {}) {
+export function exportToExcel(dados: CustodiadoData[], options: ExportOptions = {}) {
   const {
     filename = `comparecimentos_${new Date().toISOString().split('T')[0]}.xlsx`,
     sheetName = 'Comparecimentos',
@@ -314,8 +342,8 @@ export function exportToExcel(dados: Comparecimento[], options: ExportOptions = 
  * Função para exportar dados filtrados
  */
 export function exportFilteredData(
-  dadosOriginais: Comparecimento[],
-  dadosFiltrados: Comparecimento[],
+  dadosOriginais: CustodiadoData[],
+  dadosFiltrados: CustodiadoData[],
   filterInfo?: ExportOptions['filterInfo']
 ) {
   const hasFilters = filterInfo && Object.values(filterInfo).some(value => value && value !== 'todos');
@@ -328,4 +356,40 @@ export function exportFilteredData(
     includeFilters: hasFilters,
     filterInfo: hasFilters ? filterInfo : undefined
   });
+}
+
+/**
+ * Calcular estatísticas dos dados
+ */
+export function calculateStatistics(dados: CustodiadoData[]) {
+  const hoje = new Date().toISOString().split('T')[0];
+  
+  return {
+    total: dados.length,
+    emConformidade: dados.filter(d => {
+      const status = String(d.status || '');
+      return status === 'EM_CONFORMIDADE' || status === 'em conformidade';
+    }).length,
+    inadimplentes: dados.filter(d => {
+      const status = String(d.status || '');
+      return status === 'INADIMPLENTE' || status === 'inadimplente';
+    }).length,
+    comparecimentosHoje: dados.filter(d => d.proximoComparecimento === hoje).length,
+    atrasados: dados.filter(d => dateUtils.isOverdue(d.proximoComparecimento)).length,
+    proximosPrazos: dados.filter(d => {
+      const dias = dateUtils.getDaysUntil(d.proximoComparecimento);
+      return dias >= 0 && dias <= 7;
+    }).length
+  };
+}
+
+/**
+ * Exportar com estatísticas
+ */
+export function exportWithStatistics(dados: CustodiadoData[], options: ExportOptions = {}) {
+  const stats = calculateStatistics(dados);
+  
+  console.log('Estatísticas da exportação:', stats);
+  
+  return exportToExcel(dados, options);
 }

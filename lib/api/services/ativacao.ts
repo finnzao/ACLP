@@ -1,9 +1,44 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient as api } from '@/lib/http/client';
-import { ApiResponse, AtivarContaDTO, AtivarContaResponse, SolicitarNovoConviteDTO } from '@/types/api';
+import { ApiResponse } from '@/types/api';
 
-// Tipos específicos para ativação
+// ========== TIPOS ESPECÍFICOS PARA ATIVAÇÃO ==========
+
+/**
+ * DTO para ativar conta
+ */
+export interface AtivarContaDTO {
+  token: string;
+  senha: string;
+  confirmaSenha: string;
+  aceitouTermos: boolean;
+}
+
+/**
+ * Resposta da ativação de conta
+ */
+export interface AtivarContaResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    id: string;
+    nome: string;
+    email: string;
+    tipo: 'ADMIN' | 'USUARIO';
+  };
+}
+
+/**
+ * DTO para solicitar novo convite
+ */
+export interface SolicitarNovoConviteDTO {
+  email: string;
+  motivo?: string;
+}
+
+/**
+ * Resposta da validação de token
+ */
 export interface ValidarTokenResponse {
   success: boolean;
   message: string;
@@ -20,14 +55,54 @@ export interface ValidarTokenResponse {
   };
 }
 
-export interface AtivarConta extends AtivarContaDTO {
-  aceitouTermos: boolean;
+/**
+ * Tipo para ativação de conta (mesmo que AtivarContaDTO)
+ */
+export type AtivarConta = AtivarContaDTO;
+
+/**
+ * Resposta de verificação de convite
+ */
+export interface VerificarConviteResponse {
+  temConvite: boolean;
+  status?: string;
+  expiraEm?: string;
 }
 
+// ========== HELPER FUNCTIONS ==========
 
+/**
+ * Extrai mensagem de erro de unknown
+ */
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as any).response;
+    if (response?.data?.message) {
+      return String(response.data.message);
+    }
+  }
+  
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  return 'Erro desconhecido';
+}
 
+/**
+ * Verifica se é erro com status HTTP específico
+ */
+function isErrorWithStatus(error: unknown, status: number): boolean {
+  return !!(
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    (error as any).response?.status === status
+  );
+}
 
-// Serviço de Ativação
+// ========== SERVIÇO DE ATIVAÇÃO ==========
+
 export const ativacaoService = {
   /**
    * Validar token de ativação
@@ -41,24 +116,14 @@ export const ativacaoService = {
       console.error('[ativacaoService] Erro ao validar token:', error);
 
       // Tratar erros específicos
-      if (
-        error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        (error as any).response?.status === 404
-      ) {
+      if (isErrorWithStatus(error, 404)) {
         return {
           success: false,
           message: 'Token de ativação não encontrado ou inválido'
         };
       }
 
-      if (
-        error &&
-        typeof error === 'object' &&
-        'response' in error &&
-        (error as any).response?.status === 410
-      ) {
+      if (isErrorWithStatus(error, 410)) {
         return {
           success: false,
           message: 'Este convite já expirou'
@@ -67,12 +132,7 @@ export const ativacaoService = {
 
       return {
         success: false,
-        message:
-          (error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            (error as any).response?.data?.message) ||
-          'Erro ao validar token'
+        message: getErrorMessage(error) || 'Erro ao validar token'
       };
     }
   },
@@ -105,6 +165,28 @@ export const ativacaoService = {
         };
       }
 
+      // Validação adicional de senha forte
+      if (!/[A-Z]/.test(data.senha)) {
+        return {
+          success: false,
+          message: 'A senha deve conter pelo menos uma letra maiúscula'
+        };
+      }
+
+      if (!/[a-z]/.test(data.senha)) {
+        return {
+          success: false,
+          message: 'A senha deve conter pelo menos uma letra minúscula'
+        };
+      }
+
+      if (!/[0-9]/.test(data.senha)) {
+        return {
+          success: false,
+          message: 'A senha deve conter pelo menos um número'
+        };
+      }
+
       const response = await api.post<AtivarContaResponse>('/api/usuarios/ativar', {
         token: data.token,
         senha: data.senha,
@@ -118,35 +200,29 @@ export const ativacaoService = {
 
       return {
         success: false,
-        message:
-          (error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            (error as any).response?.data?.message) ||
-          'Erro ao ativar conta'
+        message: getErrorMessage(error) || 'Erro ao ativar conta'
       };
     }
   },
 
   /**
    * Solicitar reenvio de convite
-   * @param email Email do usuário
+   * @param data Email e motivo opcional
    */
   solicitarNovoConvite: async (data: SolicitarNovoConviteDTO): Promise<ApiResponse> => {
     try {
       const response = await api.post<ApiResponse>('/api/convites/solicitar-reenvio', data);
-      return response.data ?? { success: false, message: 'Erro desconhecido', timestamp: new Date().toISOString() };
+      return response.data ?? { 
+        success: false, 
+        message: 'Erro desconhecido', 
+        timestamp: new Date().toISOString() 
+      };
     } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao solicitar novo convite:', error);
 
       return {
         success: false,
-        message:
-          (error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            (error as any).response?.data?.message) ||
-          'Erro ao solicitar novo convite',
+        message: getErrorMessage(error) || 'Erro ao solicitar novo convite',
         timestamp: new Date().toISOString()
       };
     }
@@ -156,14 +232,11 @@ export const ativacaoService = {
    * Verificar se email tem convite pendente
    * @param email Email para verificar
    */
-  verificarConvitePendente: async (email: string): Promise<{
-    temConvite: boolean;
-    status?: string;
-    expiraEm?: string;
-  }> => {
+  verificarConvitePendente: async (email: string): Promise<VerificarConviteResponse> => {
     try {
       const response = await api.get(`/api/convites/verificar/${encodeURIComponent(email)}`);
       const data = response.data ?? { temConvite: false };
+      
       return {
         temConvite: Boolean((data as any).temConvite),
         status: (data as any).status,
@@ -182,32 +255,73 @@ export const ativacaoService = {
   cancelarConvite: async (tokenOuId: string): Promise<ApiResponse> => {
     try {
       const response = await api.delete<ApiResponse>(`/api/convites/${tokenOuId}`);
-      return response.data ?? { success: false, message: 'Erro desconhecido', timestamp: new Date().toISOString() };
+      return response.data ?? { 
+        success: false, 
+        message: 'Erro desconhecido', 
+        timestamp: new Date().toISOString() 
+      };
     } catch (error: unknown) {
       console.error('[ativacaoService] Erro ao cancelar convite:', error);
 
       return {
         success: false,
-        message:
-          (error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            (error as any).response?.data?.message) ||
-          'Erro ao cancelar convite',
+        message: getErrorMessage(error) || 'Erro ao cancelar convite',
+        timestamp: new Date().toISOString()
+      };
+    }
+  },
+
+  /**
+   * Reenviar email de convite (admin only)
+   * @param conviteId ID do convite
+   */
+  reenviarConvite: async (conviteId: string): Promise<ApiResponse> => {
+    try {
+      const response = await api.post<ApiResponse>(`/api/convites/${conviteId}/reenviar`);
+      return response.data ?? { 
+        success: false, 
+        message: 'Erro desconhecido', 
+        timestamp: new Date().toISOString() 
+      };
+    } catch (error: unknown) {
+      console.error('[ativacaoService] Erro ao reenviar convite:', error);
+
+      return {
+        success: false,
+        message: getErrorMessage(error) || 'Erro ao reenviar convite',
         timestamp: new Date().toISOString()
       };
     }
   }
 };
 
-// Hook customizado para usar na tela de ativação
+// ========== HOOK CUSTOMIZADO ==========
+
 import { useState, useCallback } from 'react';
 
-export function useAtivacao() {
+/**
+ * Estado do hook de ativação
+ */
+interface UseAtivacaoState {
+  loading: boolean;
+  error: string | null;
+  validarToken: (token: string) => Promise<ValidarTokenResponse | null>;
+  ativarConta: (data: AtivarConta) => Promise<AtivarContaResponse | null>;
+  limparErro: () => void;
+}
+
+/**
+ * Hook customizado para usar na tela de ativação
+ */
+export function useAtivacao(): UseAtivacaoState {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const validarToken = useCallback(async (token: string) => {
+  const limparErro = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const validarToken = useCallback(async (token: string): Promise<ValidarTokenResponse | null> => {
     setLoading(true);
     setError(null);
 
@@ -220,14 +334,15 @@ export function useAtivacao() {
 
       return result;
     } catch (err) {
-      setError('Erro ao validar token');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao validar token';
+      setError(errorMessage);
       return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const ativarConta = useCallback(async (data: AtivarConta) => {
+  const ativarConta = useCallback(async (data: AtivarConta): Promise<AtivarContaResponse | null> => {
     setLoading(true);
     setError(null);
 
@@ -240,7 +355,8 @@ export function useAtivacao() {
 
       return result;
     } catch (err) {
-      setError('Erro ao ativar conta');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao ativar conta';
+      setError(errorMessage);
       return null;
     } finally {
       setLoading(false);
@@ -251,9 +367,73 @@ export function useAtivacao() {
     loading,
     error,
     validarToken,
-    ativarConta
+    ativarConta,
+    limparErro
   };
 }
 
-// Exportar tudo junto
+// ========== VALIDADORES ==========
+
+/**
+ * Validar força da senha
+ */
+export function validarForcaSenha(senha: string): {
+  valida: boolean;
+  forca: 'fraca' | 'media' | 'forte';
+  problemas: string[];
+} {
+  const problemas: string[] = [];
+  let pontos = 0;
+
+  if (senha.length < 8) {
+    problemas.push('Mínimo de 8 caracteres');
+  } else {
+    pontos++;
+  }
+
+  if (!/[A-Z]/.test(senha)) {
+    problemas.push('Pelo menos uma letra maiúscula');
+  } else {
+    pontos++;
+  }
+
+  if (!/[a-z]/.test(senha)) {
+    problemas.push('Pelo menos uma letra minúscula');
+  } else {
+    pontos++;
+  }
+
+  if (!/[0-9]/.test(senha)) {
+    problemas.push('Pelo menos um número');
+  } else {
+    pontos++;
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
+    problemas.push('Pelo menos um caractere especial');
+  } else {
+    pontos++;
+  }
+
+  let forca: 'fraca' | 'media' | 'forte' = 'fraca';
+  if (pontos >= 4) forca = 'forte';
+  else if (pontos >= 3) forca = 'media';
+
+  return {
+    valida: problemas.length === 0,
+    forca,
+    problemas
+  };
+}
+
+/**
+ * Validar formato de email
+ */
+export function validarEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+// ========== EXPORTS ==========
+
 export default ativacaoService;
