@@ -2,8 +2,40 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, FileText, User } from 'lucide-react';
-import { validateDocuments, getDocumentSummary } from '@/lib/utils/validation';
-import { formatCPF, formatRG } from '@/lib/utils/formatting';
+import { 
+  FormattingCPF as formatCPF,
+  FormattingRG as formatRG
+} from '@/lib/utils/formatting';
+
+// Funções de validação locais
+const validateDocuments = (cpf?: string, rg?: string): { isValid: boolean; error?: string } => {
+  const hasCpf = cpf?.trim();
+  const hasRg = rg?.trim();
+
+  if (!hasCpf && !hasRg) {
+    return {
+      isValid: false,
+      error: 'Pelo menos CPF ou RG deve ser informado'
+    };
+  }
+
+  return { isValid: true };
+};
+
+const getDocumentSummary = (cpf?: string, rg?: string): string => {
+  const hasCpf = cpf?.trim();
+  const hasRg = rg?.trim();
+
+  if (hasCpf && hasRg) {
+    return 'CPF e RG informados';
+  } else if (hasCpf) {
+    return 'Apenas CPF informado';
+  } else if (hasRg) {
+    return 'Apenas RG informado';
+  } else {
+    return 'Nenhum documento informado';
+  }
+};
 
 interface DocumentFormProps {
   cpf?: string;

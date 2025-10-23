@@ -688,7 +688,7 @@ export interface ResumoSistema {
   custodiadosEmConformidade: number;
   custodiadosInadimplentes: number;
   comparecimentosHoje: number;
-  totalComparecimentosRegistrados: number;
+  totalComparecimentos: number;
   comparecimentosEsteMes?: number;
   totalMudancasEndereco?: number;
   enderecosAtivos?: number;

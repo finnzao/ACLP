@@ -134,7 +134,7 @@ export default function DashboardPage() {
         atrasados: resumo.proximosComparecimentos?.totalAtrasados || 24,
         percentualConformidade: resumo.percentualConformidade || 20,
         percentualInadimplencia: resumo.percentualInadimplencia || 80,
-        totalComparecimentos: resumo.totalComparecimentos || 64,
+        totalComparecimentos: resumo.totalComparecimentos || 60,
         comparecimentosEsteMes: resumo.comparecimentosEsteMes || 3
       });
 

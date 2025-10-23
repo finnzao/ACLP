@@ -1,17 +1,16 @@
-// painel-web/app/dashboard/historicoComparecimento/enderecos/[id]/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useHistoricoEndereco } from '@/hooks/useHistoricoEndereco';
 import { custodiadosService } from '@/lib/api/services';
-import type { CustodiadoResponse } from '@/types/api';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  User, 
+import type { CustodiadoData } from '@/types/api';
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  Clock,
+  User,
   FileText,
   Home,
   CheckCircle,
@@ -25,21 +24,19 @@ export default function HistoricoEnderecosPage() {
   const custodiadoId = parseInt(params.id as string);
 
   const { historico, loading, error, buscarHistorico, enderecoAtual, totalEnderecos } = useHistoricoEndereco();
-  const [custodiado, setCustodiado] = useState<CustodiadoResponse | null>(null);
+  const [custodiado, setCustodiado] = useState<CustodiadoData | null>(null);
   const [loadingCustodiado, setLoadingCustodiado] = useState(true);
 
   const carregarDados = useCallback(async () => {
     try {
       setLoadingCustodiado(true);
-      
-      // Buscar dados do custodiado - buscarPorId retorna CustodiadoResponse diretamente
-      const custodiadoData = await custodiadosService.buscarPorId(custodiadoId);
-      
-      if (custodiadoData) {
-        setCustodiado(custodiadoData.data);
+
+      const response = await custodiadosService.buscarPorId(custodiadoId);
+
+      if (response && response.data) {
+        setCustodiado(response.data);
       }
-      
-      // Buscar histórico de endereços
+
       await buscarHistorico(custodiadoId);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
@@ -154,7 +151,7 @@ export default function HistoricoEnderecosPage() {
                 <Home className="w-5 h-5" />
                 <span>{totalEnderecos} {totalEnderecos === 1 ? 'endereço' : 'endereços'}</span>
               </div>
-              
+
               {enderecoAtual && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium">
                   <CheckCircle className="w-4 h-4" />
@@ -196,28 +193,25 @@ export default function HistoricoEnderecosPage() {
                 {historico.map((item, index) => (
                   <div key={item.id} className="relative pl-20">
                     {/* Círculo indicador */}
-                    <div className={`absolute left-5 w-7 h-7 rounded-full border-4 flex items-center justify-center ${
-                      item.enderecoAtivo 
-                        ? 'bg-green-500 border-green-200 shadow-lg shadow-green-200' 
+                    <div className={`absolute left-5 w-7 h-7 rounded-full border-4 flex items-center justify-center ${item.enderecoAtivo
+                        ? 'bg-green-500 border-green-200 shadow-lg shadow-green-200'
                         : 'bg-gray-400 border-gray-200'
-                    }`}>
+                      }`}>
                       {item.enderecoAtivo && (
                         <div className="w-2 h-2 bg-white rounded-full"></div>
                       )}
                     </div>
 
                     {/* Card do Endereço */}
-                    <div className={`bg-white rounded-xl shadow-sm border transition-all hover:shadow-md ${
-                      item.enderecoAtivo 
-                        ? 'border-green-300 ring-2 ring-green-100' 
+                    <div className={`bg-white rounded-xl shadow-sm border transition-all hover:shadow-md ${item.enderecoAtivo
+                        ? 'border-green-300 ring-2 ring-green-100'
                         : 'border-gray-200'
-                    }`}>
-                      {/* Header do Card */}
-                      <div className={`px-6 py-4 border-b ${
-                        item.enderecoAtivo 
-                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-100' 
-                          : 'bg-gray-50 border-gray-200'
                       }`}>
+                      {/* Header do Card */}
+                      <div className={`px-6 py-4 border-b ${item.enderecoAtivo
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-100'
+                          : 'bg-gray-50 border-gray-200'
+                        }`}>
                         <div className="flex items-center justify-between flex-wrap gap-3">
                           <div className="flex items-center gap-3">
                             {item.enderecoAtivo ? (
@@ -246,7 +240,7 @@ export default function HistoricoEnderecosPage() {
                               </div>
                             )}
                           </div>
-                          
+
                           {item.enderecoAtivo && (
                             <span className="px-4 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-full shadow-sm">
                               Ativo
@@ -356,13 +350,13 @@ export default function HistoricoEnderecosPage() {
                 <FileText className="w-5 h-5" />
                 Resumo do Histórico
               </h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="bg-white rounded-lg p-4 shadow-sm">
                   <p className="text-sm text-blue-700 mb-2 font-medium">Total de Endereços</p>
                   <p className="text-3xl font-bold text-blue-900">{totalEnderecos}</p>
                 </div>
-                
+
                 {enderecoAtual && (
                   <>
                     <div className="bg-white rounded-lg p-4 shadow-sm">
@@ -370,7 +364,7 @@ export default function HistoricoEnderecosPage() {
                       <p className="text-3xl font-bold text-blue-900">{enderecoAtual.diasResidencia}</p>
                       <p className="text-xs text-gray-600 mt-1">dias de residência</p>
                     </div>
-                    
+
                     <div className="bg-white rounded-lg p-4 shadow-sm">
                       <p className="text-sm text-blue-700 mb-2 font-medium">Cidade Atual</p>
                       <p className="text-xl font-bold text-blue-900">

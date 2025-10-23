@@ -23,6 +23,24 @@ interface Props {
   onExcluir?: (id: string | number) => void;
 }
 
+// Type helper para status
+type StatusKey = keyof typeof STATUS_COLORS;
+
+const getStatusKey = (status: string | undefined): StatusKey => {
+  const normalizedStatus = status?.toLowerCase() || 'inadimplente';
+
+  if (normalizedStatus in STATUS_COLORS) {
+    return normalizedStatus as StatusKey;
+  }
+
+  const uppercaseStatus = status?.toUpperCase();
+  if (uppercaseStatus && uppercaseStatus in STATUS_COLORS) {
+    return uppercaseStatus as StatusKey;
+  }
+
+  return 'inadimplente';
+};
+
 const dateUtils = {
   formatToBR: (date: string | Date | null | undefined): string => {
     if (!date) return 'Não informado';
@@ -61,9 +79,10 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
       setLoadingDetails(true);
       try {
         const custodiadoId = typeof dados.id === 'string' ? parseInt(dados.id) : dados.id;
-        const custodiado = await custodiadosService.buscarPorId(custodiadoId);
+        const response = await custodiadosService.buscarPorId(custodiadoId);
         
-        if (custodiado) {
+        if (response && response.data) {
+          const custodiado = response.data;
           setDadosCompletos({
             ...dados,
             ...custodiado,
@@ -149,6 +168,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
     return periodicidade === 'mensal' ? 'Mensal (30 dias)' : 'Bimensal (60 dias)';
   };
 
+  const statusKey = getStatusKey(dadosCompletos.status);
   const isComparecimentoHoje = dateUtils.isToday(dadosCompletos.proximoComparecimento);
   const isComparecimentoAtrasado = dateUtils.isOverdue(dadosCompletos.proximoComparecimento);
   const diasRestantes = dateUtils.getDaysUntil(dadosCompletos.proximoComparecimento);
@@ -190,8 +210,8 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <span className={`px-4 py-2 rounded-full text-sm font-medium ${STATUS_COLORS[dadosCompletos.status].bg} ${STATUS_COLORS[dadosCompletos.status].text}`}>
-              {STATUS_LABELS[dadosCompletos.status]}
+            <span className={`px-4 py-2 rounded-full text-sm font-medium ${STATUS_COLORS[statusKey].bg} ${STATUS_COLORS[statusKey].text}`}>
+              {STATUS_LABELS[statusKey]}
             </span>
             
             {isComparecimentoHoje && (
@@ -271,7 +291,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
                 Endereço Residencial
               </h4>
               
-              {/* Botão Minimalista de Histórico */}
               <button
                 onClick={handleVerHistoricoEnderecos}
                 className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 hover:text-green-900 bg-white hover:bg-green-100 border border-green-200 rounded-lg transition-all"
@@ -508,7 +527,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
         details={[
           `Processo: ${dadosCompletos.processo}`,
           `CPF: ${dadosCompletos.cpf ? formatCPF(String(dadosCompletos.cpf)) : 'Não informado'}`,
-          `Status: ${STATUS_LABELS[dadosCompletos.status]}`,
+          `Status: ${STATUS_LABELS[statusKey]}`,
           'Esta ação não pode ser desfeita!'
         ]}
         confirmText="Sim, Excluir"
