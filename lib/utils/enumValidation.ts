@@ -30,13 +30,13 @@ export function validateEstadoBrasil(estado: string): string {
     'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
     'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
   ];
-  
+
   const estadoUpper = estado.toUpperCase();
-  
+
   if (!estadosValidos.includes(estadoUpper)) {
     throw new Error(`Estado inválido: ${estado}. Use uma sigla válida como BA, SP, RJ, etc.`);
   }
-  
+
   return estadoUpper;
 }
 
@@ -45,15 +45,15 @@ export function validateEstadoBrasil(estado: string): string {
  */
 export function convertStatusToString(status: string): string {
   const statusUpper = status.toUpperCase();
-  
+
   if (statusUpper === 'EM CONFORMIDADE' || statusUpper === 'EM_CONFORMIDADE') {
     return 'EM_CONFORMIDADE';
   }
-  
+
   if (statusUpper === 'INADIMPLENTE') {
     return 'INADIMPLENTE';
   }
-  
+
   // Se não reconhece, retornar o valor original
   return statusUpper;
 }
@@ -68,10 +68,10 @@ export function sanitizeFormData(data: any): any {
     validadoPor: data.validadoPor?.trim(),
     observacoes: data.observacoes?.trim(),
     motivoMudancaEndereco: data.motivoMudancaEndereco?.trim(),
-    
+
     // Converter enum para string
     tipoValidacao: convertTipoValidacaoToString(data.tipoValidacao),
-    
+
     // Validar endereço se houver
     ...(data.novoEndereco && {
       novoEndereco: {
@@ -93,55 +93,59 @@ export function sanitizeFormData(data: any): any {
  */
 export function validateBeforeSend(data: any): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   // Validar campos obrigatórios
   if (!data.custodiadoId) {
     errors.push('ID do custodiado é obrigatório');
   }
-  
+
   if (!data.dataComparecimento) {
     errors.push('Data do comparecimento é obrigatória');
   }
-  
+
   if (!data.tipoValidacao) {
     errors.push('Tipo de validação é obrigatório');
   }
-  
+
   if (!data.validadoPor?.trim()) {
     errors.push('Campo "Validado por" é obrigatório');
   }
-  
+
   // Validar endereço se houver mudança
   if (data.mudancaEndereco && data.novoEndereco) {
     const endereco = data.novoEndereco;
-    
+
     if (!endereco.cep?.trim()) {
       errors.push('CEP é obrigatório para atualização de endereço');
     }
-    
+
     if (!endereco.logradouro?.trim()) {
       errors.push('Logradouro é obrigatório para atualização de endereço');
     }
-    
+
     if (!endereco.bairro?.trim()) {
       errors.push('Bairro é obrigatório para atualização de endereço');
     }
-    
+
     if (!endereco.cidade?.trim()) {
       errors.push('Cidade é obrigatória para atualização de endereço');
     }
-    
+
     if (!endereco.estado?.trim()) {
       errors.push('Estado é obrigatório para atualização de endereço');
     } else {
       try {
         validateEstadoBrasil(endereco.estado);
       } catch (error) {
-        errors.push(error.message);
+        if (error instanceof Error) {
+          errors.push(error.message);
+        } else {
+          errors.push('Erro ao validar estado');
+        }
       }
     }
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors
@@ -156,22 +160,22 @@ export function logFormDataForDebug(data: any, label: string = 'FormData'): void
     console.group(`[${label}] Dados do formulário:`);
     console.log('Dados originais:', data);
     console.log('Tipo de tipoValidacao:', typeof data.tipoValidacao, data.tipoValidacao);
-    
+
     if (data.novoEndereco) {
       console.log('Endereço:', data.novoEndereco);
       console.log('Estado:', data.novoEndereco.estado, typeof data.novoEndereco.estado);
     }
-    
+
     try {
       const sanitized = sanitizeFormData(data);
       console.log('Dados sanitizados:', sanitized);
-      
+
       const validation = validateBeforeSend(sanitized);
       console.log('Validação:', validation);
     } catch (error) {
       console.error('Erro na sanitização:', error);
     }
-    
+
     console.groupEnd();
   }
 }

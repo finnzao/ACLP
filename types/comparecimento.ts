@@ -1,7 +1,7 @@
 // types/comparecimento.ts (renomeado de .d.ts para .ts)
 
-import type { Periodicidade, StatusComparecimento } from './index';
-import { TipoValidacao } from './api';
+import type { Periodicidade } from './index';
+import { StatusComparecimento, TipoValidacao } from './api';
 import { ReactNode } from 'react';
 
 export interface Endereco {
@@ -56,10 +56,10 @@ interface ComparecimentoBase {
 }
 
 // Interface principal que garante pelo menos um documento
-export interface Comparecimento extends ComparecimentoBase, AtLeastOneDocument {
+export type Comparecimento = ComparecimentoBase & AtLeastOneDocument & {
   cpf?: ReactNode;
   rg?: ReactNode;
-}
+};
 
 // Interface para novo comparecimento
 interface NovoComparecimentoBase {
@@ -75,7 +75,7 @@ interface NovoComparecimentoBase {
   observacoes?: string;
 }
 
-export interface NovoComparecimento extends NovoComparecimentoBase, AtLeastOneDocument { }
+export type NovoComparecimento = NovoComparecimentoBase & AtLeastOneDocument & { }
 
 // Interface mais flexível para formulários (antes da validação)
 export interface ComparecimentoFormData {

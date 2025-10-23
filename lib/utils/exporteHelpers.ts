@@ -1,18 +1,20 @@
-import { Comparecimento } from '@/types';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { CustodiadoData, StatusComparecimento } from '@/types/api';
 import type { ExportData, ExportStatistics, ExportFilterInfo } from '@/types/export';
 
 /**
  * Calcula estatísticas dos dados para incluir no relatório
  */
-export function calculateExportStatistics(dados: Comparecimento[]): ExportStatistics {
+export function calculateExportStatistics(dados: CustodiadoData[]): ExportStatistics {
     const hoje = new Date().toISOString().split('T')[0];
 
-    const emConformidade = dados.filter(d => d.status === 'em conformidade').length;
-    const inadimplentes = dados.filter(d => d.status === 'inadimplente').length;
+    const emConformidade = dados.filter(d => d.status === StatusComparecimento.EM_CONFORMIDADE).length;
+    const inadimplentes = dados.filter(d => d.status === StatusComparecimento.INADIMPLENTE).length;
 
     const comparecimentosHoje = dados.filter(d => d.proximoComparecimento === hoje).length;
 
     const atrasados = dados.filter(d => {
+        if (!d.proximoComparecimento) return false;
         const proximoComparecimento = new Date(d.proximoComparecimento);
         const hojeDate = new Date(hoje);
         return proximoComparecimento < hojeDate;
@@ -23,6 +25,7 @@ export function calculateExportStatistics(dados: Comparecimento[]): ExportStatis
     const proximoPrazoStr = proximoPrazo.toISOString().split('T')[0];
 
     const proximosPrazos = dados.filter(d => {
+        if (!d.proximoComparecimento) return false;
         const dataComparecimento = d.proximoComparecimento;
         return dataComparecimento >= hoje && dataComparecimento <= proximoPrazoStr;
     }).length;
@@ -81,7 +84,7 @@ export function generateFilename(filterInfo?: ExportFilterInfo): string {
 /**
  * Valida dados antes da exportação
  */
-export function validateExportData(dados: Comparecimento[]): { valid: boolean; errors: string[] } {
+export function validateExportData(dados: CustodiadoData[]): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!dados || dados.length === 0) {
@@ -89,7 +92,7 @@ export function validateExportData(dados: Comparecimento[]): { valid: boolean; e
     }
 
     // Verificar se há campos obrigatórios vazios
-    const camposObrigatorios: (keyof Comparecimento)[] = ['nome', 'processo', 'proximoComparecimento'];
+    const camposObrigatorios: (keyof CustodiadoData)[] = ['nome', 'processo', 'proximoComparecimento'];
 
     dados.forEach((item, index) => {
         camposObrigatorios.forEach(campo => {
@@ -118,9 +121,32 @@ export function validateExportData(dados: Comparecimento[]): { valid: boolean; e
 /**
  * Transforma dados para formato de exportação com validação
  */
-export function transformDataForExport(dados: Comparecimento[]): ExportData[] {
+export function transformDataForExport(dados: CustodiadoData[]): ExportData[] {
     return dados.map((item, index) => {
         const hoje = new Date();
+        
+        // Proteção contra proximoComparecimento undefined
+        if (!item.proximoComparecimento) {
+            return {
+                '#': index + 1,
+                'Nome': item.nome || '',
+                'CPF': item.cpf || '',
+                'RG': item.rg || '',
+                'Contato': item.contato || '',
+                'Processo': item.processo || '',
+                'Vara': item.vara || '',
+                'Comarca': item.comarca || '',
+                'Data da Decisão': formatDateToBR(item.dataDecisao),
+                'Periodicidade': formatPeriodicidade(item.periodicidade),
+                'Status': formatStatus(item.status),
+                'Primeiro Comparecimento': formatDateToBR(item.dataComparecimentoInicial),
+                'Último Comparecimento': formatDateToBR(item.ultimoComparecimento),
+                'Próximo Comparecimento': 'Não definido',
+                'Status de Urgência': 'Sem data',
+                'Dias em Atraso': 0
+            };
+        }
+
         const proximoComparecimento = new Date(item.proximoComparecimento);
         const diffTime = proximoComparecimento.getTime() - hoje.getTime();
         const diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -149,10 +175,10 @@ export function transformDataForExport(dados: Comparecimento[]): ExportData[] {
             'Processo': item.processo || '',
             'Vara': item.vara || '',
             'Comarca': item.comarca || '',
-            'Data da Decisão': formatDateToBR(item.decisao),
-            'Periodicidade': item.periodicidade === 'mensal' ? 'Mensal' : 'Bimensal',
-            'Status': item.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente',
-            'Primeiro Comparecimento': formatDateToBR(item.primeiroComparecimento),
+            'Data da Decisão': formatDateToBR(item.dataDecisao),
+            'Periodicidade': formatPeriodicidade(item.periodicidade),
+            'Status': formatStatus(item.status),
+            'Primeiro Comparecimento': formatDateToBR(item.dataComparecimentoInicial),
             'Último Comparecimento': formatDateToBR(item.ultimoComparecimento),
             'Próximo Comparecimento': formatDateToBR(item.proximoComparecimento),
             'Status de Urgência': statusUrgencia,
@@ -164,10 +190,46 @@ export function transformDataForExport(dados: Comparecimento[]): ExportData[] {
 /**
  * Formata data para padrão brasileiro
  */
-function formatDateToBR(date: string | Date): string {
+function formatDateToBR(date?: string | Date): string {
     if (!date) return '';
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString('pt-BR');
+    
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        
+        // Verificar se é uma data válida
+        if (isNaN(dateObj.getTime())) return '';
+        
+        return dateObj.toLocaleDateString('pt-BR');
+    } catch (error) {
+        return '';
+    }
+}
+
+/**
+ * Formata periodicidade para exibição
+ */
+function formatPeriodicidade(periodicidade?: number): string {
+    if (!periodicidade) return '';
+    
+    if (periodicidade === 30) return 'Mensal';
+    if (periodicidade === 60) return 'Bimensal';
+    if (periodicidade === 90) return 'Trimestral';
+    if (periodicidade === 180) return 'Semestral';
+    if (periodicidade === 365) return 'Anual';
+    
+    return `${periodicidade} dias`;
+}
+
+/**
+ * Formata status para exibição
+ */
+function formatStatus(status?: StatusComparecimento): string {
+    if (!status) return '';
+    
+    // ✅ CORRETO - Comparar enum com enum
+    return status === StatusComparecimento.EM_CONFORMIDADE 
+        ? 'Em Conformidade' 
+        : 'Inadimplente';
 }
 
 /**
@@ -230,7 +292,7 @@ export function estimateExportTime(dataLength: number): string {
 /**
  * Limpa e normaliza dados antes da exportação
  */
-export function sanitizeExportData(dados: Comparecimento[]): Comparecimento[] {
+export function sanitizeExportData(dados: CustodiadoData[]): CustodiadoData[] {
     return dados.map(item => ({
         ...item,
         nome: String(item.nome || '').trim(),
