@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { comparecimentosService } from '@/lib/api/services';
 import type { ComparecimentoResponse } from '@/types/api';
 import ExportButton from '@/components/ExportButton';
@@ -20,6 +20,9 @@ import {
   MapPin,
 } from 'lucide-react';
 
+import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
+
+
 interface HistoricoFormatado extends ComparecimentoResponse {
   custodiadoNomeCompleto?: string;
   tipoValidacaoFormatado?: string;
@@ -27,9 +30,32 @@ interface HistoricoFormatado extends ComparecimentoResponse {
   horaFormatada?: string;
 }
 
-export default function HistoricoPage() {
+const TipoValidacaoUtils = {
+  // Normaliza para lowercase (formato do banco)
+  normalize(tipo: string): string {
+    return tipo.toLowerCase();
+  },
+
+  // Formata para exibição
+  format(tipo: string): string {
+    const tipoNormalizado = tipo.toLowerCase();
+    const formatacao: Record<string, string> = {
+      'presencial': 'Presencial',
+      'online': 'Online',
+      'cadastro_inicial': 'Cadastro Inicial'
+    };
+    return formatacao[tipoNormalizado] || tipo;
+  },
+
+  // Compara case-insensitive
+  isEqual(tipo1: string, tipo2: string): boolean {
+    return tipo1.toLowerCase() === tipo2.toLowerCase();
+  }
+};
+
+function HistoricoPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParamsSafe();
   const { showToast } = useToast();
 
   const [historicos, setHistoricos] = useState<HistoricoFormatado[]>([]);
@@ -37,11 +63,11 @@ export default function HistoricoPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [filtro, setFiltro] = useState('');
-  const [colunaOrdenacao, setColunaOrdenacao] = useState<string>('dataComparecimento');
-  const [ordem, setOrdem] = useState<'asc' | 'desc'>('desc');
+  const [colunaOrdenacao] = useState<string>('dataComparecimento');
+  const [ordem] = useState<'asc' | 'desc'>('desc');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
-  const [filtroTipoValidacao, setFiltroTipoValidacao] = useState<'todos' | 'PRESENCIAL' | 'ONLINE' | 'CADASTRO_INICIAL'>('todos');
+  const [filtroTipoValidacao, setFiltroTipoValidacao] = useState<'todos' | string>('todos');
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileExport, setShowMobileExport] = useState(false);
 
@@ -62,7 +88,6 @@ export default function HistoricoPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Carregar históricos do backend
   const carregarHistoricos = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -70,10 +95,9 @@ export default function HistoricoPage() {
     try {
       console.log('[HistoricoPage] Carregando históricos...');
 
-      // Buscar todos os comparecimentos usando o endpoint com paginação
       const response = await comparecimentosService.listarTodos({
         page: 0,
-        size: 1000 // Buscar muitos registros de uma vez
+        size: 1000
       });
 
       console.log('[HistoricoPage] Resposta recebida:', response);
@@ -83,11 +107,10 @@ export default function HistoricoPage() {
           ? response.data
           : response.data.comparecimentos || [];
 
-        // Formatar dados
         const historicosFormatados: HistoricoFormatado[] = historicosData.map((h: ComparecimentoResponse) => ({
           ...h,
           custodiadoNomeCompleto: h.custodiadoNome || 'Nome não informado',
-          tipoValidacaoFormatado: formatarTipoValidacao(h.tipoValidacao),
+          tipoValidacaoFormatado: TipoValidacaoUtils.format(h.tipoValidacao),
           dataFormatada: formatarData(h.dataComparecimento),
           horaFormatada: h.horaComparecimento || '00:00:00'
         }));
@@ -115,20 +138,18 @@ export default function HistoricoPage() {
     carregarHistoricos();
   }, [carregarHistoricos]);
 
-  // Aplicar filtros da URL
   useEffect(() => {
     const busca = searchParams.get('busca');
-    const tipo = searchParams.get('tipo') as 'todos' | 'PRESENCIAL' | 'ONLINE' | 'CADASTRO_INICIAL' | null;
+    const tipo = searchParams.get('tipo');
     const dataI = searchParams.get('dataInicio');
     const dataF = searchParams.get('dataFim');
 
     if (busca) setFiltro(busca);
-    if (tipo) setFiltroTipoValidacao(tipo);
+    if (tipo) setFiltroTipoValidacao(TipoValidacaoUtils.normalize(tipo));
     if (dataI) setDataInicio(dataI);
     if (dataF) setDataFim(dataF);
   }, [searchParams]);
 
-  // Atualizar URL com filtros
   useEffect(() => {
     const params = new URLSearchParams();
 
@@ -143,16 +164,6 @@ export default function HistoricoPage() {
     window.history.replaceState({}, '', newUrl);
     setCurrentPage(1);
   }, [filtro, filtroTipoValidacao, dataInicio, dataFim]);
-
-  // Funções auxiliares
-  const formatarTipoValidacao = (tipo: string): string => {
-    const tipos: Record<string, string> = {
-      'PRESENCIAL': 'Presencial',
-      'ONLINE': 'Online',
-      'CADASTRO_INICIAL': 'Cadastro Inicial'
-    };
-    return tipos[tipo] || tipo;
-  };
 
   const formatarData = (data: string): string => {
     if (!data) return '';
@@ -171,7 +182,6 @@ export default function HistoricoPage() {
       .trim();
   }, []);
 
-  // Filtrar dados
   const filtrarDados = useCallback((data: HistoricoFormatado[]): HistoricoFormatado[] => {
     return data.filter((item) => {
       const termo = filtro.trim();
@@ -186,7 +196,8 @@ export default function HistoricoPage() {
           validadorNormalizado.includes(termoNormalizado);
       }
 
-      const matchTipo = filtroTipoValidacao === 'todos' || item.tipoValidacao === filtroTipoValidacao;
+      const matchTipo = filtroTipoValidacao === 'todos' || 
+        TipoValidacaoUtils.isEqual(item.tipoValidacao, filtroTipoValidacao);
 
       const dentroPeriodo = (!dataInicio || !dataFim) ||
         (new Date(item.dataComparecimento) >= new Date(dataInicio) &&
@@ -196,74 +207,77 @@ export default function HistoricoPage() {
     });
   }, [filtro, filtroTipoValidacao, dataInicio, dataFim, normalizarTexto]);
 
-  // Ordenar dados
   const ordenarDados = useCallback((data: HistoricoFormatado[]): HistoricoFormatado[] => {
     return [...data].sort((a, b) => {
-      const valA = a[colunaOrdenacao as keyof HistoricoFormatado];
-      const valB = b[colunaOrdenacao as keyof HistoricoFormatado];
+      let aValue: any;
+      let bValue: any;
 
-      if (colunaOrdenacao === 'dataComparecimento') {
-        const dateA = valA ? new Date(valA as string | number | Date) : undefined;
-        const dateB = valB ? new Date(valB as string | number | Date) : undefined;
-        if (!dateA || !dateB) return 0;
-        return ordem === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+      switch (colunaOrdenacao) {
+        case 'dataComparecimento':
+          aValue = new Date(a.dataComparecimento).getTime();
+          bValue = new Date(b.dataComparecimento).getTime();
+          break;
+        case 'custodiadoNome':
+          aValue = a.custodiadoNomeCompleto || '';
+          bValue = b.custodiadoNomeCompleto || '';
+          break;
+        case 'tipoValidacao':
+          aValue = a.tipoValidacao || '';
+          bValue = b.tipoValidacao || '';
+          break;
+        case 'validadoPor':
+          aValue = a.validadoPor || '';
+          bValue = b.validadoPor || '';
+          break;
+        default:
+          return 0;
       }
 
-      return ordem === 'asc'
-        ? String(valA).localeCompare(String(valB))
-        : String(valB).localeCompare(String(valA));
+      if (aValue < bValue) return ordem === 'asc' ? -1 : 1;
+      if (aValue > bValue) return ordem === 'asc' ? 1 : -1;
+      return 0;
     });
   }, [colunaOrdenacao, ordem]);
 
-  const limparFiltros = () => {
-    setFiltro('');
-    setFiltroTipoValidacao('todos');
-    setDataInicio('');
-    setDataFim('');
-    setCurrentPage(1);
-    router.push('/dashboard/historico');
-  };
-
-  const handleRefresh = async () => {
-    await carregarHistoricos();
-  };
-
   const dadosFiltrados = useMemo(() => {
-    return ordenarDados(filtrarDados(historicos));
+    const filtrados = filtrarDados(historicos);
+    return ordenarDados(filtrados);
   }, [historicos, filtrarDados, ordenarDados]);
 
   const totalFiltrados = dadosFiltrados.length;
-
   const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const dadosPaginados = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return dadosFiltrados.slice(startIndex, startIndex + itemsPerPage);
-  }, [dadosFiltrados, currentPage, itemsPerPage]);
+  const dadosPaginados = dadosFiltrados.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    containerRef.current?.scrollIntoView({ behavior: 'smooth' });
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const exportFilterInfo = {
+  const limparFiltros = () => {
+    setFiltro('');
+    setDataInicio('');
+    setDataFim('');
+    setFiltroTipoValidacao('todos');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = filtro || dataInicio || dataFim || filtroTipoValidacao !== 'todos';
+
+  const filterInfo = {
     filtro: filtro || undefined,
-    tipo: filtroTipoValidacao !== 'todos' ? filtroTipoValidacao : undefined,
+    status: filtroTipoValidacao !== 'todos' ? filtroTipoValidacao : undefined,
     dataInicio: dataInicio || undefined,
-    dataFim: dataFim || undefined
+    dataFim: dataFim || undefined,
   };
-
-  const hasActiveFilters = filtro || filtroTipoValidacao !== 'todos' || dataInicio || dataFim;
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">Carregando históricos...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Carregando históricos...</p>
         </div>
       </div>
     );
@@ -271,13 +285,13 @@ export default function HistoricoPage() {
 
   if (error) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto mt-8">
-          <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados</h3>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar históricos</h3>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={handleRefresh}
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            onClick={carregarHistoricos}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
           >
             Tentar Novamente
           </button>
@@ -286,293 +300,228 @@ export default function HistoricoPage() {
     );
   }
 
-  const MobileCard = ({ item }: { item: HistoricoFormatado }) => {
-    return (
-      <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-l-primary">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800 text-sm">{item.custodiadoNomeCompleto}</h3>
-            </div>
-          </div>
-          <span className={`px-2 py-1 rounded text-xs font-medium ${item.tipoValidacao === 'PRESENCIAL' ? 'bg-green-100 text-green-800' :
-            item.tipoValidacao === 'ONLINE' ? 'bg-blue-100 text-blue-800' :
-              'bg-purple-100 text-purple-800'
-            }`}>
-            {item.tipoValidacaoFormatado}
-          </span>
-        </div>
-
-        <div className="space-y-1.5 mb-3">
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{item.dataFormatada} às {item.horaFormatada}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <User className="w-3.5 h-3.5" />
-            <span>Validado por: {item.validadoPor}</span>
-          </div>
-          {item.observacoes && (
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <FileText className="w-3.5 h-3.5" />
-              <span className="line-clamp-1">{item.observacoes}</span>
-            </div>
-          )}
-          {item.mudancaEndereco && (
-            <button
-              onClick={() => router.push(`/dashboard/historicoComparecimento/enderecos/${item.custodiadoId}`)}
-              className="flex items-center gap-2 text-xs text-green-600 hover:text-green-700 transition-colors"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Ver histórico de endereços</span>
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gray-50" ref={containerRef}>
       {isMobile ? (
-        <>
-          <div className="bg-white sticky top-0 z-20 shadow-sm">
-            <div className="p-4 pb-2">
-              <div className="flex items-center justify-between mb-3">
-                <h1 className="text-xl font-bold text-primary-dark">Histórico de Comparecimentos</h1>
-                <div className="flex gap-2">
-                  <button onClick={handleRefresh} className="p-2 bg-gray-100 rounded-lg">
-                    <RefreshCw className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => setShowMobileExport(!showMobileExport)}
-                    className="p-2 bg-gray-100 rounded-lg"
-                  >
-                    <FileText className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-lg ${hasActiveFilters ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}
-                  >
-                    <Filter className="w-5 h-5" />
-                  </button>
-                </div>
+        <div className="p-4 space-y-4">
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-xl font-bold text-gray-800">Histórico</h1>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="p-2 bg-primary text-white rounded-lg"
+                >
+                  <Filter className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setShowMobileExport(!showMobileExport)}
+                  className="p-2 bg-green-600 text-white rounded-lg"
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={carregarHistoricos}
+                  className="p-2 bg-gray-600 text-white rounded-lg"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
               </div>
+            </div>
 
-              {showMobileExport && (
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                  <ExportButton
-                    dados={historicos as any}
-                    dadosFiltrados={dadosFiltrados as any}
-                    filterInfo={exportFilterInfo}
-                    className="w-full"
+            {showMobileExport && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <ExportButton
+                  dados={historicos}
+                  dadosFiltrados={dadosFiltrados}
+                  filterInfo={filterInfo}
+                />
+              </div>
+            )}
+
+            {showFilters && (
+              <div className="space-y-3 mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome ou validador..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
                   />
                 </div>
-              )}
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={filtroTipoValidacao}
+                  onChange={(e) => setFiltroTipoValidacao(e.target.value)}
+                >
+                  <option value="todos">Todos os Tipos</option>
+                  <option value="presencial">Presencial</option>
+                  <option value="online">Online</option>
+                  <option value="cadastro_inicial">Cadastro Inicial</option>
+                </select>
+
                 <input
-                  type="text"
-                  placeholder="Buscar por nome ou validador..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  placeholder="Data Inicial"
                 />
-                {filtro && (
+
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                  placeholder="Data Final"
+                />
+
+                {hasActiveFilters && (
                   <button
-                    onClick={() => setFiltro('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    onClick={limparFiltros}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2"
                   >
-                    <X className="w-4 h-4 text-gray-400" />
+                    <X className="w-4 h-4" />
+                    Limpar Filtros
                   </button>
                 )}
               </div>
+            )}
 
+            <div className="text-sm text-gray-600">
+              {totalFiltrados} {totalFiltrados === 1 ? 'registro' : 'registros'}
+              {hasActiveFilters && ' (filtrado)'}
+            </div>
+          </div>
 
+          <div className="space-y-3">
+            {dadosPaginados.map((item, index) => (
+              <div key={item.id || index} className="bg-white rounded-lg shadow-sm p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold text-gray-800">{item.custodiadoNomeCompleto}</h3>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    TipoValidacaoUtils.isEqual(item.tipoValidacao, 'presencial') ? 'bg-green-100 text-green-800' :
+                    TipoValidacaoUtils.isEqual(item.tipoValidacao, 'online') ? 'bg-blue-100 text-blue-800' :
+                    'bg-purple-100 text-purple-800'
+                  }`}>
+                    {item.tipoValidacaoFormatado}
+                  </span>
+                </div>
 
-              {showFilters && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-3 animate-in slide-in-from-top-2">
-                  <div>
-                    <label className="text-xs font-medium text-gray-700 mb-1 block">Tipo de Validação</label>
-                    <div className="grid grid-cols-4 gap-1">
-                      <button
-                        onClick={() => setFiltroTipoValidacao('todos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroTipoValidacao === 'todos' ? 'bg-primary text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Todos
-                      </button>
-                      <button
-                        onClick={() => setFiltroTipoValidacao('PRESENCIAL')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroTipoValidacao === 'PRESENCIAL' ? 'bg-green-500 text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Presencial
-                      </button>
-                      <button
-                        onClick={() => setFiltroTipoValidacao('ONLINE')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroTipoValidacao === 'ONLINE' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Online
-                      </button>
-                      <button
-                        onClick={() => setFiltroTipoValidacao('CADASTRO_INICIAL')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroTipoValidacao === 'CADASTRO_INICIAL' ? 'bg-purple-500 text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Cadastro
-                      </button>
-                    </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Calendar className="w-4 h-4" />
+                    <span>{item.dataFormatada} às {item.horaFormatada}</span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">Data Início</label>
-                      <input
-                        type="date"
-                        value={dataInicio}
-                        onChange={(e) => setDataInicio(e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">Data Fim</label>
-                      <input
-                        type="date"
-                        value={dataFim}
-                        onChange={(e) => setDataFim(e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
-                      />
-                    </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <User className="w-4 h-4" />
+                    <span>Validado por: {item.validadoPor}</span>
                   </div>
 
-                  {hasActiveFilters && (
-                    <button onClick={limparFiltros} className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
-                      Limpar Filtros
+                  {item.observacoes && (
+                    <div className="flex items-start gap-2 text-gray-600">
+                      <FileText className="w-4 h-4 mt-0.5" />
+                      <span className="line-clamp-2">{item.observacoes}</span>
+                    </div>
+                  )}
+
+                  {item.mudancaEndereco && (
+                    <button
+                      onClick={() => router.push(`/dashboard/historicoComparecimento/enderecos/${item.custodiadoId}`)}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs"
+                    >
+                      <MapPin className="w-3 h-3" />
+                      Ver Mudança de Endereço
                     </button>
                   )}
                 </div>
-              )}
-            </div>
-
-            <div className="px-4 pb-2 flex items-center justify-between text-xs text-gray-600 border-t">
-              <span>{totalFiltrados} resultados</span>
-              {totalPages > 1 && <span>Página {currentPage} de {totalPages}</span>}
-            </div>
-          </div>
-
-          <div className="p-4 pb-20 space-y-3">
-            {dadosPaginados.map((item, index) => (
-              <MobileCard key={item.id || index} item={item} />
+              </div>
             ))}
-
-            {dadosFiltrados.length === 0 && (
-              <div className="text-center py-12">
-                <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
-                <p className="text-gray-500 text-sm mb-4">Tente ajustar os filtros ou termos de busca</p>
-                <button onClick={limparFiltros} className="bg-primary text-white px-4 py-2 rounded-lg text-sm">
-                  Limpar Filtros
-                </button>
-              </div>
-            )}
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="flex items-center gap-1 px-3 py-2 text-sm bg-white border rounded-lg disabled:opacity-50"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Anterior
-                </button>
-                <span className="text-sm text-gray-600">{currentPage} / {totalPages}</span>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center gap-1 px-3 py-2 text-sm bg-white border rounded-lg disabled:opacity-50"
-                >
-                  Próxima
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
           </div>
-        </>
-      ) : (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary mb-2">Histórico de Comparecimentos</h2>
-              <p className="text-text-muted">Visualize todos os comparecimentos registrados no sistema</p>
-            </div>
-            <div className="flex gap-2">
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2">
               <button
-                onClick={handleRefresh}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 bg-white border border-gray-300 rounded-lg disabled:opacity-50"
               >
-                <RefreshCw className="w-4 h-4" />
-                Atualizar
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <ExportButton dados={historicos as any} dadosFiltrados={dadosFiltrados as any} filterInfo={exportFilterInfo} />
-            </div>
-          </div>
 
-          <div className="bg-white p-4 rounded-lg shadow mb-6">
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Search className="w-4 h-4 inline mr-1" />
-                  Buscar
-                </label>
-                <input
-                  type="text"
-                  placeholder="Nome do custodiado ou validador"
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              <span className="text-sm text-gray-600">
+                Página {currentPage} de {totalPages}
+              </span>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 bg-white border border-gray-300 rounded-lg disabled:opacity-50"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Histórico de Comparecimentos</h1>
+                <p className="text-gray-600">Visualize e exporte todos os registros de comparecimento</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={carregarHistoricos}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  Atualizar
+                </button>
+
+                <ExportButton
+                  dados={historicos}
+                  dadosFiltrados={dadosFiltrados}
+                  filterInfo={filterInfo}
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Nome do custodiado ou validador..."
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Validação</label>
                 <select
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={filtroTipoValidacao}
-                  onChange={(e) => setFiltroTipoValidacao(e.target.value as any)}
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  onChange={(e) => setFiltroTipoValidacao(e.target.value)}
                 >
-                  <option value="todos">Todos</option>
-                  <option value="PRESENCIAL">Presencial</option>
-                  <option value="ONLINE">Online</option>
-                  <option value="CADASTRO_INICIAL">Cadastro Inicial</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
-                <select
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  value={colunaOrdenacao}
-                  onChange={(e) => setColunaOrdenacao(e.target.value)}
-                >
-                  <option value="dataComparecimento">Data do Comparecimento</option>
-                  <option value="custodiadoNome">Nome do Custodiado</option>
-                  <option value="tipoValidacao">Tipo de Validação</option>
-                  <option value="validadoPor">Validado Por</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                <select
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  value={ordem}
-                  onChange={(e) => setOrdem(e.target.value as 'asc' | 'desc')}
-                >
-                  <option value="desc">Mais Recente</option>
-                  <option value="asc">Mais Antigo</option>
+                  <option value="todos">Todos os Tipos</option>
+                  <option value="presencial">Presencial</option>
+                  <option value="online">Online</option>
+                  <option value="cadastro_inicial">Cadastro Inicial</option>
                 </select>
               </div>
 
@@ -580,7 +529,7 @@ export default function HistoricoPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
                 <input
                   type="date"
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
                 />
@@ -590,7 +539,7 @@ export default function HistoricoPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
                 <input
                   type="date"
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
                 />
@@ -650,27 +599,20 @@ export default function HistoricoPage() {
                       className="border-b border-border hover:bg-gray-50 transition-colors"
                     >
                       <td className="p-3">
-                        <div>
-                          <p className="font-medium text-text-base">{item.custodiadoNomeCompleto}</p>
-                        </div>
+                        <p className="font-medium text-text-base">{item.custodiadoNomeCompleto}</p>
                       </td>
-                      <td className="p-3 text-center text-sm">
-                        {item.dataFormatada}
-                      </td>
-                      <td className="p-3 text-center text-sm">
-                        {item.horaFormatada}
-                      </td>
+                      <td className="p-3 text-center text-sm">{item.dataFormatada}</td>
+                      <td className="p-3 text-center text-sm">{item.horaFormatada}</td>
                       <td className="p-3 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.tipoValidacao === 'PRESENCIAL' ? 'bg-green-100 text-green-800' :
-                          item.tipoValidacao === 'ONLINE' ? 'bg-blue-100 text-blue-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          TipoValidacaoUtils.isEqual(item.tipoValidacao, 'presencial') ? 'bg-green-100 text-green-800' :
+                          TipoValidacaoUtils.isEqual(item.tipoValidacao, 'online') ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
                           {item.tipoValidacaoFormatado}
                         </span>
                       </td>
-                      <td className="p-3 text-sm">
-                        {item.validadoPor}
-                      </td>
+                      <td className="p-3 text-sm">{item.validadoPor}</td>
                       <td className="p-3 text-sm">
                         {item.observacoes ? (
                           <span className="line-clamp-2">{item.observacoes}</span>
@@ -678,13 +620,12 @@ export default function HistoricoPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           {item.mudancaEndereco && (
                             <button
                               onClick={() => router.push(`/dashboard/historicoComparecimento/enderecos/${item.custodiadoId}`)}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs hover:bg-green-200 transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs hover:bg-green-200 transition-colors"
                               title="Ver histórico de endereços"
                             >
                               <MapPin className="w-3 h-3" />
@@ -699,7 +640,6 @@ export default function HistoricoPage() {
                           )}
                         </div>
                       </td>
-
                     </tr>
                   ))}
                 </tbody>
@@ -763,9 +703,7 @@ export default function HistoricoPage() {
 
             {dadosFiltrados.length === 0 && (
               <div className="p-8 text-center">
-                <div className="text-gray-400 mb-4">
-                  <Search className="w-12 h-12 mx-auto" />
-                </div>
+                <Search className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
                 <p className="text-gray-500 mb-4">
                   Tente ajustar os filtros ou termos de busca
@@ -785,3 +723,5 @@ export default function HistoricoPage() {
     </div>
   );
 }
+
+export default withSearchParams(HistoricoPage);

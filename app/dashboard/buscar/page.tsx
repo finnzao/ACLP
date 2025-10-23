@@ -22,7 +22,6 @@ export default function BuscarPage() {
     setLoading(true);
     setHasSearched(true);
     
-    // Simular busca
     setTimeout(() => {
       const termo = busca.toLowerCase().trim();
       const dados = usuarios.map(item => ({

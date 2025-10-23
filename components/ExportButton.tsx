@@ -44,7 +44,7 @@ export default function ExportButton<T = any>({
       );
 
       if (result.success) {
-        console.log(`✅ ${result.message} (${result.count} registros)`);
+        console.log(`${result.message} (${result.count} registros)`);
       } else {
         console.error(`❌ ${result.message}`);
         alert(result.message);
@@ -220,7 +220,7 @@ export function QuickExportButton<T = any>({
     try {
       const result = exportFilteredData(dados as any, dados as any);
       if (result.success) {
-        console.log(`✅ ${result.message}`);
+        console.log(`${result.message}`);
       } else {
         alert(result.message);
       }

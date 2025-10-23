@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle,
   XCircle,
@@ -16,11 +16,8 @@ import {
   UserCheck,
   ChevronDown,
   ChevronUp,
-  Smartphone,
-  Building,
   Search,
-  Users,
-  X
+  type LucideIcon
 } from 'lucide-react';
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
@@ -37,11 +34,13 @@ import {
 import {
   FormularioComparecimento,
   AtualizacaoEndereco,
-  MobileSectionProps,
   EstadoPagina,
   dateUtils,
   Endereco
 } from '@/types/comparecimento';
+
+// ✅ Importar o hook seguro
+import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
 
 declare global {
   interface Window {
@@ -49,22 +48,31 @@ declare global {
   }
 }
 
-export default function ConfirmarPresencaPage() {
+// ✅ Interface corrigida para MobileSection
+interface MobileSectionProps {
+  title: string;
+  icon: LucideIcon;  // ✅ Tipo correto para ícones do Lucide
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function ConfirmarPresencaPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  
+  const searchParams = useSearchParamsSafe();
   const processo = searchParams.get('processo');
+  
   const { success, error } = useToastHelpers();
 
   const { custodiados, loading: loadingCustodiados, error: errorCustodiados, refetch } = useCustodiados();
   const { registrarComparecimento, loading: loadingComparecimento } = useComparecimentos();
 
-  // CORREÇÃO: Mudança de CustodiadoResponse para CustodiadoData
   const [custodiado, setCustodiado] = useState<CustodiadoData | null>(null);
   const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
 
-  // CORREÇÃO: Mudança de CustodiadoResponse[] para CustodiadoData[]
   const [resultadosBusca, setResultadosBusca] = useState<CustodiadoData[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
@@ -159,8 +167,6 @@ export default function ConfirmarPresencaPage() {
     success('Pessoa selecionada', `${pessoaSelecionada.nome} - ${pessoaSelecionada.processo}`);
   }, [success]);
 
-  // CORREÇÃO: Removido buscarPessoa das dependências para evitar loop infinito
-  // Adicionado flag para evitar múltiplas buscas
   const [buscaInicialFeita, setBuscaInicialFeita] = useState(false);
 
   useEffect(() => {
@@ -168,7 +174,7 @@ export default function ConfirmarPresencaPage() {
       setBuscaInicialFeita(true);
       buscarPessoa();
     }
-  }, [processo, custodiados, custodiado, buscaInicialFeita]);
+  }, [processo, custodiados, custodiado, buscaInicialFeita, buscarPessoa]);
 
   useEffect(() => {
     if (estado === 'sucesso' && custodiado && custodiado.periodicidade) {
@@ -197,204 +203,136 @@ export default function ConfirmarPresencaPage() {
     return `${h}:${m}:00`;
   };
 
-  const handleInputChange = (field: keyof FormularioComparecimento, value: string) => {
-    setFormulario(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleRespostaAlteracaoEndereco = useCallback((houve: boolean) => {
-    requestAnimationFrame(() => {
-      setAtualizacaoEndereco(prev => ({
-        ...prev,
-        houveAlteracao: houve
-      }));
-      setEnderecoRespondido(true);
-
-      if (houve) {
-        setTimeout(() => {
-          setExpandedSection('endereco');
-        }, 50);
-      }
-    });
-  }, []);
-
   const confirmarComparecimento = async () => {
-    if (!custodiado || !custodiado.id) return;
-
-    if (!enderecoRespondido) {
-      error('Informação pendente', 'Responda sobre a atualização de endereço');
-      setExpandedSection('endereco');
+    if (!custodiado) {
+      error('Erro', 'Nenhuma pessoa selecionada');
       return;
     }
 
-    setEstado('confirmando');
+    // ✅ Validar ID do custodiado
+    if (!custodiado.id || custodiado.id === 0) {
+      error('Erro', 'ID do custodiado inválido');
+      return;
+    }
 
-    try {
-      const dadosBasicos = {
-        custodiadoId: custodiado.id,
-        dataComparecimento: formulario.dataComparecimento,
-        horaComparecimento: formatarHoraParaAPI(formulario.horaComparecimento),
-        tipoValidacao: formulario.tipoValidacao,
-        observacoes: formulario.observacoes,
-        validadoPor: formulario.validadoPor,
-        anexos: '',
-        mudancaEndereco: atualizacaoEndereco.houveAlteracao,
-        motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao || undefined,
-        novoEndereco: atualizacaoEndereco.houveAlteracao ? {
-          cep: atualizacaoEndereco.endereco?.cep || '',
-          logradouro: atualizacaoEndereco.endereco?.logradouro || '',
-          numero: atualizacaoEndereco.endereco?.numero || '',
-          complemento: atualizacaoEndereco.endereco?.complemento || '',
-          bairro: atualizacaoEndereco.endereco?.bairro || '',
-          cidade: atualizacaoEndereco.endereco?.cidade || '',
-          estado: atualizacaoEndereco.endereco?.estado || ''
-        } : undefined
-      };
+    if (!enderecoRespondido) {
+      error('Atenção', 'Você precisa responder se houve mudança de endereço');
+      return;
+    }
 
-      logFormDataForDebug(dadosBasicos, 'Dados Originais');
-
-      const dadosSanitizados = sanitizeFormData(dadosBasicos);
-      logFormDataForDebug(dadosSanitizados, 'Dados Sanitizados');
-
-      const validacao = validateBeforeSend(dadosSanitizados);
-      if (!validacao.isValid) {
-        setEstado('erro');
-        setMensagem(`Erro de validação: ${validacao.errors.join(', ')}`);
-        error('Dados inválidos', validacao.errors.join(', '));
+    if (atualizacaoEndereco.houveAlteracao) {
+      if (!atualizacaoEndereco.endereco?.cep ||
+        !atualizacaoEndereco.endereco?.logradouro ||
+        !atualizacaoEndereco.endereco?.bairro ||
+        !atualizacaoEndereco.endereco?.cidade ||
+        !atualizacaoEndereco.endereco?.estado) {
+        error('Endereço incompleto', 'Preencha todos os campos obrigatórios do endereço');
         return;
       }
 
-      const dadosComparecimento: ComparecimentoDTO = dadosSanitizados;
-
-      console.log('Dados finais sendo enviados:', dadosComparecimento);
-      console.log('Hora formatada:', dadosComparecimento.horaComparecimento);
-
-      const resultado = await registrarComparecimento(dadosComparecimento);
-
-      if (resultado.success) {
-        setEstado('sucesso');
-        const msgEndereco = atualizacaoEndereco.houveAlteracao ? ' Endereço atualizado.' : '';
-        setMensagem(`Comparecimento confirmado com sucesso!${msgEndereco}`);
-        success('Comparecimento registrado', resultado.message || 'Presença confirmada com sucesso');
-      } else {
-        console.error('Erro na resposta:', resultado);
-        setEstado('erro');
-        setMensagem(resultado.message || 'Erro ao confirmar comparecimento');
-        error('Erro no registro', resultado.message || 'Falha ao registrar comparecimento');
+      if (!atualizacaoEndereco.motivoAlteracao || atualizacaoEndereco.motivoAlteracao.trim().length < 10) {
+        error('Motivo inválido', 'O motivo da alteração deve ter pelo menos 10 caracteres');
+        return;
       }
-    } catch (err: unknown) {
-      console.error('Erro na requisição:', err);
+    }
+
+    setEstado('buscando');
+
+    try {
+      const horaFormatada = formatarHoraParaAPI(formulario.horaComparecimento);
+
+      const dadosComparecimento: ComparecimentoDTO = {
+        custodiadoId: custodiado.id,
+        dataComparecimento: formulario.dataComparecimento,
+        horaComparecimento: horaFormatada,
+        tipoValidacao: formulario.tipoValidacao,
+        validadoPor: formulario.validadoPor.trim() || 'Sistema',
+        observacoes: formulario.observacoes?.trim() || undefined,
+        motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao!,
+        novoEndereco: atualizacaoEndereco.houveAlteracao ? {
+          cep: atualizacaoEndereco.endereco!.cep,
+          logradouro: atualizacaoEndereco.endereco!.logradouro,
+          numero: atualizacaoEndereco.endereco!.numero,
+          complemento: atualizacaoEndereco.endereco!.complemento,
+          bairro: atualizacaoEndereco.endereco!.bairro,
+          cidade: atualizacaoEndereco.endereco!.cidade,
+          estado: atualizacaoEndereco.endereco!.estado,
+         
+        } : undefined
+      };
+
+      const dadosValidados = validateBeforeSend(dadosComparecimento);
+      const dadosLimpos = sanitizeFormData(dadosValidados);
+
+      logFormDataForDebug(dadosLimpos, 'Dados enviados para API');
+
+      await registrarComparecimento(dadosLimpos);
+
+      setMensagem(`Comparecimento registrado com sucesso para ${custodiado.nome}`);
+      setEstado('sucesso');
+
+      await refetch();
+
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 3000);
+
+    } catch (err) {
+      console.error('Erro ao confirmar comparecimento:', err);
       setEstado('erro');
-
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
-
-      if (errorMessage.includes('JSON_INVALIDO') || errorMessage.includes('Malformed JSON')) {
-        setMensagem('Erro nos dados enviados. Verifique se todos os campos estão preenchidos corretamente.');
-        error('Erro de validação', 'Dados inválidos. Verifique os campos obrigatórios.');
-      } else if (errorMessage.toLowerCase().includes('hora') || errorMessage.toLowerCase().includes('time')) {
-        setMensagem('Erro no formato da hora. O sistema espera formato HH:mm:ss.');
-        error('Formato de hora inválido', 'Use o formato HH:mm:ss para hora (ex: 14:30:00)');
-      } else if (errorMessage.toLowerCase().includes('status')) {
-        setMensagem('Erro na validação do status. Entre em contato com o suporte.');
-        error('Erro de validação', 'Status inválido detectado');
-      } else if (errorMessage.toLowerCase().includes('estado')) {
-        setMensagem('Estado inválido. Use siglas como BA, SP, RJ, etc.');
-        error('Estado inválido', 'Use uma sigla válida de estado brasileiro');
-      } else if (errorMessage.toLowerCase().includes('tipo')) {
-        setMensagem('Tipo de validação inválido. Contate o suporte.');
-        error('Tipo inválido', 'Erro no tipo de validação');
-      } else {
-        setMensagem('Erro interno. Tente novamente.');
-        error('Erro interno', 'Ocorreu um erro inesperado. Tente novamente.');
-      }
+      setMensagem(err instanceof Error ? err.message : 'Erro desconhecido ao confirmar comparecimento');
+      error('Erro', 'Não foi possível registrar o comparecimento');
     }
   };
 
-  const MobileSection = ({
-    id,
-    title,
-    icon,
-    children,
-    defaultExpanded = false,
-    badge = null
-  }: MobileSectionProps) => {
-    const isExpanded = expandedSection === id || defaultExpanded;
-
-    return (
-      <div className="bg-white rounded-lg shadow-sm mb-3 overflow-hidden">
-        <button
-          onClick={() => setExpandedSection(isExpanded ? null : id)}
-          className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {icon}
-            <span className="font-medium text-gray-800">{title}</span>
-            {badge}
-          </div>
-          {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
-          )}
-        </button>
-        {isExpanded && (
-          <div className="px-4 pb-4 slide-in-from-top-2">
-            {children}
-          </div>
-        )}
-      </div>
-    );
+  const handleInputChange = (campo: keyof FormularioComparecimento, valor: string) => {
+    setFormulario(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
   };
 
-  const ListaResultadosBusca = () => {
-    if (!mostrarResultados || resultadosBusca.length === 0) return null;
+  const handleEnderecoChange = (novoEndereco: Partial<Endereco>) => {
+    setAtualizacaoEndereco(prev => ({
+      ...prev,
+      novoEndereco: {
+        ...prev.endereco,
+        ...novoEndereco
+      } as Endereco
+    }));
+  };
 
-    return (
-      <div className="mt-3 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto">
-        <div className="p-2 bg-gray-50 border-b">
-          <p className="text-xs font-medium text-gray-600">
-            {resultadosBusca.length} resultado(s) encontrado(s)
-          </p>
+  // ✅ Componente MobileSection com tipos corretos
+  const MobileSection = ({ title, icon: Icon, isExpanded, onToggle, children }: MobileSectionProps) => (
+    <div className="bg-white rounded-lg shadow-sm mb-3 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full p-4 flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-3">
+          <Icon className="w-5 h-5 text-primary" />
+          <span className="font-semibold text-gray-800">{title}</span>
         </div>
-        {resultadosBusca.map((resultado) => (
-          <button
-            key={resultado.id}
-            onClick={() => selecionarPessoa(resultado)}
-            className="w-full p-3 text-left hover:bg-blue-50 border-b border-gray-100 transition-colors"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-800 text-sm">{resultado.nome}</p>
-                <p className="text-xs text-gray-500">CPF: {resultado.cpf || 'Não informado'}</p>
-                <p className="text-xs text-gray-500">Processo: {resultado.processo}</p>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs ${resultado.status === 'EM_CONFORMIDADE'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
-                }`}>
-                {resultado.status === 'EM_CONFORMIDADE' ? 'Conforme' : 'Inadimplente'}
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      buscarPessoa();
-    }
-  };
+        {isExpanded ? (
+          <ChevronUp className="w-5 h-5 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+        )}
+      </button>
+      {isExpanded && (
+        <div className="p-4 pt-0 border-t border-gray-100">
+          {children}
+        </div>
+      )}
+    </div>
+  );
 
   if (loadingCustodiados) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Carregando dados do sistema...</p>
+          <p className="text-lg text-gray-600">Carregando dados...</p>
         </div>
       </div>
     );
@@ -402,750 +340,252 @@ export default function ConfirmarPresencaPage() {
 
   if (errorCustodiados) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
-        <div className="text-center p-6 bg-white rounded-2xl shadow-xl max-w-md w-full">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Erro ao carregar dados</h2>
-          <p className="text-gray-600 mb-6 text-sm">{errorCustodiados}</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => refetch()}
-              className="flex-1 bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark transition-colors"
-            >
-              Tentar Novamente
-            </button>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-colors"
-            >
-              Voltar
-            </button>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h3 className="text-red-800 font-semibold mb-2 flex items-center gap-2">
+            <XCircle className="w-5 h-5" />
+            Erro ao carregar dados
+          </h3>
+          <p className="text-red-600 mb-4">{errorCustodiados}</p>
+          <button
+            onClick={() => refetch()}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Tentar Novamente
+          </button>
         </div>
       </div>
     );
   }
 
-  if (isMobile) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white sticky top-0 z-20 shadow-sm">
-          <div className="flex items-center gap-4 p-4">
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto p-4 md:p-6">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-6">
+          <div className="flex items-center gap-3 mb-2">
             <button
               onClick={() => router.back()}
-              className="p-2 -ml-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="text-gray-600 hover:text-gray-800"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-6 h-6" />
             </button>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold text-primary-dark">
-                Confirmar Presença
-              </h1>
-              <p className="text-xs text-gray-600">Registro de comparecimento</p>
-            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-primary-dark">
+              Confirmar Comparecimento
+            </h1>
           </div>
+          <p className="text-gray-600 text-sm md:text-base ml-9 md:ml-0">
+            Registre o comparecimento de forma rápida e eficiente
+          </p>
         </div>
 
-        <div className="p-4 pb-24">
-          {estado === 'buscando' && (
-            <div className="bg-white rounded-lg p-6 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
-              <p className="text-gray-600">Buscando pessoa...</p>
+        {/* Estados de Feedback */}
+        {estado === 'sucesso' && (
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-6 animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-start gap-4">
+              <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h3 className="text-green-800 font-semibold text-lg mb-2">Sucesso!</h3>
+                <p className="text-green-700 mb-3">{mensagem}</p>
+                {proximoComparecimento && (
+                  <div className="bg-white rounded-lg p-4 border border-green-200">
+                    <p className="text-sm text-gray-600 mb-1">Próximo comparecimento calculado:</p>
+                    <p className="text-lg font-semibold text-primary">{proximoComparecimento}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Periodicidade: {custodiado && formatarPeriodicidade(custodiado.periodicidade)}
+                    </p>
+                  </div>
+                )}
+                <p className="text-sm text-green-600 mt-3">Redirecionando para o painel...</p>
+              </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {estado === 'confirmando' && (
-            <div className="bg-white rounded-lg p-6 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-3"></div>
-              <p className="text-gray-600">Confirmando presença...</p>
-            </div>
-          )}
-
-          {estado === 'sucesso' && (
-            <div className="bg-white rounded-lg p-6 text-center">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-green-700 mb-2">Presença Confirmada!</h2>
-              <p className="text-gray-600 mb-4">{mensagem}</p>
-              {proximoComparecimento && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                  <p className="text-blue-800 text-sm font-medium">Próximo comparecimento:</p>
-                  <p className="text-blue-600 font-bold">{proximoComparecimento}</p>
-                </div>
-              )}
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="w-full bg-primary text-white py-3 rounded-lg font-medium"
-              >
-                Voltar ao Dashboard
-              </button>
-            </div>
-          )}
-
-          {estado === 'erro' && (
-            <div className="bg-white rounded-lg p-6 text-center">
-              <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-red-700 mb-2">Erro</h2>
-              <p className="text-gray-600 mb-4">{mensagem}</p>
-              <div className="flex gap-2">
+        {estado === 'erro' && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 mb-6 animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-start gap-4">
+              <XCircle className="w-8 h-8 text-red-600 flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h3 className="text-red-800 font-semibold text-lg mb-2">Erro ao Registrar</h3>
+                <p className="text-red-700 mb-4">{mensagem}</p>
                 <button
-                  onClick={() => {
-                    setEstado('inicial');
-                    setResultadosBusca([]);
-                    setMostrarResultados(false);
-                  }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded"
+                  onClick={() => setEstado('inicial')}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Tentar Novamente
                 </button>
-                <button
-                  onClick={() => router.back()}
-                  className="flex-1 bg-primary text-white py-2 rounded"
-                >
-                  Voltar
-                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {estado === 'inicial' && (
-            <>
-              <MobileSection
-                id="busca"
-                title="Buscar Pessoa"
-                icon={<Search className="w-5 h-5 text-blue-600" />}
-                defaultExpanded={!custodiado}
-                badge={
-                  resultadosBusca.length > 0 ? (
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                      {resultadosBusca.length} encontrado(s)
-                    </span>
-                  ) : null
-                }
-              >
-                <div className="space-y-3">
+        {/* Mobile Layout */}
+        {isMobile && estado !== 'sucesso' && (
+          <div className="space-y-3">
+            {/* Busca */}
+            <MobileSection
+              title="Buscar Pessoa"
+              icon={Search}
+              isExpanded={expandedSection === 'busca'}
+              onToggle={() => setExpandedSection(expandedSection === 'busca' ? null : 'busca')}
+            >
+              <div className="space-y-3">
+                <div className="relative">
                   <input
                     type="text"
                     value={buscaProcesso}
                     onChange={(e) => setBuscaProcesso(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Nome, CPF ou número do processo"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
+                    placeholder="Nome, CPF ou processo..."
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm"
                   />
-
-                  <ListaResultadosBusca />
-
-                  <button
-                    onClick={buscarPessoa}
-                    className="w-full bg-blue-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-                  >
-                    Buscar
-                  </button>
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 </div>
-              </MobileSection>
+                
+                <button
+                  onClick={buscarPessoa}
+                  disabled={estado === 'buscando'}
+                  className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+                >
+                  {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
+                </button>
 
-              {custodiado && custodiado.proximoComparecimento && (
-                <>
-                  <MobileSection
-                    id="dados-pessoais"
-                    title="Dados da Pessoa"
-                    icon={<User className="w-5 h-5 text-green-600" />}
-                    badge={
-                      <span className={`px-2 py-1 rounded-full text-xs ${custodiado.status === 'EM_CONFORMIDADE'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                        }`}>
-                        {custodiado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
-                      </span>
-                    }
-                  >
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs text-gray-500">Nome</p>
-                        <p className="font-medium text-gray-800">{custodiado.nome}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-gray-500">CPF</p>
-                          <p className="font-medium text-gray-800 text-sm">{custodiado.cpf || 'Não informado'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Contato</p>
-                          <p className="font-medium text-gray-800 text-sm">{custodiado.contato}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Processo</p>
-                        <p className="font-medium text-gray-800 text-sm">{custodiado.processo}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Próximo Comparecimento</p>
-                        <p className="font-medium text-gray-800">{dateUtils.formatToBR(custodiado.proximoComparecimento)}</p>
-                      </div>
+                {mostrarResultados && resultadosBusca.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-sm font-medium text-gray-700">
+                      {resultadosBusca.length} resultado(s) encontrado(s):
+                    </p>
+                    {resultadosBusca.map((pessoa, idx) => (
                       <button
-                        onClick={() => {
-                          setCustodiado(null);
-                          setEnderecoRespondido(false);
-                          setAtualizacaoEndereco({ houveAlteracao: false });
-                          setBuscaProcesso('');
-                          setResultadosBusca([]);
-                          setExpandedSection('busca');
-                        }}
-                        className="text-sm text-blue-600 underline"
+                        key={idx}
+                        onClick={() => selecionarPessoa(pessoa)}
+                        className="w-full p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors text-left"
                       >
-                        Buscar outra pessoa
+                        <p className="font-medium text-gray-800">{pessoa.nome}</p>
+                        <p className="text-sm text-gray-600">{pessoa.processo}</p>
+                        <p className="text-xs text-gray-500">CPF: {pessoa.cpf}</p>
                       </button>
-                    </div>
-                  </MobileSection>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </MobileSection>
 
-                  <MobileSection
-                    id="endereco"
-                    title="Atualização de Endereço"
-                    icon={<MapPin className="w-5 h-5 text-orange-600" />}
-                    badge={
-                      enderecoRespondido ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                          Respondido
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                          Pendente
-                        </span>
-                      )
-                    }
-                  >
-                    {!enderecoRespondido ? (
-                      <div className="space-y-3">
-                        <p className="text-sm text-gray-700">
-                          Houve mudança no endereço desde o último comparecimento?
+            {/* Dados Pessoais */}
+            {custodiado && (
+              <>
+                <MobileSection
+                  title="Dados Pessoais"
+                  icon={User}
+                  isExpanded={expandedSection === 'dados-pessoais'}
+                  onToggle={() => setExpandedSection(expandedSection === 'dados-pessoais' ? null : 'dados-pessoais')}
+                >
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Nome</p>
+                      <p className="font-medium text-gray-800">{custodiado.nome}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-500">CPF</p>
+                        <p className="font-medium text-gray-800">{custodiado.cpf}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">RG</p>
+                        <p className="font-medium text-gray-800">{custodiado.rg || 'Não informado'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Processo</p>
+                      <p className="font-medium text-gray-800">{custodiado.processo}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Periodicidade</p>
+                      <p className="font-medium text-gray-800">{formatarPeriodicidade(custodiado.periodicidade)}</p>
+                    </div>
+                  </div>
+                </MobileSection>
+
+                {/* Endereço */}
+                <MobileSection
+                  title="Verificação de Endereço"
+                  icon={MapPin}
+                  isExpanded={expandedSection === 'endereco'}
+                  onToggle={() => setExpandedSection(expandedSection === 'endereco' ? null : 'endereco')}
+                >
+                  {!enderecoRespondido ? (
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800 mb-3 font-medium">
+                          O endereço cadastrado está correto?
                         </p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            onClick={() => handleRespostaAlteracaoEndereco(true)}
-                            className="bg-yellow-500 text-white py-2 rounded text-sm font-medium transition-colors hover:bg-yellow-600"
-                            type="button"
-                          >
-                            Sim, mudou
-                          </button>
-                          <button
-                            onClick={() => handleRespostaAlteracaoEndereco(false)}
-                            className="bg-green-500 text-white py-2 rounded text-sm font-medium transition-colors hover:bg-green-600"
-                            type="button"
-                          >
-                            Não mudou
-                          </button>
-                        </div>
+                        {custodiado.endereco && (
+                          <div className="text-sm text-blue-700 space-y-1">
+                            <p>{custodiado.endereco.logradouro}{custodiado.endereco.numero ? `, ${custodiado.endereco.numero}` : ''}</p>
+                            <p>{custodiado.endereco.bairro}</p>
+                            <p>{custodiado.endereco.cidade} - {custodiado.endereco.estado}</p>
+                            <p>CEP: {custodiado.endereco.cep}</p>
+                          </div>
+                        )}
                       </div>
-                    ) : atualizacaoEndereco.houveAlteracao ? (
-                      <div className="space-y-4" style={{ transform: 'translateZ(0)' }}>
-                        <div key="endereco-form-stable" className="transition-none">
-                          <EnderecoForm
-                            endereco={atualizacaoEndereco.endereco || {} as Endereco}
-                            onEnderecoChange={(endereco) => {
-                              requestAnimationFrame(() => {
-                                setAtualizacaoEndereco(prev => ({
-                                  ...prev,
-                                  endereco
-                                }));
-                              });
-                            }}
-                            showTitle={false}
-                            required={true}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Motivo da mudança
-                          </label>
-                          <textarea
-                            value={atualizacaoEndereco.motivoAlteracao || ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (window.enderecoTimeout) {
-                                clearTimeout(window.enderecoTimeout);
-                              }
-                              window.enderecoTimeout = setTimeout(() => {
-                                setAtualizacaoEndereco(prev => ({
-                                  ...prev,
-                                  motivoAlteracao: value
-                                }));
-                              }, 150);
-                            }}
-                            rows={2}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
-                            placeholder="Ex: Mudança familiar, trabalho..."
-                          />
-                        </div>
-                        <button
-                          onClick={() => {
-                            setEnderecoRespondido(false);
-                            setAtualizacaoEndereco({ houveAlteracao: false });
-                          }}
-                          className="text-sm text-gray-600 underline hover:text-gray-800 transition-colors"
-                          type="button"
-                        >
-                          Alterar resposta
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <p className="text-sm text-green-800 font-medium">
-                            Endereço confirmado sem alterações
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setEnderecoRespondido(false);
-                            setAtualizacaoEndereco({ houveAlteracao: false });
-                          }}
-                          className="text-xs text-green-600 underline mt-2 hover:text-green-800 transition-colors"
-                          type="button"
-                        >
-                          Alterar resposta
-                        </button>
-                      </div>
-                    )}
-                  </MobileSection>
-
-                  <MobileSection
-                    id="comparecimento"
-                    title="Detalhes do Comparecimento"
-                    icon={<UserCheck className="w-5 h-5 text-blue-600" />}
-                  >
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Tipo de Validação
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => handleInputChange('tipoValidacao', TipoValidacao.PRESENCIAL)}
-                            className={`p-3 rounded-lg border-2 transition-all ${formulario.tipoValidacao === TipoValidacao.PRESENCIAL
-                              ? 'border-primary bg-primary text-white'
-                              : 'border-gray-300 bg-white text-gray-700'
-                              }`}
-                          >
-                            <Building className="w-4 h-4 mx-auto mb-1" />
-                            <span className="text-xs font-medium">Presencial</span>
-                          </button>
-                          <button
-                            onClick={() => handleInputChange('tipoValidacao', TipoValidacao.ONLINE)}
-                            className={`p-3 rounded-lg border-2 transition-all ${formulario.tipoValidacao === TipoValidacao.ONLINE
-                              ? 'border-primary bg-primary text-white'
-                              : 'border-gray-300 bg-white text-gray-700'
-                              }`}
-                          >
-                            <Smartphone className="w-4 h-4 mx-auto mb-1" />
-                            <span className="text-xs font-medium">Virtual</span>
-                          </button>
-                        </div>
-                      </div>
-
+                      
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Data
-                          </label>
-                          <input
-                            type="date"
-                            value={formulario.dataComparecimento}
-                            onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Horário
-                          </label>
-                          <input
-                            type="time"
-                            value={formulario.horaComparecimento}
-                            onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Observações
-                        </label>
-                        <textarea
-                          value={formulario.observacoes}
-                          onChange={(e) => handleInputChange('observacoes', e.target.value)}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          placeholder="Adicione observações se necessário..."
-                        />
-                      </div>
-                    </div>
-                  </MobileSection>
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        {estado === 'inicial' && custodiado && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => router.back()}
-                className="bg-gray-200 text-gray-700 py-3 rounded-lg font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarComparecimento}
-                disabled={loadingComparecimento || !enderecoRespondido}
-                className="bg-green-500 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loadingComparecimento ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Confirmar
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Versão Desktop continua igual, apenas comente o resto se precisar por limite...
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-primary hover:text-primary-dark transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Voltar
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-primary-dark">Confirmar Presença</h1>
-            <p className="text-lg text-gray-600">Registro de comparecimento</p>
-          </div>
-        </div>
-
-        {(estado === 'buscando' || estado === 'confirmando' || estado === 'sucesso' || estado === 'erro') && (
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            {estado === 'buscando' && (
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6"></div>
-                <h2 className="text-2xl font-bold text-primary-dark mb-2">Buscando pessoa...</h2>
-                <p className="text-gray-600">Aguarde enquanto localizamos os dados</p>
-              </div>
-            )}
-
-            {estado === 'confirmando' && (
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-6"></div>
-                <h2 className="text-2xl font-bold text-green-700 mb-2">Confirmando Presença...</h2>
-                <p className="text-gray-600">Aguarde enquanto registramos o comparecimento</p>
-              </div>
-            )}
-
-            {estado === 'sucesso' && (
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="w-12 h-12 text-green-500" />
-                </div>
-                <h2 className="text-2xl font-bold text-green-700 mb-2">Presença Confirmada!</h2>
-                <p className="text-gray-600 mb-6">{mensagem}</p>
-
-                {custodiado && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                    <p className="text-green-800">
-                      <strong>Comparecimento registrado para:</strong><br />
-                      {custodiado.nome} - Processo: {custodiado.processo}
-                    </p>
-                    <p className="text-green-700 text-sm mt-2">
-                      Data/Hora: {dateUtils.formatToBR(formulario.dataComparecimento)} às {formulario.horaComparecimento}
-                    </p>
-                    {atualizacaoEndereco.houveAlteracao && (
-                      <p className="text-green-700 text-sm mt-1">
-                        Endereço atualizado com sucesso
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {proximoComparecimento && custodiado && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-2">
-                      Próximo Comparecimento
-                    </h3>
-                    <p className="text-blue-700 text-lg font-medium">
-                      {proximoComparecimento}
-                    </p>
-                    <p className="text-blue-600 text-sm mt-1">
-                      Periodicidade: {formatarPeriodicidade(custodiado.periodicidade)}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex gap-4 justify-center">
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="bg-primary text-white px-8 py-3 rounded-lg hover:bg-primary-dark transition-all font-medium"
-                  >
-                    Voltar ao Dashboard
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEstado('inicial');
-                      setCustodiado(null);
-                      setBuscaProcesso('');
-                      setEnderecoRespondido(false);
-                      setResultadosBusca([]);
-                      setMostrarResultados(false);
-                    }}
-                    className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium"
-                  >
-                    Nova Confirmação
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {estado === 'erro' && (
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <XCircle className="w-12 h-12 text-red-500" />
-                </div>
-                <h2 className="text-2xl font-bold text-red-700 mb-2">Erro na Confirmação</h2>
-                <p className="text-gray-600 mb-6">{mensagem}</p>
-                <div className="flex justify-center gap-4">
-                  <button
-                    onClick={() => router.back()}
-                    className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition-all font-medium"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEstado('inicial');
-                      setMensagem('');
-                      setResultadosBusca([]);
-                      setMostrarResultados(false);
-                    }}
-                    className="bg-yellow-500 text-white px-6 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium"
-                  >
-                    Tentar Novamente
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {estado === 'inicial' && (
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="p-8">
-              {!custodiado && (
-                <div className="mb-8">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Search className="w-6 h-6 text-blue-600" />
-                      <h3 className="text-lg font-semibold text-blue-900">Buscar Pessoa</h3>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex gap-4">
-                        <input
-                          type="text"
-                          value={buscaProcesso}
-                          onChange={(e) => setBuscaProcesso(e.target.value)}
-                          placeholder="Digite o nome, CPF ou número do processo"
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          onKeyPress={handleKeyPress}
-                        />
                         <button
-                          onClick={buscarPessoa}
-                          className="bg-blue-500 text-white px-8 py-3 rounded-lg hover:bg-blue-600 transition-all font-medium flex items-center gap-2"
+                          onClick={() => {
+                            setEnderecoRespondido(true);
+                            setAtualizacaoEndereco({ houveAlteracao: false });
+                          }}
+                          className="bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-medium"
                         >
-                          <Search className="w-5 h-5" />
-                          Buscar
+                          Sim, está correto
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEnderecoRespondido(true);
+                            setAtualizacaoEndereco({
+                              houveAlteracao: true,
+                              endereco: custodiado.endereco || {
+                                cep: '',
+                                logradouro: '',
+                                numero: '',
+                                complemento: '',
+                                bairro: '',
+                                cidade: '',
+                                estado: ''
+                              }
+                            });
+                          }}
+                          className="bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                        >
+                          Não, houve mudança
                         </button>
                       </div>
-
-                      {mostrarResultados && resultadosBusca.length > 0 && (
-                        <div className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                          <div className="p-3 bg-gray-50 border-b flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-700">
-                              <Users className="w-4 h-4 inline mr-2" />
-                              {resultadosBusca.length} resultado(s) encontrado(s)
-                            </p>
-                            <button
-                              onClick={() => {
-                                setMostrarResultados(false);
-                                setResultadosBusca([]);
-                              }}
-                              className="text-gray-500 hover:text-gray-700"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          {resultadosBusca.map((resultado) => (
-                            <button
-                              key={resultado.id}
-                              onClick={() => selecionarPessoa(resultado)}
-                              className="w-full p-4 text-left hover:bg-blue-50 border-b border-gray-100 transition-colors"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-semibold text-gray-800">{resultado.nome}</p>
-                                  <div className="flex gap-4 mt-1">
-                                    <p className="text-sm text-gray-600">CPF: {resultado.cpf || 'Não informado'}</p>
-                                    <p className="text-sm text-gray-600">Processo: {resultado.processo}</p>
-                                  </div>
-                                </div>
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${resultado.status === 'EM_CONFORMIDADE'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                                  }`}>
-                                  {resultado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {custodiado && (
-                <>
-                  <div className="bg-primary p-6 rounded-xl mb-8 text-white">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                        <User className="w-8 h-8" />
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="text-2xl font-bold">{custodiado.nome}</h2>
-                        <p className="text-primary-light">Processo: {custodiado.processo}</p>
-                      </div>
-                      <div>
-                        <span className={`px-4 py-2 rounded-full text-sm font-medium ${custodiado.status === 'EM_CONFORMIDADE'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-red-500 text-white'
-                          }`}>
-                          {custodiado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="font-semibold mb-1">CPF</p>
-                        <p className="text-primary-light">{custodiado.cpf || 'Não informado'}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-1">Contato</p>
-                        <p className="text-primary-light">{custodiado.contato}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-1">Vara</p>
-                        <p className="text-primary-light">{custodiado.vara}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-1">Próximo Comparecimento</p>
-                        {custodiado.proximoComparecimento && (
-                          <div>
-                            <p className="font-semibold mb-1">Próximo Comparecimento</p>
-                            <p className="text-primary-light font-medium">
-                              {dateUtils.formatToBR(custodiado.proximoComparecimento)}
+                  ) : (
+                    <div className="space-y-4">
+                      {atualizacaoEndereco.houveAlteracao ? (
+                        <div>
+                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                            <p className="text-orange-800 font-medium text-sm">
+                              ⚠️ Atualizando endereço
                             </p>
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setCustodiado(null);
-                        setEnderecoRespondido(false);
-                        setAtualizacaoEndereco({ houveAlteracao: false });
-                        setBuscaProcesso('');
-                        setResultadosBusca([]);
-                        setMostrarResultados(false);
-                      }}
-                      className="mt-4 text-sm text-white underline hover:text-primary-light transition-colors"
-                    >
-                      Buscar outra pessoa
-                    </button>
-                  </div>
-
-                  <div className="mb-8">
-                    <div className={`bg-orange-50 border border-orange-200 rounded-lg p-6 ${!enderecoRespondido ? 'ring-2 ring-orange-500 ring-offset-2' : ''
-                      }`}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <MapPin className="w-6 h-6 text-orange-600" />
-                        <h3 className="text-lg font-semibold text-orange-900">Atualização de Endereço</h3>
-                        {!enderecoRespondido && (
-                          <span className="bg-red-100 text-red-700 text-sm py-1 px-3 rounded-full ml-2 flex items-center">
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            Resposta obrigatória
-                          </span>
-                        )}
-                      </div>
-
-                      {!enderecoRespondido ? (
-                        <>
-                          <p className="text-orange-800 mb-4">
-                            Houve alguma mudança no endereço do custodiado desde o último comparecimento?
-                          </p>
-
-                          <div className="flex gap-4">
-                            <button
-                              onClick={() => handleRespostaAlteracaoEndereco(true)}
-                              className="bg-yellow-500 text-white px-8 py-3 rounded-lg hover:bg-yellow-600 transition-all font-medium flex items-center gap-2"
-                            >
-                              <MapPin className="w-5 h-5" />
-                              Sim, houve mudança
-                            </button>
-                            <button
-                              onClick={() => handleRespostaAlteracaoEndereco(false)}
-                              className="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-all font-medium flex items-center gap-2"
-                            >
-                              <CheckCircle className="w-5 h-5" />
-                              Não, mantém o mesmo
-                            </button>
-                          </div>
-                        </>
-                      ) : atualizacaoEndereco.houveAlteracao ? (
-                        <div className="space-y-6">
+                          
+                          {/* ✅ EnderecoForm com prop correta */}
                           <EnderecoForm
-                            endereco={atualizacaoEndereco.endereco || {} as Endereco}
-                            onEnderecoChange={(endereco) =>
-                              setAtualizacaoEndereco(prev => ({
-                                ...prev,
-                                endereco
-                              }))
-                            }
-                            showTitle={false}
-                            required={true}
+                            endereco={atualizacaoEndereco.endereco!}
+                            onEnderecoChange={handleEnderecoChange}
                           />
-
-                          <div>
+                          
+                          <div className="mt-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Motivo da Alteração (Opcional)
+                              Motivo da alteração *
                             </label>
                             <textarea
                               value={atualizacaoEndereco.motivoAlteracao || ''}
                               onChange={(e) => {
-                                const value = e.target.value.slice(0, 500);
+                                const value = e.target.value;
                                 setAtualizacaoEndereco(prev => ({
                                   ...prev,
                                   motivoAlteracao: value
@@ -1164,17 +604,17 @@ export default function ConfirmarPresencaPage() {
                               setEnderecoRespondido(false);
                               setAtualizacaoEndereco({ houveAlteracao: false });
                             }}
-                            className="text-orange-600 hover:text-orange-800 transition-colors underline"
+                            className="text-orange-600 hover:text-orange-800 transition-colors underline text-sm mt-3"
                           >
                             Alterar resposta
                           </button>
                         </div>
                       ) : (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mb-2">
                             <CheckCircle className="w-5 h-5 text-green-600" />
-                            <p className="text-green-800 font-medium">
-                              Endereço confirmado como inalterado
+                            <p className="text-green-800 font-medium text-sm">
+                              Endereço confirmado
                             </p>
                           </div>
                           <button
@@ -1182,13 +622,344 @@ export default function ConfirmarPresencaPage() {
                               setEnderecoRespondido(false);
                               setAtualizacaoEndereco({ houveAlteracao: false });
                             }}
-                            className="text-green-600 hover:text-green-800 text-sm mt-2 underline"
+                            className="text-green-600 hover:text-green-800 text-sm underline"
                           >
                             Alterar resposta
                           </button>
                         </div>
                       )}
                     </div>
+                  )}
+                </MobileSection>
+
+                {/* Formulário de Comparecimento */}
+                <MobileSection
+                  title="Dados do Comparecimento"
+                  icon={FileText}
+                  isExpanded={expandedSection === 'comparecimento'}
+                  onToggle={() => setExpandedSection(expandedSection === 'comparecimento' ? null : 'comparecimento')}
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tipo de Validação *
+                      </label>
+                      <select
+                        value={formulario.tipoValidacao}
+                        onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        required
+                      >
+                        <option value={TipoValidacao.PRESENCIAL}>Presencial</option>
+                        <option value={TipoValidacao.ONLINE}>Balcão Virtual</option>
+                        <option value={TipoValidacao.CADASTRO_INICIAL}>Cadastro Inicial</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Validado por *
+                      </label>
+                      <input
+                        type="text"
+                        value={formulario.validadoPor}
+                        onChange={(e) => handleInputChange('validadoPor', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Nome do servidor"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Data *
+                      </label>
+                      <input
+                        type="date"
+                        value={formulario.dataComparecimento}
+                        onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Horário *
+                      </label>
+                      <input
+                        type="time"
+                        value={formulario.horaComparecimento}
+                        onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Observações
+                      </label>
+                      <textarea
+                        value={formulario.observacoes}
+                        onChange={(e) => handleInputChange('observacoes', e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+                        placeholder="Adicione observações..."
+                      />
+                    </div>
+                  </div>
+                </MobileSection>
+
+                {/* Botões de Ação Mobile */}
+                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => router.back()}
+                      className="bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmarComparecimento}
+                      disabled={loadingComparecimento || !enderecoRespondido}
+                      className="bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loadingComparecimento ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        <>
+                          <Save className="w-5 h-5" />
+                          Confirmar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Desktop Layout */}
+        {!isMobile && estado !== 'sucesso' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="space-y-8">
+              {/* Busca Desktop */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
+                  <Search className="w-5 h-5" />
+                  Buscar Pessoa
+                </h3>
+                
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={buscaProcesso}
+                    onChange={(e) => setBuscaProcesso(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
+                    placeholder="Digite o nome, CPF ou número do processo..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                  <button
+                    onClick={buscarPessoa}
+                    disabled={estado === 'buscando'}
+                    className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
+                  >
+                    <Search className="w-5 h-5" />
+                    {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
+                  </button>
+                </div>
+
+                {mostrarResultados && resultadosBusca.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">
+                      {resultadosBusca.length} resultado(s) encontrado(s):
+                    </p>
+                    <div className="grid gap-3">
+                      {resultadosBusca.map((pessoa, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => selecionarPessoa(pessoa)}
+                          className="p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-all text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-gray-800 text-lg">{pessoa.nome}</p>
+                              <p className="text-gray-600">{pessoa.processo}</p>
+                              <p className="text-sm text-gray-500">CPF: {pessoa.cpf}</p>
+                            </div>
+                            <UserCheck className="w-6 h-6 text-primary" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {custodiado && (
+                <>
+                  <div className="border-t border-gray-200 pt-6">
+                    <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5" />
+                      Dados da Pessoa Selecionada
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 p-6 rounded-lg">
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">Nome Completo</p>
+                        <p className="font-semibold text-gray-800">{custodiado.nome}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">CPF</p>
+                        <p className="font-semibold text-gray-800">{custodiado.cpf}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">RG</p>
+                        <p className="font-semibold text-gray-800">{custodiado.rg || 'Não informado'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">Processo</p>
+                        <p className="font-semibold text-gray-800">{custodiado.processo}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">Vara</p>
+                        <p className="font-semibold text-gray-800">{custodiado.vara}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">Periodicidade</p>
+                        <p className="font-semibold text-gray-800">{formatarPeriodicidade(custodiado.periodicidade)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
+                      <MapPin className="w-5 h-5" />
+                      Verificação de Endereço
+                    </h3>
+
+                    {!enderecoRespondido ? (
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+                          <p className="text-blue-800 font-medium mb-4">
+                            O endereço cadastrado está correto?
+                          </p>
+                          {custodiado.endereco && (
+                            <div className="bg-white rounded-lg p-4 mb-4 border border-blue-100">
+                              <p className="text-gray-800">{custodiado.endereco.logradouro}{custodiado.endereco.numero ? `, ${custodiado.endereco.numero}` : ''}</p>
+                              <p className="text-gray-800">{custodiado.endereco.complemento}</p>
+                              <p className="text-gray-800">{custodiado.endereco.bairro}</p>
+                              <p className="text-gray-800">{custodiado.endereco.cidade} - {custodiado.endereco.estado}</p>
+                              <p className="text-gray-600 text-sm mt-2">CEP: {custodiado.endereco.cep}</p>
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-4">
+                            <button
+                              onClick={() => {
+                                setEnderecoRespondido(true);
+                                setAtualizacaoEndereco({ houveAlteracao: false });
+                              }}
+                              className="flex-1 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle className="w-5 h-5" />
+                              Sim, está correto
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEnderecoRespondido(true);
+                                setAtualizacaoEndereco({
+                                  houveAlteracao: true,
+                                  endereco: custodiado.endereco || {
+                                    cep: '',
+                                    logradouro: '',
+                                    numero: '',
+                                    complemento: '',
+                                    bairro: '',
+                                    cidade: '',
+                                    estado: ''
+                                  }
+                                });
+                              }}
+                              className="flex-1 bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium flex items-center justify-center gap-2"
+                            >
+                              <AlertCircle className="w-5 h-5" />
+                              Não, houve mudança
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        {atualizacaoEndereco.houveAlteracao ? (
+                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                              <AlertCircle className="w-5 h-5 text-orange-600" />
+                              <p className="text-orange-800 font-medium">
+                                Atualização de endereço necessária
+                              </p>
+                            </div>
+                            
+                            {/* ✅ EnderecoForm com prop correta */}
+                            <EnderecoForm
+                              endereco={atualizacaoEndereco.endereco!}
+                              onEnderecoChange={handleEnderecoChange}
+                            />
+                            
+                            <div className="mt-4">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Motivo da alteração *
+                              </label>
+                              <textarea
+                                value={atualizacaoEndereco.motivoAlteracao || ''}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setAtualizacaoEndereco(prev => ({
+                                    ...prev,
+                                    motivoAlteracao: value
+                                  }));
+                                }}
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+                                placeholder="Mínimo 10 caracteres. Ex: Mudança familiar, trabalho..."
+                                minLength={10}
+                                maxLength={500}
+                              />
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setEnderecoRespondido(false);
+                                setAtualizacaoEndereco({ houveAlteracao: false });
+                              }}
+                              className="text-orange-600 hover:text-orange-800 transition-colors underline mt-3"
+                            >
+                              Alterar resposta
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                              <p className="text-green-800 font-medium">
+                                Endereço confirmado como inalterado
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEnderecoRespondido(false);
+                                setAtualizacaoEndereco({ houveAlteracao: false });
+                              }}
+                              className="text-green-600 hover:text-green-800 text-sm mt-2 underline"
+                            >
+                              Alterar resposta
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-6">
@@ -1341,3 +1112,5 @@ export default function ConfirmarPresencaPage() {
     </div>
   );
 }
+
+export default withSearchParams(ConfirmarPresencaPage);

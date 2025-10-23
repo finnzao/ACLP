@@ -18,6 +18,12 @@ interface ToastContextType {
   hideToast: (id: string) => void;
 }
 
+
+const TOAST_CONFIG = {
+  maxToasts: 1,
+  defaultDuration: 5000
+};
+
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function useToast() {
@@ -126,8 +132,13 @@ function ToastContainer({ toasts, onClose }: { toasts: Toast[]; onClose: (id: st
   );
 }
 
-// Provider do Toast
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ 
+  children,
+  maxToasts = TOAST_CONFIG.maxToasts 
+}: { 
+  children: ReactNode;
+  maxToasts?: number;
+}) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = (toast: Omit<Toast, 'id'>) => {
@@ -135,10 +146,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const newToast: Toast = {
       ...toast,
       id,
-      duration: toast.duration ?? 5000 // 5 segundos por padrão
+      duration: toast.duration ?? TOAST_CONFIG.defaultDuration
     };
 
-    setToasts(prev => [...prev, newToast]);
+    setToasts(prev => {
+      if (maxToasts === 1) {
+        return [newToast];
+      }
+
+      const newToasts = [...prev, newToast];
+      if (newToasts.length > maxToasts) {
+        // Remove os mais antigos
+        return newToasts.slice(-maxToasts);
+      }
+      return newToasts;
+    });
   };
 
   const hideToast = (id: string) => {

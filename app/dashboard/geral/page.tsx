@@ -2,8 +2,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useCustodiados } from '@/hooks/useAPI';
+import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
 import type { CustodiadoData } from '@/types/api';
 import DetalhesCustodiadoModal from '@/components/DetalhesCustodiado';
 import EditarCustodiadoModal from '@/components/EditarCustodiado';
@@ -58,9 +58,9 @@ interface CustodiadoFormatado {
   cidadeEstado?: string;
 }
 
-export default function GeralPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+
+function GeralPage() {
+  const searchParams = useSearchParamsSafe();
   const { showToast } = useToast();
 
   const {
@@ -195,22 +195,19 @@ export default function GeralPage() {
           estado: custodiado.endereco.estado
         } : undefined,
         observacoes: custodiado.observacoes,
-        atrasado: custodiado.inadimplente || custodiado.atrasado,
-        diasAtraso: custodiado.diasAtraso,
-        comparecimentoHoje: custodiado.comparecimentoHoje,
-        // Construir enderecoCompleto manualmente se não existir
-        enderecoCompleto: custodiado.enderecoCompleto || (custodiado.endereco 
-          ? `${custodiado.endereco.logradouro}${custodiado.endereco.numero ? ', ' + custodiado.endereco.numero : ''}, ${custodiado.endereco.bairro}, ${custodiado.endereco.cidade} - ${custodiado.endereco.estado}`
-          : ''),
-        cidadeEstado: custodiado.cidadeEstado || (custodiado.endereco 
-          ? `${custodiado.endereco.cidade} - ${custodiado.endereco.estado}` 
-          : '')
+        enderecoCompleto: custodiado.endereco 
+          ? `${custodiado.endereco.logradouro}${custodiado.endereco.numero ? ', ' + custodiado.endereco.numero : ''}, ${custodiado.endereco.bairro} - ${custodiado.endereco.cidade}/${custodiado.endereco.estado}`
+          : undefined,
+        cidadeEstado: custodiado.endereco
+          ? `${custodiado.endereco.cidade}/${custodiado.endereco.estado}`
+          : undefined
       };
     };
 
     return dadosExtraidos.map(transformarCustodiado);
   }, [dadosExtraidos]);
 
+  // Aplicar filtros da URL
   useEffect(() => {
     const busca = searchParams.get('busca');
     const status = searchParams.get('status') as 'todos' | 'em conformidade' | 'inadimplente' | null;
@@ -225,6 +222,7 @@ export default function GeralPage() {
     if (dataF) setDataFim(dataF);
   }, [searchParams]);
 
+  // Atualizar URL com filtros
   useEffect(() => {
     const params = new URLSearchParams();
 
@@ -241,9 +239,15 @@ export default function GeralPage() {
     setCurrentPage(1);
   }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim]);
 
-  const limparMascaraProcesso = useCallback((processo: string) => {
-    return processo.replace(/\D/g, '');
-  }, []);
+  const handleRefresh = async () => {
+    await refetchCustodiados();
+    showToast({
+      type: 'success',
+      title: 'Dados atualizados',
+      message: 'A lista de custodiados foi atualizada com sucesso.',
+      duration: 3000
+    });
+  };
 
   const normalizarTexto = useCallback((texto: string) => {
     return texto
@@ -253,26 +257,35 @@ export default function GeralPage() {
       .trim();
   }, []);
 
-  const getDaysUntil = useCallback((date: string): number => {
-    if (!date) return 0;
-    const today = new Date();
-    const targetDate = new Date(date);
-    const diffTime = targetDate.getTime() - today.getTime();
+  const isToday = (dataStr: string): boolean => {
+    if (!dataStr) return false;
+    const hoje = new Date();
+    const data = new Date(dataStr);
+    return (
+      data.getDate() === hoje.getDate() &&
+      data.getMonth() === hoje.getMonth() &&
+      data.getFullYear() === hoje.getFullYear()
+    );
+  };
+
+  const isOverdue = (dataStr: string): boolean => {
+    if (!dataStr) return false;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const data = new Date(dataStr);
+    data.setHours(0, 0, 0, 0);
+    return data < hoje;
+  };
+
+  const getDaysUntil = (dataStr: string): number => {
+    if (!dataStr) return 0;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const data = new Date(dataStr);
+    data.setHours(0, 0, 0, 0);
+    const diffTime = data.getTime() - hoje.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }, []);
-
-  const isToday = useCallback((date: string): boolean => {
-    if (!date) return false;
-    return date === new Date().toISOString().split('T')[0];
-  }, []);
-
-  const isOverdue = useCallback((date: string): boolean => {
-    if (!date) return false;
-    const today = new Date();
-    const targetDate = new Date(date);
-    const diffTime = targetDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) < 0;
-  }, []);
+  };
 
   const filtrarDados = useCallback((data: CustodiadoFormatado[]): CustodiadoFormatado[] => {
     return data.filter((item) => {
@@ -280,33 +293,28 @@ export default function GeralPage() {
       let matchTexto = true;
 
       if (termo.length > 0) {
-        const primeiraLetra = termo[0];
-        const buscandoProcesso = /\d/.test(primeiraLetra);
         const termoNormalizado = normalizarTexto(termo);
-        const termoSomenteNumeros = limparMascaraProcesso(termo);
         const nomeNormalizado = normalizarTexto(item.nome);
-        const processoSemMascara = limparMascaraProcesso(item.processo);
+        const processoNormalizado = normalizarTexto(item.processo);
+        const cpfNormalizado = normalizarTexto(item.cpf);
 
-        const matchNome = nomeNormalizado.includes(termoNormalizado);
-        const matchProcesso = item.processo.includes(termo) || processoSemMascara.includes(termoSomenteNumeros);
-
-        matchTexto = buscandoProcesso ? matchProcesso : matchNome;
+        matchTexto = nomeNormalizado.includes(termoNormalizado) ||
+          processoNormalizado.includes(termoNormalizado) ||
+          cpfNormalizado.includes(termoNormalizado);
       }
 
       const matchStatus = filtroStatus === 'todos' || item.status === filtroStatus;
 
-      let matchUrgencia = true;
-      if (filtroUrgencia !== 'todos') {
-        const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
-        const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
-        const proximo = getDaysUntil(item.proximoComparecimento) <= 7 && !hoje && !atrasado;
-
-        switch (filtroUrgencia) {
-          case 'hoje': matchUrgencia = hoje; break;
-          case 'atrasados': matchUrgencia = atrasado; break;
-          case 'proximos': matchUrgencia = proximo; break;
+      const matchUrgencia = (() => {
+        if (filtroUrgencia === 'todos') return true;
+        if (filtroUrgencia === 'hoje') return isToday(item.proximoComparecimento);
+        if (filtroUrgencia === 'atrasados') return isOverdue(item.proximoComparecimento);
+        if (filtroUrgencia === 'proximos') {
+          const dias = getDaysUntil(item.proximoComparecimento);
+          return dias >= 0 && dias <= 7 && !isToday(item.proximoComparecimento);
         }
-      }
+        return true;
+      })();
 
       const dentroPeriodo = (!dataInicio || !dataFim) ||
         (new Date(item.proximoComparecimento) >= new Date(dataInicio) &&
@@ -314,81 +322,105 @@ export default function GeralPage() {
 
       return matchTexto && matchStatus && matchUrgencia && dentroPeriodo;
     });
-  }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim, normalizarTexto, limparMascaraProcesso, isToday, isOverdue, getDaysUntil]);
+  }, [filtro, filtroStatus, filtroUrgencia, dataInicio, dataFim, normalizarTexto]);
 
   const ordenarDados = useCallback((data: CustodiadoFormatado[]): CustodiadoFormatado[] => {
     return [...data].sort((a, b) => {
-      const valA = a[colunaOrdenacao as keyof CustodiadoFormatado];
-      const valB = b[colunaOrdenacao as keyof CustodiadoFormatado];
+      let aValue: any;
+      let bValue: any;
 
-      if (colunaOrdenacao.includes('Comparecimento') || colunaOrdenacao === 'decisao' || colunaOrdenacao === 'dataDecisao') {
-        const dateA = valA ? new Date(valA as string | number | Date) : undefined;
-        const dateB = valB ? new Date(valB as string | number | Date) : undefined;
-        if (!dateA || !dateB) return 0;
-        return ordem === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+      switch (colunaOrdenacao) {
+        case 'nome':
+          aValue = a.nome;
+          bValue = b.nome;
+          break;
+        case 'status':
+          aValue = a.status;
+          bValue = b.status;
+          break;
+        case 'proximoComparecimento':
+          aValue = new Date(a.proximoComparecimento || '9999-12-31').getTime();
+          bValue = new Date(b.proximoComparecimento || '9999-12-31').getTime();
+          break;
+        case 'ultimoComparecimento':
+          aValue = new Date(a.ultimoComparecimento || '1900-01-01').getTime();
+          bValue = new Date(b.ultimoComparecimento || '1900-01-01').getTime();
+          break;
+        default:
+          return 0;
       }
 
-      return ordem === 'asc'
-        ? String(valA).localeCompare(String(valB))
-        : String(valB).localeCompare(String(valA));
+      if (aValue < bValue) return ordem === 'asc' ? -1 : 1;
+      if (aValue > bValue) return ordem === 'asc' ? 1 : -1;
+      return 0;
     });
   }, [colunaOrdenacao, ordem]);
 
-  const limparFiltros = () => {
-    setFiltro('');
-    setFiltroStatus('todos');
-    setFiltroUrgencia('todos');
-    setDataInicio('');
-    setDataFim('');
-    setCurrentPage(1);
-    router.push('/dashboard/geral');
-  };
-
-  const handleRefresh = async () => {
-    await refetchCustodiados();
-  };
-
   const dadosFiltrados = useMemo(() => {
-    return ordenarDados(filtrarDados(todosOsDados));
+    const filtrados = filtrarDados(todosOsDados);
+    return ordenarDados(filtrados);
   }, [todosOsDados, filtrarDados, ordenarDados]);
 
-  const totalFiltrados = dadosFiltrados.length;
-  const totalEmConformidade = dadosFiltrados.filter(d => d.status === 'em conformidade').length;
-  const totalInadimplentes = dadosFiltrados.filter(d => d.status === 'inadimplente').length;
-  const totalHoje = dadosFiltrados.filter(d => d.comparecimentoHoje || isToday(d.proximoComparecimento)).length;
-  const totalAtrasados = dadosFiltrados.filter(d => d.atrasado || isOverdue(d.proximoComparecimento)).length;
+  const totalHoje = useMemo(() => {
+    return todosOsDados.filter(item => isToday(item.proximoComparecimento)).length;
+  }, [todosOsDados]);
 
+  const totalAtrasados = useMemo(() => {
+    return todosOsDados.filter(item => isOverdue(item.proximoComparecimento)).length;
+  }, [todosOsDados]);
+
+  const totalProximos = useMemo(() => {
+    return todosOsDados.filter(item => {
+      const dias = getDaysUntil(item.proximoComparecimento);
+      return dias >= 0 && dias <= 7 && !isToday(item.proximoComparecimento);
+    }).length;
+  }, [todosOsDados]);
+
+  const totalFiltrados = dadosFiltrados.length;
   const totalPages = Math.ceil(totalFiltrados / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const dadosPaginados = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return dadosFiltrados.slice(startIndex, startIndex + itemsPerPage);
-  }, [dadosFiltrados, currentPage, itemsPerPage]);
+  const dadosPaginados = dadosFiltrados.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    containerRef.current?.scrollIntoView({ behavior: 'smooth' });
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const exportFilterInfo = {
+  const handleOrdenacao = (coluna: string) => {
+    if (colunaOrdenacao === coluna) {
+      setOrdem(ordem === 'asc' ? 'desc' : 'asc');
+    } else {
+      setColunaOrdenacao(coluna);
+      setOrdem('asc');
+    }
+  };
+
+  const limparFiltros = () => {
+    setFiltro('');
+    setDataInicio('');
+    setDataFim('');
+    setFiltroStatus('todos');
+    setFiltroUrgencia('todos');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = filtro || dataInicio || dataFim || filtroStatus !== 'todos' || filtroUrgencia !== 'todos';
+
+  const filterInfo = {
     filtro: filtro || undefined,
     status: filtroStatus !== 'todos' ? filtroStatus : undefined,
     urgencia: filtroUrgencia !== 'todos' ? filtroUrgencia : undefined,
     dataInicio: dataInicio || undefined,
-    dataFim: dataFim || undefined
+    dataFim: dataFim || undefined,
   };
-
-  const hasActiveFilters = filtro || filtroStatus !== 'todos' || filtroUrgencia !== 'todos' || dataInicio || dataFim;
 
   if (loadingBackend) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-lg text-gray-600">Carregando dados do servidor...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Carregando custodiados...</p>
         </div>
       </div>
     );
@@ -396,306 +428,283 @@ export default function GeralPage() {
 
   if (errorBackend) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto mt-8">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
           <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados</h3>
           <p className="text-red-600 mb-4">{errorBackend}</p>
           <button
-            onClick={handleRefresh}
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
           >
-            Tentar Novamente
+            Recarregar Página
           </button>
         </div>
       </div>
     );
   }
 
-  const MobileCard = ({ item }: { item: CustodiadoFormatado }) => {
-    const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
-    const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
-    const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
-
-    return (
-      <div
-        className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${atrasado ? 'border-l-red-500' : hoje ? 'border-l-yellow-500' : 'border-l-gray-300'
-          }`}
-      >
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800 text-sm">{item.nome}</h3>
-              <p className="text-xs text-gray-500">{item.cpf}</p>
-            </div>
-          </div>
-          {(atrasado || hoje) && (
-            <span className={`px-2 py-1 rounded text-xs font-bold ${atrasado ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'
-              }`}>
-              {atrasado ? `${Math.abs(diasRestantes)}d atraso` : 'HOJE'}
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-1.5 mb-3">
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <FileText className="w-3.5 h-3.5" />
-            <span>{item.processo}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Próximo: {item.proximoComparecimento ? new Date(item.proximoComparecimento).toLocaleDateString('pt-BR') : '-'}</span>
-          </div>
-          {item.cidadeEstado && (
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <MapPin className="w-3.5 h-3.5" />
-              <span>{item.cidadeEstado}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'inadimplente'
-            ? 'bg-red-100 text-red-800'
-            : 'bg-green-100 text-green-800'
-            }`}>
-            {item.status === 'inadimplente' ? 'Inadimplente' : 'Em Conformidade'}
-          </span>
-          <button
-            onClick={() => setSelecionado(item)}
-            className="text-primary text-sm font-medium hover:text-primary-dark"
-          >
-            Ver detalhes
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gray-50" ref={containerRef}>
       {isMobile ? (
-        <>
-          <div className="bg-white sticky top-0 z-20 shadow-sm">
-            <div className="p-4 pb-2">
-              <div className="flex items-center justify-between mb-3">
-                <h1 className="text-xl font-bold text-primary-dark">Lista Geral</h1>
-                <div className="flex gap-2">
-                  <button onClick={handleRefresh} className="p-2 bg-gray-100 rounded-lg">
-                    <RefreshCw className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => setShowMobileExport(!showMobileExport)}
-                    className="p-2 bg-gray-100 rounded-lg"
-                  >
-                    <Download className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-lg ${hasActiveFilters ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}
-                  >
-                    <SlidersHorizontal className="w-5 h-5" />
-                  </button>
-                </div>
+        <div className="p-4 space-y-4">
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-xl font-bold text-gray-800">Custodiados</h1>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="p-2 bg-primary text-white rounded-lg"
+                >
+                  <SlidersHorizontal className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setShowMobileExport(!showMobileExport)}
+                  className="p-2 bg-green-600 text-white rounded-lg"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  className="p-2 bg-gray-600 text-white rounded-lg"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
               </div>
+            </div>
 
-              {showMobileExport && (
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                  <ExportButton
-                    dados={todosOsDados}
-                    dadosFiltrados={dadosFiltrados}
-                    filterInfo={exportFilterInfo}
-                    className="w-full"
+            {showMobileExport && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <ExportButton
+                  dados={todosOsDados}
+                  dadosFiltrados={dadosFiltrados}
+                  filterInfo={filterInfo}
+                />
+              </div>
+            )}
+
+            {showFilters && (
+              <div className="space-y-3 mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome, CPF ou processo..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
                   />
                 </div>
-              )}
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={filtroStatus}
+                  onChange={(e) => setFiltroStatus(e.target.value as any)}
+                >
+                  <option value="todos">Todos os Status</option>
+                  <option value="em conformidade">Em Conformidade</option>
+                  <option value="inadimplente">Inadimplente</option>
+                </select>
+
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={filtroUrgencia}
+                  onChange={(e) => setFiltroUrgencia(e.target.value as any)}
+                >
+                  <option value="todos">Todas as Urgências</option>
+                  <option value="hoje">Comparecimento Hoje ({totalHoje})</option>
+                  <option value="atrasados">Atrasados ({totalAtrasados})</option>
+                  <option value="proximos">Próximos 7 dias ({totalProximos})</option>
+                </select>
+
                 <input
-                  type="text"
-                  placeholder="Buscar por nome ou processo..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  placeholder="Data Inicial"
                 />
-                {filtro && (
+
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                  placeholder="Data Final"
+                />
+
+                {hasActiveFilters && (
                   <button
-                    onClick={() => setFiltro('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    onClick={limparFiltros}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2"
                   >
-                    <X className="w-4 h-4 text-gray-400" />
+                    <X className="w-4 h-4" />
+                    Limpar Filtros
                   </button>
                 )}
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                <div className="bg-gray-50 p-2 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-primary">{totalFiltrados}</p>
-                  <p className="text-xs text-gray-600">Total</p>
-                </div>
-                <div className="bg-gray-50 p-2 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-red-500">{totalAtrasados}</p>
-                  <p className="text-xs text-gray-600">Atrasados</p>
-                </div>
-              </div>
+            <div className="flex items-center gap-4 text-sm text-gray-600">
+              <span>Total: {todosOsDados.length}</span>
+              <span>Filtrados: {totalFiltrados}</span>
+            </div>
+          </div>
 
-              {showFilters && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-lg space-y-3 animate-in slide-in-from-top-2">
-                  <div>
-                    <label className="text-xs font-medium text-gray-700 mb-1 block">Status</label>
-                    <div className="grid grid-cols-3 gap-1">
-                      <button
-                        onClick={() => setFiltroStatus('todos')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'todos' ? 'bg-primary text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Todos
-                      </button>
-                      <button
-                        onClick={() => setFiltroStatus('em conformidade')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'em conformidade' ? 'bg-green-500 text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Conformidade
-                      </button>
-                      <button
-                        onClick={() => setFiltroStatus('inadimplente')}
-                        className={`py-1.5 px-2 rounded text-xs font-medium ${filtroStatus === 'inadimplente' ? 'bg-red-500 text-white' : 'bg-white text-gray-600'}`}
-                      >
-                        Inadimplente
-                      </button>
+          <div className="space-y-3">
+            {dadosPaginados.map((item, index) => {
+              const hoje = isToday(item.proximoComparecimento);
+              const atrasado = isOverdue(item.proximoComparecimento);
+              const diasRestantes = getDaysUntil(item.proximoComparecimento);
+
+              return (
+                <div
+                  key={item.id || index}
+                  className={`bg-white rounded-lg shadow-sm p-4 ${atrasado ? 'border-l-4 border-red-500' : hoje ? 'border-l-4 border-yellow-500' : ''}`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <User className="w-5 h-5 text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-800 truncate">{item.nome}</h3>
+                        <p className="text-xs text-gray-600">{item.cpf}</p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${item.status === 'inadimplente' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                      {item.status === 'inadimplente' ? 'Inadimplente' : 'Conforme'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm mb-3">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <FileText className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{item.processo}</span>
+                    </div>
+
+                    {item.enderecoCompleto && (
+                      <div className="flex items-start gap-2 text-gray-600">
+                        <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 text-xs">{item.enderecoCompleto}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Calendar className="w-4 h-4 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className={`text-xs ${atrasado ? 'text-red-600 font-medium' : hoje ? 'text-yellow-600 font-medium' : ''}`}>
+                          Próximo: {item.proximoComparecimento ? new Date(item.proximoComparecimento).toLocaleDateString('pt-BR') : '-'}
+                        </p>
+                        {(atrasado || hoje || (diasRestantes > 0 && diasRestantes <= 7)) && (
+                          <p className="text-xs text-gray-500">
+                            {atrasado ? `${Math.abs(diasRestantes)} dias de atraso` : hoje ? 'Hoje' : `${diasRestantes} dias`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-medium text-gray-700 mb-1 block">Urgência</label>
-                    <div className="grid grid-cols-4 gap-1">
-                      <button onClick={() => setFiltroUrgencia('todos')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'todos' ? 'bg-primary text-white' : 'bg-white text-gray-600'}`}>Todos</button>
-                      <button onClick={() => setFiltroUrgencia('hoje')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'hoje' ? 'bg-yellow-500 text-white' : 'bg-white text-gray-600'}`}>Hoje</button>
-                      <button onClick={() => setFiltroUrgencia('atrasados')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'atrasados' ? 'bg-red-500 text-white' : 'bg-white text-gray-600'}`}>Atraso</button>
-                      <button onClick={() => setFiltroUrgencia('proximos')} className={`py-1.5 px-2 rounded text-xs font-medium ${filtroUrgencia === 'proximos' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600'}`}>7 dias</button>
-                    </div>
-                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    {atrasado && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs flex-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Urgente
+                      </span>
+                    )}
+                    {hoje && !atrasado && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-1">
+                        <Clock className="w-3 h-3" />
+                        Hoje
+                      </span>
+                    )}
+                    {!atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs flex-1">
+                        <Clock className="w-3 h-3" />
+                        Próximo
+                      </span>
+                    )}
 
-                  {hasActiveFilters && (
-                    <button onClick={limparFiltros} className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium">
-                      Limpar Filtros
+                    <button
+                      onClick={() => setSelecionado(item)}
+                      className="bg-primary text-white px-3 py-1.5 rounded text-sm hover:bg-primary-dark transition-colors"
+                    >
+                      Ver Detalhes
                     </button>
-                  )}
+                  </div>
                 </div>
-              )}
-            </div>
-
-            <div className="px-4 pb-2 flex items-center justify-between text-xs text-gray-600 border-t">
-              <span>{totalFiltrados} resultados</span>
-              {totalPages > 1 && <span>Página {currentPage} de {totalPages}</span>}
-            </div>
+              );
+            })}
           </div>
 
-          <div className="p-4 pb-20 space-y-3">
-            {dadosPaginados.map((item, index) => (
-              <MobileCard key={item.id || index} item={item} />
-            ))}
-
-            {dadosFiltrados.length === 0 && (
-              <div className="text-center py-12">
-                <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
-                <p className="text-gray-500 text-sm mb-4">Tente ajustar os filtros ou termos de busca</p>
-                <button onClick={limparFiltros} className="bg-primary text-white px-4 py-2 rounded-lg text-sm">
-                  Limpar Filtros
-                </button>
-              </div>
-            )}
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="flex items-center gap-1 px-3 py-2 text-sm bg-white border rounded-lg disabled:opacity-50"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Anterior
-                </button>
-                <span className="text-sm text-gray-600">{currentPage} / {totalPages}</span>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center gap-1 px-3 py-2 text-sm bg-white border rounded-lg disabled:opacity-50"
-                >
-                  Próxima
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-3xl font-bold text-primary mb-2">Painel Geral de Comparecimentos</h2>
-              <p className="text-text-muted">Gerencie todos os comparecimentos em um só lugar</p>
-            </div>
-            <div className="flex gap-2">
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2">
               <button
-                onClick={handleRefresh}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 bg-white border border-gray-300 rounded-lg disabled:opacity-50"
               >
-                <RefreshCw className="w-4 h-4" />
-                Atualizar
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <ExportButton dados={todosOsDados} dadosFiltrados={dadosFiltrados} filterInfo={exportFilterInfo} />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-primary">
-              <p className="text-sm text-text-muted">Total de Custodiados</p>
-              <p className="text-2xl font-bold text-primary-dark">{totalFiltrados}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-secondary">
-              <p className="text-sm text-text-muted">Em Conformidade</p>
-              <p className="text-2xl font-bold text-secondary">{totalEmConformidade}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-danger">
-              <p className="text-sm text-text-muted">Inadimplentes</p>
-              <p className="text-2xl font-bold text-danger">{totalInadimplentes}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-warning">
-              <p className="text-sm text-text-muted">Hoje</p>
-              <p className="text-2xl font-bold text-warning">{totalHoje}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-l-red-500">
-              <p className="text-sm text-text-muted">Atrasados</p>
-              <p className="text-2xl font-bold text-red-500">{totalAtrasados}</p>
-            </div>
-          </div>
+              <span className="text-sm text-gray-600">
+                Página {currentPage} de {totalPages}
+              </span>
 
-          <div className="bg-white p-4 rounded-lg shadow mb-6">
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Search className="w-4 h-4 inline mr-1" />
-                  Buscar
-                </label>
-                <input
-                  type="text"
-                  placeholder="Nome ou processo"
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 bg-white border border-gray-300 rounded-lg disabled:opacity-50"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Gerenciamento de Custodiados</h1>
+                <p className="text-gray-600">Visualize, filtre e gerencie todos os custodiados cadastrados</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleRefresh}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  Atualizar
+                </button>
+
+                <ExportButton
+                  dados={todosOsDados}
+                  dadosFiltrados={dadosFiltrados}
+                  filterInfo={filterInfo}
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Nome, CPF ou processo..."
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'em conformidade' | 'inadimplente')}
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  onChange={(e) => setFiltroStatus(e.target.value as any)}
                 >
                   <option value="todos">Todos</option>
                   <option value="em conformidade">Em Conformidade</option>
@@ -706,41 +715,14 @@ export default function GeralPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Urgência</label>
                 <select
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={filtroUrgencia}
-                  onChange={(e) => setFiltroUrgencia(e.target.value as 'todos' | 'hoje' | 'atrasados' | 'proximos')}
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  onChange={(e) => setFiltroUrgencia(e.target.value as any)}
                 >
                   <option value="todos">Todos</option>
-                  <option value="hoje">Hoje</option>
-                  <option value="atrasados">Atrasados</option>
-                  <option value="proximos">Próximos 7 dias</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
-                <select
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  value={colunaOrdenacao}
-                  onChange={(e) => setColunaOrdenacao(e.target.value)}
-                >
-                  <option value="nome">Nome</option>
-                  <option value="status">Status</option>
-                  <option value="proximoComparecimento">Próximo Comparecimento</option>
-                  <option value="ultimoComparecimento">Último Comparecimento</option>
-                  <option value="decisao">Data da Decisão</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                <select
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  value={ordem}
-                  onChange={(e) => setOrdem(e.target.value as 'asc' | 'desc')}
-                >
-                  <option value="asc">Crescente</option>
-                  <option value="desc">Decrescente</option>
+                  <option value="hoje">Hoje ({totalHoje})</option>
+                  <option value="atrasados">Atrasados ({totalAtrasados})</option>
+                  <option value="proximos">Próximos 7 dias ({totalProximos})</option>
                 </select>
               </div>
 
@@ -748,7 +730,7 @@ export default function GeralPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
                 <input
                   type="date"
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
                 />
@@ -758,7 +740,7 @@ export default function GeralPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
                 <input
                   type="date"
-                  className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
                 />
@@ -771,7 +753,7 @@ export default function GeralPage() {
                     className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center gap-2"
                   >
                     <X className="w-4 h-4" />
-                    Limpar Filtros
+                    Limpar
                   </button>
                 </div>
               )}
@@ -782,25 +764,39 @@ export default function GeralPage() {
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">
-                  Resultados ({totalFiltrados} {totalFiltrados === 1 ? 'custodiado' : 'custodiados'})
+                  Resultados ({totalFiltrados} de {todosOsDados.length})
                   {totalFiltrados > 0 && (
                     <span className="text-sm text-gray-600 ml-2">
-                      • Página {currentPage} de {totalPages} • Mostrando {startIndex + 1}-{Math.min(endIndex, totalFiltrados)} de {totalFiltrados}
+                      • Página {currentPage} de {totalPages}
                     </span>
                   )}
                 </h3>
+                {hasActiveFilters && (
+                  <span className="text-sm text-gray-600 flex items-center gap-1">
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Filtros ativos
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-100">
+              <table className="w-full min-w-[800px]">
+                <thead className="bg-primary text-white">
                   <tr>
-                    <th className="p-3 text-left">Nome / CPF</th>
+                    <th className="p-3 text-left cursor-pointer hover:bg-primary-dark" onClick={() => handleOrdenacao('nome')}>
+                      Nome / CPF {colunaOrdenacao === 'nome' && (ordem === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-3 text-left">Processo / Vara</th>
-                    <th className="p-3 text-center">Status</th>
-                    <th className="p-3 text-center">Último</th>
-                    <th className="p-3 text-center">Próximo</th>
+                    <th className="p-3 text-center cursor-pointer hover:bg-primary-dark" onClick={() => handleOrdenacao('status')}>
+                      Status {colunaOrdenacao === 'status' && (ordem === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="p-3 text-center cursor-pointer hover:bg-primary-dark" onClick={() => handleOrdenacao('ultimoComparecimento')}>
+                      Último {colunaOrdenacao === 'ultimoComparecimento' && (ordem === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="p-3 text-center cursor-pointer hover:bg-primary-dark" onClick={() => handleOrdenacao('proximoComparecimento')}>
+                      Próximo {colunaOrdenacao === 'proximoComparecimento' && (ordem === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-3 text-center">Urgência</th>
                     <th className="p-3 text-center">Ações</th>
                   </tr>
@@ -994,3 +990,5 @@ export default function GeralPage() {
     </div>
   );
 }
+
+export default withSearchParams(GeralPage);
