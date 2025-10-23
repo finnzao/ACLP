@@ -1,124 +1,199 @@
-/**
- * Estrutura de dados para exportação Excel
- * Usa Record para permitir colunas dinâmicas
- */
-export type ExportData = Record<string, string | number>;
+import { CustodiadoData } from './api';
 
 /**
- * Estatísticas calculadas para o relatório
- */
-export interface ExportStatistics {
-  totalRegistros: number;
-  emConformidade: number;
-  inadimplentes: number;
-  comparecimentosHoje: number;
-  atrasados: number;
-  proximosPrazos: number;
-}
-
-/**
- * Informações sobre filtros aplicados
+ * Informações de filtro aplicados na exportação
  */
 export interface ExportFilterInfo {
+  /** Termo de busca/filtro geral */
   filtro?: string;
+  
+  /** Status do comparecimento: 'em conformidade' | 'inadimplente' | 'todos' */
   status?: string;
+  
+  /** Urgência: 'hoje' | 'atrasados' | 'proximos' | 'todos' */
   urgencia?: string;
+  
+  /** Data de início do período (ISO format) */
   dataInicio?: string;
+  
+  /** Data de fim do período (ISO format) */
   dataFim?: string;
 }
 
 /**
- * Configurações de estilo para células do Excel
+ * Opções para exportação de dados
+ */
+export interface ExportOptions {
+  /** Nome do arquivo a ser gerado */
+  filename?: string;
+  
+  /** Nome da planilha/aba */
+  sheetName?: string;
+  
+  /** Se deve incluir informações de filtros no relatório */
+  includeFilters?: boolean;
+  
+  /** Informações dos filtros aplicados */
+  filterInfo?: ExportFilterInfo;
+}
+
+/**
+ * Dados de exportação com campos calculados
+ */
+export type ExportData = CustodiadoData & {
+  /** Número de dias em atraso (se aplicável) */
+  diasAtraso?: number;
+  
+  /** Status de urgência calculado */
+  statusUrgencia?: string;
+};
+
+/**
+ * Resultado da operação de exportação
+ */
+export interface ExportResult {
+  /** Se a exportação foi bem-sucedida */
+  success: boolean;
+  
+  /** Mensagem de sucesso ou erro */
+  message: string;
+  
+  /** Quantidade de registros exportados */
+  count?: number;
+  
+  /** Mensagem de erro detalhada (se houver) */
+  error?: string;
+}
+
+/**
+ * Estatísticas dos dados exportados
+ */
+export interface ExportStatistics {
+  /** Total de registros */
+  totalRegistros: number;
+  
+  /** Quantidade em conformidade */
+  emConformidade: number;
+  
+  /** Quantidade inadimplentes */
+  inadimplentes: number;
+  
+  /** Comparecimentos marcados para hoje */
+  comparecimentosHoje: number;
+  
+  /** Comparecimentos atrasados */
+  atrasados: number;
+  
+  /** Comparecimentos nos próximos 7 dias */
+  proximosPrazos: number;
+}
+
+/**
+ * Tipos de urgência para filtros
+ */
+export type UrgenciaType = 'hoje' | 'atrasados' | 'proximos' | 'todos';
+
+/**
+ * Tipos de status para filtros
+ */
+export type StatusType = 'em conformidade' | 'inadimplente' | 'todos';
+
+/**
+ * Configuração de estilo para células Excel
  */
 export interface CellStyle {
   font?: {
     bold?: boolean;
     size?: number;
-    color?: { argb: string };
+    color?: { rgb: string };
     name?: string;
   };
   fill?: {
-    type: 'pattern';
-    pattern: 'solid';
-    fgColor: { argb: string };
+    fgColor: { rgb: string };
   };
-  border?: {
-    top?: { style: string; color: { argb: string } };
-    bottom?: { style: string; color: { argb: string } };
-    left?: { style: string; color: { argb: string } };
-    right?: { style: string; color: { argb: string } };
+  color?: {
+    rgb: string;
   };
   alignment?: {
     horizontal?: 'left' | 'center' | 'right';
     vertical?: 'top' | 'middle' | 'bottom';
     wrapText?: boolean;
   };
-  numberFormat?: string;
+  border?: {
+    top?: { style: string; color: { rgb: string } };
+    bottom?: { style: string; color: { rgb: string } };
+    left?: { style: string; color: { rgb: string } };
+    right?: { style: string; color: { rgb: string } };
+  };
 }
 
 /**
- * Configurações de coluna do Excel
+ * Configuração de coluna para Excel
  */
 export interface ColumnConfig {
+  /** Chave da coluna */
   key: string;
+  
+  /** Título do cabeçalho */
   header: string;
+  
+  /** Largura da coluna em caracteres */
   width?: number;
+  
+  /** Estilo da coluna */
   style?: CellStyle;
-}
-
-/**
- * Opções para exportação
- */
-export interface ExportOptions {
-  filename?: string;
-  sheetName?: string;
-  includeStatistics?: boolean;
-  includeFilters?: boolean;
-  applyStyles?: boolean;
-  autoFilter?: boolean;
-  freezeHeader?: boolean;
-}
-
-/**
- * Resultado da exportação
- */
-export interface ExportResult {
-  success: boolean;
-  filename?: string;
-  message?: string;
-  error?: string;
-  recordCount?: number;
-}
-
-/**
- * Configuração de página para impressão
- */
-export interface PageSetup {
-  orientation?: 'portrait' | 'landscape';
-  paperSize?: number;
-  fitToPage?: boolean;
-  margins?: {
-    top?: number;
-    bottom?: number;
-    left?: number;
-    right?: number;
-    header?: number;
-    footer?: number;
-  };
 }
 
 /**
  * Metadados do arquivo Excel
  */
 export interface ExcelMetadata {
+  /** Criador do arquivo */
   creator?: string;
+  
+  /** Última modificação por */
   lastModifiedBy?: string;
+  
+  /** Data de criação */
   created?: Date;
+  
+  /** Data de modificação */
   modified?: Date;
+  
+  /** Título do arquivo */
   title?: string;
+  
+  /** Assunto */
   subject?: string;
+  
+  /** Descrição */
   description?: string;
+  
+  /** Palavras-chave */
   keywords?: string;
+  
+  /** Categoria */
   category?: string;
+  
+  /** Empresa/Organização */
   company?: string;
+}
+
+/**
+ * Tipo de exportação
+ */
+export type ExportType = 'all' | 'filtered';
+
+/**
+ * Formato de exportação
+ */
+export type ExportFormat = 'xlsx' | 'csv' | 'pdf';
+
+/**
+ * Validação de filtro
+ */
+export interface FilterValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings?: string[];
 }

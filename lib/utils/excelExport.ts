@@ -2,17 +2,25 @@ import * as XLSX from 'xlsx';
 import { CustodiadoData } from '@/types/api';
 import { formatarPeriodicidade } from './periodicidade';
 
+/**
+ * Informações de filtro para exportação
+ */
+export interface ExportFilterInfo {
+  filtro?: string;
+  status?: string;
+  urgencia?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}
+
+/**
+ * Opções para exportação de dados
+ */
 export interface ExportOptions {
   filename?: string;
   sheetName?: string;
   includeFilters?: boolean;
-  filterInfo?: {
-    filtro?: string;
-    status?: string;
-    urgencia?: string;
-    dataInicio?: string;
-    dataFim?: string;
-  };
+  filterInfo?: ExportFilterInfo;
 }
 
 /**
@@ -153,7 +161,7 @@ function formatarEnderecoCompleto(endereco?: CustodiadoData['endereco']): string
 /**
  * Cria informações de filtros aplicados
  */
-export function createFilterInfo(filterInfo?: ExportOptions['filterInfo']) {
+export function createFilterInfo(filterInfo?: ExportFilterInfo): [string, string][] {
   if (!filterInfo) return [];
 
   const info: [string, string][] = [];
@@ -344,7 +352,7 @@ export function exportToExcel(dados: CustodiadoData[], options: ExportOptions = 
 export function exportFilteredData(
   dadosOriginais: CustodiadoData[],
   dadosFiltrados: CustodiadoData[],
-  filterInfo?: ExportOptions['filterInfo']
+  filterInfo?: ExportFilterInfo
 ) {
   const hasFilters = filterInfo && Object.values(filterInfo).some(value => value && value !== 'todos');
 
