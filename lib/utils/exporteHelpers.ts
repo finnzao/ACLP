@@ -26,7 +26,9 @@ export function calculateExportStatistics(dados: CustodiadoData[]): ExportStatis
 
     const proximosPrazos = dados.filter(d => {
         if (!d.proximoComparecimento) return false;
-        const dataComparecimento = d.proximoComparecimento;
+        const dataComparecimento = typeof d.proximoComparecimento === 'string' 
+            ? d.proximoComparecimento 
+            : d.proximoComparecimento.toISOString().split('T')[0];
         return dataComparecimento >= hoje && dataComparecimento <= proximoPrazoStr;
     }).length;
 
@@ -103,7 +105,7 @@ export function validateExportData(dados: CustodiadoData[]): { valid: boolean; e
     });
 
     // Verificar duplicatas de processo
-    const processos = dados.map(d => d.processo);
+    const processos = dados.map(d => d.processo).filter(Boolean);
     const processosDuplicados = processos.filter((processo, index) =>
         processos.indexOf(processo) !== index
     );
@@ -120,38 +122,34 @@ export function validateExportData(dados: CustodiadoData[]): { valid: boolean; e
 
 /**
  * Transforma dados para formato de exportação com validação
+ * Retorna CustodiadoData com campos calculados adicionados
  */
 export function transformDataForExport(dados: CustodiadoData[]): ExportData[] {
-    return dados.map((item, index) => {
+    return dados.map((item) => {
         const hoje = new Date();
         
         // Proteção contra proximoComparecimento undefined
         if (!item.proximoComparecimento) {
             return {
-                '#': index + 1,
-                'Nome': item.nome || '',
-                'CPF': item.cpf || '',
-                'RG': item.rg || '',
-                'Contato': item.contato || '',
-                'Processo': item.processo || '',
-                'Vara': item.vara || '',
-                'Comarca': item.comarca || '',
-                'Data da Decisão': formatDateToBR(item.dataDecisao),
-                'Periodicidade': formatPeriodicidade(item.periodicidade),
-                'Status': formatStatus(item.status),
-                'Primeiro Comparecimento': formatDateToBR(item.dataComparecimentoInicial),
-                'Último Comparecimento': formatDateToBR(item.ultimoComparecimento),
-                'Próximo Comparecimento': 'Não definido',
-                'Status de Urgência': 'Sem data',
-                'Dias em Atraso': 0
+                ...item,
+                statusUrgencia: 'Sem data',
+                diasAtraso: 0
             };
         }
 
-        const proximoComparecimento = new Date(item.proximoComparecimento);
+        const proximoComparecimento = typeof item.proximoComparecimento === 'string'
+            ? new Date(item.proximoComparecimento)
+            : item.proximoComparecimento;
+            
         const diffTime = proximoComparecimento.getTime() - hoje.getTime();
         const diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        const isHoje = item.proximoComparecimento === hoje.toISOString().split('T')[0];
+        const hojeStr = hoje.toISOString().split('T')[0];
+        const proximoStr = typeof item.proximoComparecimento === 'string'
+            ? item.proximoComparecimento
+            : item.proximoComparecimento.toISOString().split('T')[0];
+        
+        const isHoje = proximoStr === hojeStr;
         const isAtrasado = diasRestantes < 0;
 
         let statusUrgencia = 'Normal';
@@ -167,22 +165,9 @@ export function transformDataForExport(dados: CustodiadoData[]): ExportData[] {
         }
 
         return {
-            '#': index + 1,
-            'Nome': item.nome || '',
-            'CPF': item.cpf || '',
-            'RG': item.rg || '',
-            'Contato': item.contato || '',
-            'Processo': item.processo || '',
-            'Vara': item.vara || '',
-            'Comarca': item.comarca || '',
-            'Data da Decisão': formatDateToBR(item.dataDecisao),
-            'Periodicidade': formatPeriodicidade(item.periodicidade),
-            'Status': formatStatus(item.status),
-            'Primeiro Comparecimento': formatDateToBR(item.dataComparecimentoInicial),
-            'Último Comparecimento': formatDateToBR(item.ultimoComparecimento),
-            'Próximo Comparecimento': formatDateToBR(item.proximoComparecimento),
-            'Status de Urgência': statusUrgencia,
-            'Dias em Atraso': diasAtraso
+            ...item,
+            statusUrgencia,
+            diasAtraso
         };
     });
 }
@@ -190,7 +175,7 @@ export function transformDataForExport(dados: CustodiadoData[]): ExportData[] {
 /**
  * Formata data para padrão brasileiro
  */
-function formatDateToBR(date?: string | Date): string {
+export function formatDateToBR(date?: string | Date): string {
     if (!date) return '';
     
     try {
@@ -208,7 +193,7 @@ function formatDateToBR(date?: string | Date): string {
 /**
  * Formata periodicidade para exibição
  */
-function formatPeriodicidade(periodicidade?: number): string {
+export function formatPeriodicidade(periodicidade?: number): string {
     if (!periodicidade) return '';
     
     if (periodicidade === 30) return 'Mensal';
@@ -223,7 +208,7 @@ function formatPeriodicidade(periodicidade?: number): string {
 /**
  * Formata status para exibição
  */
-function formatStatus(status?: StatusComparecimento): string {
+export function formatStatus(status?: StatusComparecimento): string {
     if (!status) return '';
     
     // ✅ CORRETO - Comparar enum com enum
@@ -303,4 +288,73 @@ export function sanitizeExportData(dados: CustodiadoData[]): CustodiadoData[] {
         vara: String(item.vara || '').trim(),
         comarca: String(item.comarca || '').trim()
     }));
+}
+
+/**
+ * Agrupa dados por status para análise
+ */
+export function groupByStatus(dados: CustodiadoData[]): Record<string, CustodiadoData[]> {
+    return dados.reduce((acc, item) => {
+        const status = item.status || 'sem_status';
+        if (!acc[status]) {
+            acc[status] = [];
+        }
+        acc[status].push(item);
+        return acc;
+    }, {} as Record<string, CustodiadoData[]>);
+}
+
+/**
+ * Agrupa dados por urgência
+ */
+export function groupByUrgency(dados: ExportData[]): Record<string, ExportData[]> {
+    return dados.reduce((acc, item) => {
+        const urgencia = item.statusUrgencia || 'normal';
+        if (!acc[urgencia]) {
+            acc[urgencia] = [];
+        }
+        acc[urgencia].push(item);
+        return acc;
+    }, {} as Record<string, ExportData[]>);
+}
+
+/**
+ * Ordena dados por próximo comparecimento
+ */
+export function sortByProximoComparecimento(dados: CustodiadoData[]): CustodiadoData[] {
+    return [...dados].sort((a, b) => {
+        if (!a.proximoComparecimento) return 1;
+        if (!b.proximoComparecimento) return -1;
+        
+        const dateA = typeof a.proximoComparecimento === 'string' 
+            ? new Date(a.proximoComparecimento) 
+            : a.proximoComparecimento;
+        const dateB = typeof b.proximoComparecimento === 'string' 
+            ? new Date(b.proximoComparecimento) 
+            : b.proximoComparecimento;
+        
+        return dateA.getTime() - dateB.getTime();
+    });
+}
+
+/**
+ * Filtra dados por período
+ */
+export function filterByPeriod(
+    dados: CustodiadoData[], 
+    dataInicio: string, 
+    dataFim: string
+): CustodiadoData[] {
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    
+    return dados.filter(item => {
+        if (!item.proximoComparecimento) return false;
+        
+        const data = typeof item.proximoComparecimento === 'string'
+            ? new Date(item.proximoComparecimento)
+            : item.proximoComparecimento;
+        
+        return data >= inicio && data <= fim;
+    });
 }

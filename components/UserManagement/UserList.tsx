@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Search, Filter, UserPlus, Edit, Trash2,
     Mail, Building, Calendar, Shield, User, ChevronDown,
@@ -36,12 +36,8 @@ export default function UserList({ onEditUser, onAddUser }: UserListProps) {
     const [userToDelete, setUserToDelete] = useState<UsuarioResponse | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-    // Carregar usuários
-    useEffect(() => {
-        loadUsers();
-    }, []);
-
-    const loadUsers = async () => {
+    // ✅ CORREÇÃO: useCallback para loadUsers evitar warning do useEffect
+    const loadUsers = useCallback(async () => {
         setLoading(true);
         try {
             const data = await usuariosService.listar();
@@ -56,7 +52,12 @@ export default function UserList({ onEditUser, onAddUser }: UserListProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [showToast]); // ✅ Incluir showToast como dependência
+
+    // Carregar usuários
+    useEffect(() => {
+        loadUsers();
+    }, [loadUsers]); // ✅ CORREÇÃO: Incluir loadUsers como dependência
 
     // Obter departamentos únicos
     const departamentos = useMemo(() => {
@@ -94,10 +95,11 @@ export default function UserList({ onEditUser, onAddUser }: UserListProps) {
 
         // Ordenar
         filtered.sort((a, b) => {
-            let aVal = a[sortBy] || '';
-            let bVal = b[sortBy] || '';
+            let aVal: string | number = a[sortBy] || '';
+            let bVal: string | number = b[sortBy] || '';
 
             if (sortBy === 'criadoEm' || sortBy === 'ultimoLogin') {
+                // ✅ CORREÇÃO: Converter para número (timestamp)
                 aVal = new Date(aVal).getTime();
                 bVal = new Date(bVal).getTime();
             }
@@ -175,8 +177,7 @@ export default function UserList({ onEditUser, onAddUser }: UserListProps) {
                 user.departamento || '',
                 user.telefone || '',
                 user.ativo ? 'Ativo' : 'Inativo',
-                new Date(user.criadoEm).toLocaleDateString('pt-BR'),
-                user.ultimoLogin ? new Date(user.ultimoLogin).toLocaleDateString('pt-BR') : 'Nunca'
+                user.ultimoLogin ? new Date(user.ultimoLogin!).toLocaleDateString('pt-BR') : 'Nunca'
             ])
         ].map(row => row.join(',')).join('\n');
 
@@ -378,8 +379,8 @@ export default function UserList({ onEditUser, onAddUser }: UserListProps) {
 
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${user.tipo === 'ADMIN'
-                                            ? 'bg-purple-100 text-purple-800'
-                                            : 'bg-blue-100 text-blue-800'
+                                        ? 'bg-purple-100 text-purple-800'
+                                        : 'bg-blue-100 text-blue-800'
                                         }`}>
                                         {user.tipo === 'ADMIN' ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
                                         {user.tipo === 'ADMIN' ? 'Admin' : 'Usuário'}
@@ -401,8 +402,8 @@ export default function UserList({ onEditUser, onAddUser }: UserListProps) {
                                     <button
                                         onClick={() => toggleUserStatus(user)}
                                         className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full transition-colors ${user.ativo
-                                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                                             }`}
                                     >
                                         {user.ativo ? (

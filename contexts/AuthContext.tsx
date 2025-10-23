@@ -143,7 +143,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (profileResponse.success && profileResponse.data) {
         console.log('[AuthContext] Perfil carregado com sucesso:', profileResponse.data);
         
-        const userData = profileResponse.data.data || profileResponse.data;
+        const userData = profileResponse.data || profileResponse.data;
         
         setUser({
           id: userData.id,

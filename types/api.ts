@@ -7,6 +7,8 @@ export enum StatusComparecimento {
   INADIMPLENTE = 'INADIMPLENTE'
 }
 
+
+
 export enum TipoValidacao {
   PRESENCIAL = 'PRESENCIAL',
   ONLINE = 'ONLINE',

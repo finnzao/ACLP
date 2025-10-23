@@ -30,6 +30,8 @@ interface RegistrarComparecimentoData {
   };
 }
 
+
+  
 interface UseComparecimentosReturn {
   loading: boolean;
   error: string | null;
@@ -204,7 +206,7 @@ export function useComparecimentos(): UseComparecimentosReturn {
         custodiadoId: data.custodiadoId,
         dataComparecimento: data.dataComparecimento,
         horaComparecimento: formatarHoraParaAPI(data.horaComparecimento),
-        tipoValidacao: data.tipoValidacao,
+        tipoValidacao: data.tipoValidacao as any,
         observacoes: data.observacoes?.trim() || '',
         validadoPor: data.validadoPor.trim(),
         anexos: '',
