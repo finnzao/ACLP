@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
-import { CustodiadoResponse, ComparecimentoDTO, TipoValidacao } from '@/types/api';
+import { CustodiadoData, ComparecimentoDTO, TipoValidacao } from '@/types/api';
 import EnderecoForm from '@/components/EnderecoForm';
 import { useToastHelpers } from '@/components/Toast';
 import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
@@ -58,12 +58,14 @@ export default function ConfirmarPresencaPage() {
   const { custodiados, loading: loadingCustodiados, error: errorCustodiados, refetch } = useCustodiados();
   const { registrarComparecimento, loading: loadingComparecimento } = useComparecimentos();
 
-  const [pessoa, setPessoa] = useState<CustodiadoResponse | null>(null);
+  // CORREÇÃO: Mudança de CustodiadoResponse para CustodiadoData
+  const [custodiado, setCustodiado] = useState<CustodiadoData | null>(null);
   const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processo || '');
 
-  const [resultadosBusca, setResultadosBusca] = useState<CustodiadoResponse[]>([]);
+  // CORREÇÃO: Mudança de CustodiadoResponse[] para CustodiadoData[]
+  const [resultadosBusca, setResultadosBusca] = useState<CustodiadoData[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
@@ -150,28 +152,33 @@ export default function ConfirmarPresencaPage() {
     }
   }, [buscaProcesso, custodiados, success, error, normalizarTexto]);
 
-  const selecionarPessoa = useCallback((pessoaSelecionada: CustodiadoResponse) => {
-    setPessoa(pessoaSelecionada);
+  const selecionarPessoa = useCallback((pessoaSelecionada: CustodiadoData) => {
+    setCustodiado(pessoaSelecionada);
     setMostrarResultados(false);
     setExpandedSection('dados-pessoais');
     success('Pessoa selecionada', `${pessoaSelecionada.nome} - ${pessoaSelecionada.processo}`);
   }, [success]);
 
-  useEffect(() => {
-    if (processo && custodiados && custodiados.length > 0 && !pessoa) {
-      buscarPessoa();
-    }
-  }, [processo, custodiados, pessoa, buscarPessoa]);
+  // CORREÇÃO: Removido buscarPessoa das dependências para evitar loop infinito
+  // Adicionado flag para evitar múltiplas buscas
+  const [buscaInicialFeita, setBuscaInicialFeita] = useState(false);
 
   useEffect(() => {
-    if (estado === 'sucesso' && pessoa) {
+    if (processo && custodiados && custodiados.length > 0 && !custodiado && !buscaInicialFeita) {
+      setBuscaInicialFeita(true);
+      buscarPessoa();
+    }
+  }, [processo, custodiados, custodiado, buscaInicialFeita]);
+
+  useEffect(() => {
+    if (estado === 'sucesso' && custodiado && custodiado.periodicidade) {
       const proximaData = calcularProximoComparecimento(
         formulario.dataComparecimento,
-        pessoa.periodicidade
+        custodiado.periodicidade
       );
       setProximoComparecimento(dateUtils.formatToBR(proximaData));
     }
-  }, [estado, pessoa, formulario.dataComparecimento]);
+  }, [estado, custodiado, formulario.dataComparecimento]);
 
   const formatarHoraParaAPI = (hora: string): string => {
     if (!hora) return '00:00:00';
@@ -214,7 +221,7 @@ export default function ConfirmarPresencaPage() {
   }, []);
 
   const confirmarComparecimento = async () => {
-    if (!pessoa) return;
+    if (!custodiado || !custodiado.id) return;
 
     if (!enderecoRespondido) {
       error('Informação pendente', 'Responda sobre a atualização de endereço');
@@ -226,7 +233,7 @@ export default function ConfirmarPresencaPage() {
 
     try {
       const dadosBasicos = {
-        custodiadoId: pessoa.id,
+        custodiadoId: custodiado.id,
         dataComparecimento: formulario.dataComparecimento,
         horaComparecimento: formatarHoraParaAPI(formulario.horaComparecimento),
         tipoValidacao: formulario.tipoValidacao,
@@ -506,7 +513,7 @@ export default function ConfirmarPresencaPage() {
                 id="busca"
                 title="Buscar Pessoa"
                 icon={<Search className="w-5 h-5 text-blue-600" />}
-                defaultExpanded={!pessoa}
+                defaultExpanded={!custodiado}
                 badge={
                   resultadosBusca.length > 0 ? (
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
@@ -536,47 +543,47 @@ export default function ConfirmarPresencaPage() {
                 </div>
               </MobileSection>
 
-              {pessoa && (
+              {custodiado && custodiado.proximoComparecimento && (
                 <>
                   <MobileSection
                     id="dados-pessoais"
                     title="Dados da Pessoa"
                     icon={<User className="w-5 h-5 text-green-600" />}
                     badge={
-                      <span className={`px-2 py-1 rounded-full text-xs ${pessoa.status === 'EM_CONFORMIDADE'
+                      <span className={`px-2 py-1 rounded-full text-xs ${custodiado.status === 'EM_CONFORMIDADE'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
                         }`}>
-                        {pessoa.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
+                        {custodiado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
                       </span>
                     }
                   >
                     <div className="space-y-3">
                       <div>
                         <p className="text-xs text-gray-500">Nome</p>
-                        <p className="font-medium text-gray-800">{pessoa.nome}</p>
+                        <p className="font-medium text-gray-800">{custodiado.nome}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-xs text-gray-500">CPF</p>
-                          <p className="font-medium text-gray-800 text-sm">{pessoa.cpf || 'Não informado'}</p>
+                          <p className="font-medium text-gray-800 text-sm">{custodiado.cpf || 'Não informado'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Contato</p>
-                          <p className="font-medium text-gray-800 text-sm">{pessoa.contato}</p>
+                          <p className="font-medium text-gray-800 text-sm">{custodiado.contato}</p>
                         </div>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Processo</p>
-                        <p className="font-medium text-gray-800 text-sm">{pessoa.processo}</p>
+                        <p className="font-medium text-gray-800 text-sm">{custodiado.processo}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Próximo Comparecimento</p>
-                        <p className="font-medium text-gray-800">{dateUtils.formatToBR(pessoa.proximoComparecimento)}</p>
+                        <p className="font-medium text-gray-800">{dateUtils.formatToBR(custodiado.proximoComparecimento)}</p>
                       </div>
                       <button
                         onClick={() => {
-                          setPessoa(null);
+                          setCustodiado(null);
                           setEnderecoRespondido(false);
                           setAtualizacaoEndereco({ houveAlteracao: false });
                           setBuscaProcesso('');
@@ -780,7 +787,7 @@ export default function ConfirmarPresencaPage() {
           )}
         </div>
 
-        {estado === 'inicial' && pessoa && (
+        {estado === 'inicial' && custodiado && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -809,6 +816,8 @@ export default function ConfirmarPresencaPage() {
       </div>
     );
   }
+
+  // Versão Desktop continua igual, apenas comente o resto se precisar por limite...
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
@@ -853,11 +862,11 @@ export default function ConfirmarPresencaPage() {
                 <h2 className="text-2xl font-bold text-green-700 mb-2">Presença Confirmada!</h2>
                 <p className="text-gray-600 mb-6">{mensagem}</p>
 
-                {pessoa && (
+                {custodiado && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                     <p className="text-green-800">
                       <strong>Comparecimento registrado para:</strong><br />
-                      {pessoa.nome} - Processo: {pessoa.processo}
+                      {custodiado.nome} - Processo: {custodiado.processo}
                     </p>
                     <p className="text-green-700 text-sm mt-2">
                       Data/Hora: {dateUtils.formatToBR(formulario.dataComparecimento)} às {formulario.horaComparecimento}
@@ -870,7 +879,7 @@ export default function ConfirmarPresencaPage() {
                   </div>
                 )}
 
-                {proximoComparecimento && pessoa && (
+                {proximoComparecimento && custodiado && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">
                       Próximo Comparecimento
@@ -879,7 +888,7 @@ export default function ConfirmarPresencaPage() {
                       {proximoComparecimento}
                     </p>
                     <p className="text-blue-600 text-sm mt-1">
-                      Periodicidade: {formatarPeriodicidade(pessoa.periodicidade)}
+                      Periodicidade: {formatarPeriodicidade(custodiado.periodicidade)}
                     </p>
                   </div>
                 )}
@@ -894,7 +903,7 @@ export default function ConfirmarPresencaPage() {
                   <button
                     onClick={() => {
                       setEstado('inicial');
-                      setPessoa(null);
+                      setCustodiado(null);
                       setBuscaProcesso('');
                       setEnderecoRespondido(false);
                       setResultadosBusca([]);
@@ -942,7 +951,7 @@ export default function ConfirmarPresencaPage() {
         {estado === 'inicial' && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="p-8">
-              {!pessoa && (
+              {!custodiado && (
                 <div className="mb-8">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                     <div className="flex items-center gap-3 mb-4">
@@ -1016,7 +1025,7 @@ export default function ConfirmarPresencaPage() {
                 </div>
               )}
 
-              {pessoa && (
+              {custodiado && (
                 <>
                   <div className="bg-primary p-6 rounded-xl mb-8 text-white">
                     <div className="flex items-center gap-4 mb-4">
@@ -1024,15 +1033,15 @@ export default function ConfirmarPresencaPage() {
                         <User className="w-8 h-8" />
                       </div>
                       <div className="flex-1">
-                        <h2 className="text-2xl font-bold">{pessoa.nome}</h2>
-                        <p className="text-primary-light">Processo: {pessoa.processo}</p>
+                        <h2 className="text-2xl font-bold">{custodiado.nome}</h2>
+                        <p className="text-primary-light">Processo: {custodiado.processo}</p>
                       </div>
                       <div>
-                        <span className={`px-4 py-2 rounded-full text-sm font-medium ${pessoa.status === 'EM_CONFORMIDADE'
+                        <span className={`px-4 py-2 rounded-full text-sm font-medium ${custodiado.status === 'EM_CONFORMIDADE'
                           ? 'bg-green-500 text-white'
                           : 'bg-red-500 text-white'
                           }`}>
-                          {pessoa.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
+                          {custodiado.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : 'Inadimplente'}
                         </span>
                       </div>
                     </div>
@@ -1040,25 +1049,32 @@ export default function ConfirmarPresencaPage() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="font-semibold mb-1">CPF</p>
-                        <p className="text-primary-light">{pessoa.cpf || 'Não informado'}</p>
+                        <p className="text-primary-light">{custodiado.cpf || 'Não informado'}</p>
                       </div>
                       <div>
                         <p className="font-semibold mb-1">Contato</p>
-                        <p className="text-primary-light">{pessoa.contato}</p>
+                        <p className="text-primary-light">{custodiado.contato}</p>
                       </div>
                       <div>
                         <p className="font-semibold mb-1">Vara</p>
-                        <p className="text-primary-light">{pessoa.vara}</p>
+                        <p className="text-primary-light">{custodiado.vara}</p>
                       </div>
                       <div>
                         <p className="font-semibold mb-1">Próximo Comparecimento</p>
-                        <p className="text-primary-light font-medium">{dateUtils.formatToBR(pessoa.proximoComparecimento)}</p>
+                        {custodiado.proximoComparecimento && (
+                          <div>
+                            <p className="font-semibold mb-1">Próximo Comparecimento</p>
+                            <p className="text-primary-light font-medium">
+                              {dateUtils.formatToBR(custodiado.proximoComparecimento)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <button
                       onClick={() => {
-                        setPessoa(null);
+                        setCustodiado(null);
                         setEnderecoRespondido(false);
                         setAtualizacaoEndereco({ houveAlteracao: false });
                         setBuscaProcesso('');

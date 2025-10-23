@@ -89,7 +89,7 @@ export interface CustodiadoDTO {
   dataComparecimentoInicial?: string;
   status?: StatusComparecimento;
   ultimoComparecimento?: string;
-  proximoComparecimento?: string;
+  proximoComparecimento?: string | Date;
   observacoes?: string;
   cep: string;
   logradouro: string;
@@ -105,7 +105,7 @@ export interface CustodiadoData extends CustodiadoDTO {
   periodicidadeDescricao?: string;
   status?: StatusComparecimento;
   ultimoComparecimento?: string;
-  proximoComparecimento?: string;
+  proximoComparecimento?: string | Date;
   diasAtraso?: number;
   endereco?: EnderecoDTO;
   criadoEm: string;
