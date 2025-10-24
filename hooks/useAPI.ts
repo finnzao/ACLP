@@ -34,18 +34,23 @@ export function useCustodiados() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustodiados = async () => {
+  const fetchCustodiados = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError(null);  
+      
+      console.log('[useCustodiados] Iniciando busca de custodiados...', { forceRefresh });
+      
       const response: ListarCustodiadosResponse = await custodiadosService.listar();
       console.log('[useCustodiados] Resposta recebida:', response);
   
       if (response.success && Array.isArray(response.data)) {
         console.log('[useCustodiados] Custodiados carregados:', response.data.length);
         setCustodiados(response.data);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('lastDataFetch', Date.now().toString());
+        }
       } else {
-        console.warn('[useCustodiados] API retornou erro ou dados inválidos');
         setError(response.message || 'Erro ao carregar dados');
         setCustodiados([]);
       }
@@ -216,8 +221,8 @@ export function useCustodiados() {
   }, []);
 
   // Forçar atualização da lista
-  const refetch = useCallback(() => {
-    return fetchCustodiados();
+  const refetch = useCallback((forceRefresh = true) => {
+    return fetchCustodiados(forceRefresh);
   }, []);
 
   useEffect(() => {

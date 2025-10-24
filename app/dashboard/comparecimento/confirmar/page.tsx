@@ -271,23 +271,28 @@ function ConfirmarPresencaPage() {
         setMensagem(`Comparecimento registrado com sucesso para ${custodiado.nome}`);
         setEstado('sucesso');
 
-        // Atualizar dados antes de redirecionar
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         try {
+          console.log('[ConfirmarPresenca] Iniciando refetch dos dados...');
           await refetch();
-          console.log('[ConfirmarPresenca] Dados atualizados com sucesso');
+          console.log('[ConfirmarPresenca] ✅ Dados atualizados com sucesso');
         } catch (error) {
-          console.error('[ConfirmarPresenca] Erro ao atualizar dados:', error);
+          console.error('[ConfirmarPresenca] ❌ Erro ao atualizar dados:', error);
         }
 
-        // Marcar que precisa atualizar a lista geral
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('needsRefetch', 'true');
           sessionStorage.setItem('lastUpdate', Date.now().toString());
+
+          window.dispatchEvent(new CustomEvent('comparecimento-registrado', {
+            detail: { custodiadoId: custodiado.id, timestamp: Date.now() }
+          }));
+
         }
 
         setTimeout(() => {
-          // Redirecionar para a lista geral com parâmetro de atualização
-          router.push(`/dashboard/geral?updated=${Date.now()}`);
+          window.location.href = '/dashboard/geral';
         }, 2000);
       } else {
         throw new Error(result.message || 'Erro ao registrar comparecimento');

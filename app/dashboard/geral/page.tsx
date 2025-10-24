@@ -117,7 +117,6 @@ function GeralPage() {
       );
     };
 
-    // CASO 1: Estrutura ApiResponse { success, data: [] }
     if (isApiResponse(custodiadosBackend)) {
       if (custodiadosBackend.success && Array.isArray(custodiadosBackend.data)) {
         console.log('[GeralPage] Dados extraídos da ApiResponse:', custodiadosBackend.data.length);
@@ -127,7 +126,7 @@ function GeralPage() {
       return [];
     }
 
-    // CASO 2: Array direto de CustodiadoData
+
     if (Array.isArray(custodiadosBackend)) {
       console.log('[GeralPage] Array direto detectado:', custodiadosBackend.length);
       return custodiadosBackend;
@@ -207,6 +206,9 @@ function GeralPage() {
     return dadosExtraidos.map(transformarCustodiado);
   }, [dadosExtraidos]);
 
+
+
+
   // Aplicar filtros da URL
   useEffect(() => {
     const busca = searchParams.get('busca');
@@ -222,7 +224,6 @@ function GeralPage() {
     if (dataF) setDataFim(dataF);
   }, [searchParams]);
 
-  // Atualizar URL com filtros
 
   useEffect(() => {
     const updated = searchParams.get('updated');
@@ -255,7 +256,98 @@ function GeralPage() {
       }
     }
   }, [searchParams, showToast]);
-  
+
+  // ✅ NOVO: Listener para evento customizado de comparecimento registrado
+  useEffect(() => {
+    const handleComparecimentoRegistrado = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('[GeralPage] 📢 Evento de comparecimento detectado:', customEvent.detail);
+      console.log('[GeralPage] 🔄 Atualizando lista de custodiados...');
+
+      // Forçar atualização imediata
+      refetchCustodiados();
+    };
+
+    window.addEventListener('comparecimento-registrado', handleComparecimentoRegistrado);
+
+    return () => {
+      window.removeEventListener('comparecimento-registrado', handleComparecimentoRegistrado);
+    };
+  }, [refetchCustodiados]);
+
+  // ✅ MELHORADO: useEffect para detectar atualização via URL ou sessionStorage
+  useEffect(() => {
+    const updated = searchParams.get('updated');
+    const needsRefetch = typeof window !== 'undefined'
+      ? sessionStorage.getItem('needsRefetch')
+      : null;
+
+    if (updated || needsRefetch === 'true') {
+      console.log('[GeralPage] ✅ Detectado atualização recente');
+      console.log('[GeralPage] - updated param:', updated);
+      console.log('[GeralPage] - needsRefetch:', needsRefetch);
+
+      // Mostrar feedback visual ao usuário
+      showToast({
+        type: 'success',
+        title: 'Lista Atualizada',
+        message: 'Comparecimento registrado e dados atualizados com sucesso',
+        duration: 3000
+      });
+
+      // ✅ CORREÇÃO: Forçar atualização dos dados COM delay
+      setTimeout(() => {
+        console.log('[GeralPage] 🔄 Iniciando refetch dos dados...');
+        refetchCustodiados();
+      }, 300);
+
+      // Limpar flags e parâmetros da URL
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('needsRefetch');
+        sessionStorage.removeItem('lastUpdate');
+
+        // Limpar parâmetro da URL sem recarregar a página
+        setTimeout(() => {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+          console.log('[GeralPage] ✅ URL e flags limpas');
+        }, 1000);
+      }
+    }
+  }, [searchParams, showToast, refetchCustodiados]);
+
+  useEffect(() => {
+    const updated = searchParams.get('updated');
+    const needsRefetch = typeof window !== 'undefined'
+      ? sessionStorage.getItem('needsRefetch')
+      : null;
+
+    if (updated || needsRefetch === 'true') {
+      console.log('[GeralPage] ✅ Detectado atualização recente, forçando refetch dos dados');
+
+      // Mostrar feedback visual ao usuário
+      showToast({
+        type: 'success',
+        title: 'Lista Atualizada',
+        message: 'Comparecimento registrado e dados atualizados com sucesso',
+        duration: 3000
+      });
+
+      // Forçar atualização dos dados
+      refetchCustodiados();
+
+      // Limpar flags e parâmetros da URL
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('needsRefetch');
+        sessionStorage.removeItem('lastUpdate');
+
+        // Limpar parâmetro da URL sem recarregar a página
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    }
+  }, [searchParams, showToast]);
+
   useEffect(() => {
     const params = new URLSearchParams();
 
