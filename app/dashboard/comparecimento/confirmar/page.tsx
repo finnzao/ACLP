@@ -39,8 +39,14 @@ import {
   Endereco
 } from '@/types/comparecimento';
 
-// ✅ Importar o hook seguro
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
+
+import { 
+  ValidationValidadoPor, 
+  ValidationObservacoes, 
+  ValidationMotivoMudanca 
+} from '@/lib/utils/validation';
+import { convertTipoValidacaoToString } from '@/lib/utils/enumValidation';
 
 declare global {
   interface Window {
@@ -48,10 +54,10 @@ declare global {
   }
 }
 
-// ✅ Interface corrigida para MobileSection
+
 interface MobileSectionProps {
   title: string;
-  icon: LucideIcon;  // ✅ Tipo correto para ícones do Lucide
+  icon: LucideIcon; 
   isExpanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
@@ -209,7 +215,6 @@ function ConfirmarPresencaPage() {
       return;
     }
 
-    // ✅ Validar ID do custodiado
     if (!custodiado.id || custodiado.id === 0) {
       error('Erro', 'ID do custodiado inválido');
       return;
@@ -302,7 +307,6 @@ function ConfirmarPresencaPage() {
     }));
   };
 
-  // ✅ Componente MobileSection com tipos corretos
   const MobileSection = ({ title, icon: Icon, isExpanded, onToggle, children }: MobileSectionProps) => (
     <div className="bg-white rounded-lg shadow-sm mb-3 overflow-hidden">
       <button
@@ -572,7 +576,6 @@ function ConfirmarPresencaPage() {
                             </p>
                           </div>
                           
-                          {/* ✅ EnderecoForm com prop correta */}
                           <EnderecoForm
                             endereco={atualizacaoEndereco.endereco!}
                             onEnderecoChange={handleEnderecoChange}
@@ -902,7 +905,6 @@ function ConfirmarPresencaPage() {
                               </p>
                             </div>
                             
-                            {/* ✅ EnderecoForm com prop correta */}
                             <EnderecoForm
                               endereco={atualizacaoEndereco.endereco!}
                               onEnderecoChange={handleEnderecoChange}

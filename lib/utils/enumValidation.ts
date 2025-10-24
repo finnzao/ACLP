@@ -1,23 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// painel-web/lib/utils/enumValidation.ts
 
 import { TipoValidacao } from '@/types/api';
 
 /**
- * Converte enum do frontend para string aceita pelo backend
+ *  Converte enum do frontend para string MINÚSCULA aceita pelo backend
  */
 export function convertTipoValidacaoToString(tipo: TipoValidacao): string {
-  // Garantir que sempre enviamos string, não enum object
+  // Garantir que sempre enviamos string em minúsculas
   switch (tipo) {
     case TipoValidacao.PRESENCIAL:
-      return 'PRESENCIAL';
+      return 'presencial';
     case TipoValidacao.ONLINE:
-      return 'ONLINE';
+      return 'online';
     case TipoValidacao.CADASTRO_INICIAL:
-      return 'CADASTRO_INICIAL';
+      return 'cadastro_inicial'; 
     default:
-      // Se vier como string, usar diretamente
-      return String(tipo).toUpperCase();
+      return String(tipo).toLowerCase().replace(/\s+/g, '_');
   }
 }
 
@@ -54,22 +52,20 @@ export function convertStatusToString(status: string): string {
     return 'INADIMPLENTE';
   }
 
-  // Se não reconhece, retornar o valor original
   return statusUpper;
 }
 
 /**
- * Sanitiza dados do formulário antes do envio
+ *  Sanitiza dados do formulário antes do envio
  */
 export function sanitizeFormData(data: any): any {
   return {
     ...data,
-    // Garantir que strings sejam trimmed
-    validadoPor: data.validadoPor?.trim(),
-    observacoes: data.observacoes?.trim(),
-    motivoMudancaEndereco: data.motivoMudancaEndereco?.trim(),
 
-    // Converter enum para string
+    validadoPor: data.validadoPor?.trim(),
+    observacoes: data.observacoes?.trim() || undefined,
+    motivoMudancaEndereco: data.motivoMudancaEndereco?.trim() || undefined,
+
     tipoValidacao: convertTipoValidacaoToString(data.tipoValidacao),
 
     // Validar endereço se houver
@@ -79,8 +75,8 @@ export function sanitizeFormData(data: any): any {
         estado: validateEstadoBrasil(data.novoEndereco.estado),
         cep: data.novoEndereco.cep?.replace(/\D/g, ''),
         logradouro: data.novoEndereco.logradouro?.trim(),
-        numero: data.novoEndereco.numero?.trim(),
-        complemento: data.novoEndereco.complemento?.trim(),
+        numero: data.novoEndereco.numero?.trim() || undefined,
+        complemento: data.novoEndereco.complemento?.trim() || undefined,
         bairro: data.novoEndereco.bairro?.trim(),
         cidade: data.novoEndereco.cidade?.trim()
       }
@@ -91,7 +87,7 @@ export function sanitizeFormData(data: any): any {
 /**
  * Valida dados antes do envio
  */
-export function validateBeforeSend(data: any): { isValid: boolean; errors: string[] } {
+export function validateBeforeSend(data: any): any {
   const errors: string[] = [];
 
   // Validar campos obrigatórios
@@ -146,10 +142,11 @@ export function validateBeforeSend(data: any): { isValid: boolean; errors: strin
     }
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
+  if (errors.length > 0) {
+    throw new Error(errors.join(', '));
+  }
+
+  return data;
 }
 
 /**
@@ -158,22 +155,23 @@ export function validateBeforeSend(data: any): { isValid: boolean; errors: strin
 export function logFormDataForDebug(data: any, label: string = 'FormData'): void {
   if (process.env.NODE_ENV === 'development') {
     console.group(`[${label}] Dados do formulário:`);
-    console.log('Dados originais:', data);
-    console.log('Tipo de tipoValidacao:', typeof data.tipoValidacao, data.tipoValidacao);
+    console.log(' Dados originais:', data);
+    console.log(' Tipo de tipoValidacao:', typeof data.tipoValidacao, data.tipoValidacao);
 
     if (data.novoEndereco) {
-      console.log('Endereço:', data.novoEndereco);
-      console.log('Estado:', data.novoEndereco.estado, typeof data.novoEndereco.estado);
+      console.log(' Endereço:', data.novoEndereco);
+      console.log(' Estado:', data.novoEndereco.estado, typeof data.novoEndereco.estado);
     }
 
     try {
       const sanitized = sanitizeFormData(data);
-      console.log('Dados sanitizados:', sanitized);
+      console.log(' Dados sanitizados:', sanitized);
+      console.log(' tipoValidacao após sanitização:', sanitized.tipoValidacao);
 
-      const validation = validateBeforeSend(sanitized);
-      console.log('Validação:', validation);
+      validateBeforeSend(sanitized);
+      console.log(' Validação passou!');
     } catch (error) {
-      console.error('Erro na sanitização:', error);
+      console.error('❌ Erro na sanitização/validação:', error);
     }
 
     console.groupEnd();
