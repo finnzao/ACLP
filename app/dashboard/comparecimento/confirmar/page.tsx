@@ -41,12 +41,6 @@ import {
 
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
 
-import { 
-  ValidationValidadoPor, 
-  ValidationObservacoes, 
-  ValidationMotivoMudanca 
-} from '@/lib/utils/validation';
-import { convertTipoValidacaoToString } from '@/lib/utils/enumValidation';
 
 declare global {
   interface Window {
@@ -57,7 +51,7 @@ declare global {
 
 interface MobileSectionProps {
   title: string;
-  icon: LucideIcon; 
+  icon: LucideIcon;
   isExpanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
@@ -65,10 +59,10 @@ interface MobileSectionProps {
 
 function ConfirmarPresencaPage() {
   const router = useRouter();
-  
+
   const searchParams = useSearchParamsSafe();
   const processo = searchParams.get('processo');
-  
+
   const { success, error } = useToastHelpers();
 
   const { custodiados, loading: loadingCustodiados, error: errorCustodiados, refetch } = useCustodiados();
@@ -262,7 +256,7 @@ function ConfirmarPresencaPage() {
           bairro: atualizacaoEndereco.endereco!.bairro,
           cidade: atualizacaoEndereco.endereco!.cidade,
           estado: atualizacaoEndereco.endereco!.estado,
-         
+
         } : undefined
       };
 
@@ -271,16 +265,33 @@ function ConfirmarPresencaPage() {
 
       logFormDataForDebug(dadosLimpos, 'Dados enviados para API');
 
-      await registrarComparecimento(dadosLimpos);
+      const result = await registrarComparecimento(dadosLimpos);
 
-      setMensagem(`Comparecimento registrado com sucesso para ${custodiado.nome}`);
-      setEstado('sucesso');
+      if (result.success) {
+        setMensagem(`Comparecimento registrado com sucesso para ${custodiado.nome}`);
+        setEstado('sucesso');
 
-      await refetch();
+        // Atualizar dados antes de redirecionar
+        try {
+          await refetch();
+          console.log('[ConfirmarPresenca] Dados atualizados com sucesso');
+        } catch (error) {
+          console.error('[ConfirmarPresenca] Erro ao atualizar dados:', error);
+        }
 
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 3000);
+        // Marcar que precisa atualizar a lista geral
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('needsRefetch', 'true');
+          sessionStorage.setItem('lastUpdate', Date.now().toString());
+        }
+
+        setTimeout(() => {
+          // Redirecionar para a lista geral com parâmetro de atualização
+          router.push(`/dashboard/geral?updated=${Date.now()}`);
+        }, 2000);
+      } else {
+        throw new Error(result.message || 'Erro ao registrar comparecimento');
+      }
 
     } catch (err) {
       console.error('Erro ao confirmar comparecimento:', err);
@@ -446,7 +457,7 @@ function ConfirmarPresencaPage() {
                   />
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 </div>
-                
+
                 <button
                   onClick={buscarPessoa}
                   disabled={estado === 'buscando'}
@@ -533,7 +544,7 @@ function ConfirmarPresencaPage() {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           onClick={() => {
@@ -575,12 +586,12 @@ function ConfirmarPresencaPage() {
                               ⚠️ Atualizando endereço
                             </p>
                           </div>
-                          
+
                           <EnderecoForm
                             endereco={atualizacaoEndereco.endereco!}
                             onEnderecoChange={handleEnderecoChange}
                           />
-                          
+
                           <div className="mt-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               Motivo da alteração *
@@ -754,7 +765,7 @@ function ConfirmarPresencaPage() {
                   <Search className="w-5 h-5" />
                   Buscar Pessoa
                 </h3>
-                
+
                 <div className="flex gap-3">
                   <input
                     type="text"
@@ -808,7 +819,7 @@ function ConfirmarPresencaPage() {
                       <User className="w-5 h-5" />
                       Dados da Pessoa Selecionada
                     </h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 p-6 rounded-lg">
                       <div>
                         <p className="text-sm text-gray-500 mb-1">Nome Completo</p>
@@ -858,7 +869,7 @@ function ConfirmarPresencaPage() {
                               <p className="text-gray-600 text-sm mt-2">CEP: {custodiado.endereco.cep}</p>
                             </div>
                           )}
-                          
+
                           <div className="flex gap-4">
                             <button
                               onClick={() => {
@@ -904,12 +915,12 @@ function ConfirmarPresencaPage() {
                                 Atualização de endereço necessária
                               </p>
                             </div>
-                            
+
                             <EnderecoForm
                               endereco={atualizacaoEndereco.endereco!}
                               onEnderecoChange={handleEnderecoChange}
                             />
-                            
+
                             <div className="mt-4">
                               <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Motivo da alteração *

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback, useRef } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -141,7 +141,8 @@ export function ToastProvider({
 }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = (toast: Omit<Toast, 'id'>) => {
+  // CORREÇÃO: Usar useCallback com array de dependências vazio para função estável
+  const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newToast: Toast = {
       ...toast,
@@ -156,16 +157,15 @@ export function ToastProvider({
 
       const newToasts = [...prev, newToast];
       if (newToasts.length > maxToasts) {
-        // Remove os mais antigos
         return newToasts.slice(-maxToasts);
       }
       return newToasts;
     });
-  };
+  }, [maxToasts]);
 
-  const hideToast = (id: string) => {
+  const hideToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast, hideToast }}>
@@ -178,8 +178,9 @@ export function ToastProvider({
 // Hook personalizado para facilitar o uso
 export function useToastHelpers() {
   const { showToast } = useToast();
-
-  return {
+  
+  // Usar useRef para criar funções estáveis que não causam re-renders
+  const helpersRef = useRef({
     success: (title: string, message: string, duration?: number) =>
       showToast({ type: 'success', title, message, duration }),
 
@@ -192,7 +193,6 @@ export function useToastHelpers() {
     info: (title: string, message: string, duration?: number) =>
       showToast({ type: 'info', title, message, duration }),
 
-    // Específicos para exportação
     exportSuccess: (count: number, filename?: string) =>
       showToast({
         type: 'success',
@@ -208,5 +208,39 @@ export function useToastHelpers() {
         message: error,
         duration: 8000
       })
-  };
+  });
+
+  useEffect(() => {
+    helpersRef.current = {
+      success: (title: string, message: string, duration?: number) =>
+        showToast({ type: 'success', title, message, duration }),
+
+      error: (title: string, message: string, duration?: number) =>
+        showToast({ type: 'error', title, message, duration }),
+
+      warning: (title: string, message: string, duration?: number) =>
+        showToast({ type: 'warning', title, message, duration }),
+
+      info: (title: string, message: string, duration?: number) =>
+        showToast({ type: 'info', title, message, duration }),
+
+      exportSuccess: (count: number, filename?: string) =>
+        showToast({
+          type: 'success',
+          title: 'Exportação Concluída',
+          message: `${count} registros exportados com sucesso${filename ? ` em ${filename}` : ''}`,
+          duration: 6000
+        }),
+
+      exportError: (error: string) =>
+        showToast({
+          type: 'error',
+          title: 'Erro na Exportação',
+          message: error,
+          duration: 8000
+        })
+    };
+  }, [showToast]);
+
+  return helpersRef.current;
 }

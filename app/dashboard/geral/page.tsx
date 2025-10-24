@@ -100,7 +100,7 @@ function GeralPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  
+
   const dadosExtraidos = useMemo((): CustodiadoData[] => {
 
     if (loadingBackend || !custodiadosBackend) {
@@ -136,7 +136,7 @@ function GeralPage() {
     // CASO 3: Objeto com array em alguma propriedade
     if (typeof custodiadosBackend === 'object') {
       const possibleKeys = ['data', 'custodiados', 'items', 'results', 'content'];
-      
+
       for (const key of possibleKeys) {
         if (key in custodiadosBackend && Array.isArray((custodiadosBackend as any)[key])) {
           const arrayData = (custodiadosBackend as any)[key];
@@ -160,7 +160,7 @@ function GeralPage() {
     const transformarCustodiado = (custodiado: CustodiadoData): CustodiadoFormatado => {
       // Função auxiliar para garantir string
       const ensureString = (value: string | undefined | null): string => value || '';
-      
+
       // Função auxiliar para processar proximoComparecimento
       const processarProximoComparecimento = (valor: string | Date | undefined): string => {
         if (!valor) return '';
@@ -195,7 +195,7 @@ function GeralPage() {
           estado: custodiado.endereco.estado
         } : undefined,
         observacoes: custodiado.observacoes,
-        enderecoCompleto: custodiado.endereco 
+        enderecoCompleto: custodiado.endereco
           ? `${custodiado.endereco.logradouro}${custodiado.endereco.numero ? ', ' + custodiado.endereco.numero : ''}, ${custodiado.endereco.bairro} - ${custodiado.endereco.cidade}/${custodiado.endereco.estado}`
           : undefined,
         cidadeEstado: custodiado.endereco
@@ -223,6 +223,39 @@ function GeralPage() {
   }, [searchParams]);
 
   // Atualizar URL com filtros
+
+  useEffect(() => {
+    const updated = searchParams.get('updated');
+    const needsRefetch = typeof window !== 'undefined'
+      ? sessionStorage.getItem('needsRefetch')
+      : null;
+
+    if (updated || needsRefetch === 'true') {
+      console.log('[GeralPage] ✅ Detectado atualização recente, forçando refetch dos dados');
+
+      // Mostrar feedback visual ao usuário
+      showToast({
+        type: 'success',
+        title: 'Lista Atualizada',
+        message: 'Comparecimento registrado e dados atualizados com sucesso',
+        duration: 3000
+      });
+
+      // Forçar atualização dos dados
+      refetchCustodiados();
+
+      // Limpar flags e parâmetros da URL
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('needsRefetch');
+        sessionStorage.removeItem('lastUpdate');
+
+        // Limpar parâmetro da URL sem recarregar a página
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    }
+  }, [searchParams, showToast]);
+  
   useEffect(() => {
     const params = new URLSearchParams();
 
