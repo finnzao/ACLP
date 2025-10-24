@@ -4,6 +4,8 @@
 import { useState } from 'react';
 import { Download, FileSpreadsheet, Filter } from 'lucide-react';
 import { exportFilteredData } from '@/lib/utils/excelExport';
+import { exportFilteredHistorico } from '@/lib/utils/historicoExport';
+import type { ComparecimentoResponse } from '@/types/api';
 
 interface ExportButtonProps<T = any> {
   dados: T[];
@@ -16,13 +18,15 @@ interface ExportButtonProps<T = any> {
     dataFim?: string;
   };
   className?: string;
+  exportType?: 'custodiados' | 'historico'; // Identificar tipo de exportação
 }
 
 export default function ExportButton<T = any>({ 
   dados, 
   dadosFiltrados, 
   filterInfo,
-  className = ""
+  className = "",
+  exportType = 'custodiados'
 }: ExportButtonProps<T>) {
   const [isExporting, setIsExporting] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
@@ -31,20 +35,31 @@ export default function ExportButton<T = any>({
     value && value !== 'todos' && value !== ''
   );
 
-  const handleExport = async (exportType: 'all' | 'filtered') => {
+  const handleExport = async (exportMode: 'all' | 'filtered') => {
     setIsExporting(true);
     setShowOptions(false);
 
     try {
-      const dataToExport = exportType === 'filtered' ? dadosFiltrados : dados;
-      const result = exportFilteredData(
-        dados as any,
-        dataToExport as any,
-        exportType === 'filtered' ? filterInfo : undefined
-      );
+      const dataToExport = exportMode === 'filtered' ? dadosFiltrados : dados;
+      let result;
+
+      // Escolher função de exportação baseada no tipo
+      if (exportType === 'historico') {
+        result = exportFilteredHistorico(
+          dados as any as ComparecimentoResponse[],
+          dataToExport as any as ComparecimentoResponse[],
+          exportMode === 'filtered' ? filterInfo : undefined
+        );
+      } else {
+        result = exportFilteredData(
+          dados as any,
+          dataToExport as any,
+          exportMode === 'filtered' ? filterInfo : undefined
+        );
+      }
 
       if (result.success) {
-        console.log(`${result.message} (${result.count} registros)`);
+        console.log(`✅ ${result.message} (${result.count} registros)`);
       } else {
         console.error(`❌ ${result.message}`);
         alert(result.message);
@@ -164,8 +179,12 @@ export default function ExportButton<T = any>({
                   )}
                   {filterInfo?.status && filterInfo.status !== 'todos' && (
                     <div className="text-xs text-gray-600">
-                      <span className="font-medium">Status:</span> {
-                        filterInfo.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente'
+                      <span className="font-medium">
+                        {exportType === 'historico' ? 'Tipo:' : 'Status:'}
+                      </span> {
+                        exportType === 'historico' 
+                          ? formatarTipoValidacao(filterInfo.status)
+                          : (filterInfo.status === 'em conformidade' ? 'Em Conformidade' : 'Inadimplente')
                       }
                     </div>
                   )}
@@ -204,23 +223,44 @@ export default function ExportButton<T = any>({
   );
 }
 
+// Função auxiliar para formatar tipo de validação
+function formatarTipoValidacao(tipo: string): string {
+  const tipos: Record<string, string> = {
+    'presencial': 'Presencial',
+    'online': 'Online',
+    'cadastro_inicial': 'Cadastro Inicial'
+  };
+  return tipos[tipo.toLowerCase()] || tipo;
+}
+
 export function QuickExportButton<T = any>({ 
   dados, 
   label = "Exportar",
-  className = ""
+  className = "",
+  exportType = 'custodiados'
 }: {
   dados: T[];
   label?: string;
   className?: string;
+  exportType?: 'custodiados' | 'historico';
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleQuickExport = async () => {
     setIsExporting(true);
     try {
-      const result = exportFilteredData(dados as any, dados as any);
+      let result;
+      
+      if (exportType === 'historico') {
+        result = exportFilteredHistorico(
+          dados as any as ComparecimentoResponse[],
+          dados as any as ComparecimentoResponse[]
+        );
+      } else {
+        result = exportFilteredData(dados as any, dados as any);
+      }
+      
       if (result.success) {
-        console.log(`${result.message}`);
       } else {
         alert(result.message);
       }

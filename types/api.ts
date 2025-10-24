@@ -571,7 +571,6 @@ export interface ComparecimentoResponse {
   id: number;
   custodiadoId: number;
   custodiadoNome?: string;
-  nomeCustodiado?: string;
   processoCustodiado?: string;
   dataComparecimento: string;
   horaComparecimento?: string;

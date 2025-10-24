@@ -335,6 +335,7 @@ function HistoricoPage() {
                   dados={historicos}
                   dadosFiltrados={dadosFiltrados}
                   filterInfo={filterInfo}
+                  exportType="historico"
                 />
               </div>
             )}
@@ -492,6 +493,7 @@ function HistoricoPage() {
                   dados={historicos}
                   dadosFiltrados={dadosFiltrados}
                   filterInfo={filterInfo}
+                  exportType="historico"
                 />
               </div>
             </div>
