@@ -40,6 +40,7 @@ import {
 } from '@/types/comparecimento';
 
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
+import { authService } from '@/lib/api/authService'; // ✅ Importar authService
 
 
 declare global {
@@ -76,12 +77,15 @@ function ConfirmarPresencaPage() {
   const [resultadosBusca, setResultadosBusca] = useState<CustodiadoData[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
+  // ✅ Estado para armazenar o nome do usuário logado
+  const [nomeUsuarioLogado, setNomeUsuarioLogado] = useState<string>('');
+
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
     dataComparecimento: dateUtils.getCurrentDate(),
     horaComparecimento: dateUtils.getCurrentTime(),
     tipoValidacao: TipoValidacao.PRESENCIAL,
     observacoes: '',
-    validadoPor: 'Servidor Atual'
+    validadoPor: '' // ✅ Inicialmente vazio, será preenchido com o nome do usuário
   });
 
   const [atualizacaoEndereco, setAtualizacaoEndereco] = useState<AtualizacaoEndereco>({
@@ -103,6 +107,42 @@ function ConfirmarPresencaPage() {
 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // ✅ Carregar dados do usuário logado ao montar o componente
+  useEffect(() => {
+    const carregarUsuarioLogado = () => {
+      try {
+        const userData = authService.getUserData();
+        
+        if (userData && userData.nome) {
+          console.log('[ConfirmarPresenca] 👤 Usuário logado:', userData.nome);
+          setNomeUsuarioLogado(userData.nome);
+          
+          // Atualizar o formulário com o nome do usuário
+          setFormulario(prev => ({
+            ...prev,
+            validadoPor: userData.nome
+          }));
+        } else {
+          console.warn('[ConfirmarPresenca] ⚠️ Usuário não encontrado, usando padrão');
+          setNomeUsuarioLogado('Servidor Atual');
+          setFormulario(prev => ({
+            ...prev,
+            validadoPor: 'Servidor Atual'
+          }));
+        }
+      } catch (err) {
+        console.error('[ConfirmarPresenca] ❌ Erro ao carregar usuário:', err);
+        setNomeUsuarioLogado('Servidor Atual');
+        setFormulario(prev => ({
+          ...prev,
+          validadoPor: 'Servidor Atual'
+        }));
+      }
+    };
+
+    carregarUsuarioLogado();
+  }, []); // Executa apenas uma vez ao montar
 
   const normalizarTexto = useCallback((texto: string): string => {
     return texto
@@ -220,6 +260,11 @@ function ConfirmarPresencaPage() {
     }
 
     if (atualizacaoEndereco.houveAlteracao) {
+      console.log('[ConfirmarPresenca] 🏠 Validando mudança de endereço:', {
+        endereco: atualizacaoEndereco.endereco,
+        motivo: atualizacaoEndereco.motivoAlteracao
+      });
+
       if (!atualizacaoEndereco.endereco?.cep ||
         !atualizacaoEndereco.endereco?.logradouro ||
         !atualizacaoEndereco.endereco?.bairro ||
@@ -233,12 +278,20 @@ function ConfirmarPresencaPage() {
         error('Motivo inválido', 'O motivo da alteração deve ter pelo menos 10 caracteres');
         return;
       }
+
+      console.log('[ConfirmarPresenca] ✅ Validação de mudança de endereço OK');
     }
 
     setEstado('buscando');
 
     try {
       const horaFormatada = formatarHoraParaAPI(formulario.horaComparecimento);
+
+      console.log('[ConfirmarPresenca] 📦 Construindo payload com:', {
+        mudancaEndereco: atualizacaoEndereco.houveAlteracao,
+        endereco: atualizacaoEndereco.endereco,
+        motivo: atualizacaoEndereco.motivoAlteracao
+      });
 
       const dadosComparecimento: ComparecimentoDTO = {
         custodiadoId: custodiado.id,
@@ -247,7 +300,8 @@ function ConfirmarPresencaPage() {
         tipoValidacao: formulario.tipoValidacao,
         validadoPor: formulario.validadoPor.trim() || 'Sistema',
         observacoes: formulario.observacoes?.trim() || undefined,
-        motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao!,
+        mudancaEndereco: atualizacaoEndereco.houveAlteracao, // ✅ Campo adicionado
+        motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao,
         novoEndereco: atualizacaoEndereco.houveAlteracao ? {
           cep: atualizacaoEndereco.endereco!.cep,
           logradouro: atualizacaoEndereco.endereco!.logradouro,
@@ -259,6 +313,8 @@ function ConfirmarPresencaPage() {
 
         } : undefined
       };
+
+      console.log('[ConfirmarPresenca] 📤 Payload final:', JSON.stringify(dadosComparecimento, null, 2));
 
       const dadosValidados = validateBeforeSend(dadosComparecimento);
       const dadosLimpos = sanitizeFormData(dadosValidados);
@@ -314,9 +370,11 @@ function ConfirmarPresencaPage() {
   };
 
   const handleEnderecoChange = (novoEndereco: Partial<Endereco>) => {
+    console.log('[ConfirmarPresenca] 📝 Atualizando endereço:', novoEndereco);
+    
     setAtualizacaoEndereco(prev => ({
       ...prev,
-      novoEndereco: {
+      endereco: {  // ✅ CORRIGIDO: era 'novoEndereco'
         ...prev.endereco,
         ...novoEndereco
       } as Endereco
@@ -889,9 +947,10 @@ function ConfirmarPresencaPage() {
                             <button
                               onClick={() => {
                                 setEnderecoRespondido(true);
+                                // ✅ CORRIGIDO: Inicializar com endereço VAZIO
                                 setAtualizacaoEndereco({
                                   houveAlteracao: true,
-                                  endereco: custodiado.endereco || {
+                                  endereco: {
                                     cep: '',
                                     logradouro: '',
                                     numero: '',
@@ -901,6 +960,7 @@ function ConfirmarPresencaPage() {
                                     estado: ''
                                   }
                                 });
+                                console.log('[ConfirmarPresenca] 🏠 Mudança de endereço iniciada - formulário vazio');
                               }}
                               className="flex-1 bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium flex items-center justify-center gap-2"
                             >
@@ -1007,14 +1067,17 @@ function ConfirmarPresencaPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Validado por *
                         </label>
-                        <input
-                          type="text"
-                          value={formulario.validadoPor}
-                          onChange={(e) => handleInputChange('validadoPor', e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          placeholder="Nome do servidor responsável"
-                          required
-                        />
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                          <input
+                            type="text"
+                            value={formulario.validadoPor}
+                            readOnly
+                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                            placeholder="Nome do servidor responsável"
+                            title={`Usuário logado: ${nomeUsuarioLogado}`}
+                          />
+                        </div>
                       </div>
 
                       <div>
