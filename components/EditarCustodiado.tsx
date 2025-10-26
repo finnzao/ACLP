@@ -26,6 +26,10 @@ interface ValidationErrors {
   [key: string]: string;
 }
 
+// ===========================
+// FORMATAÇÃO DE PROCESSO CNJ
+// ===========================
+
 const formatProcessoCNJ = (processo: string): string => {
   if (!processo) return '';
 
@@ -120,6 +124,10 @@ const isValidProcessoCNJ = (processo: string): boolean => {
   return true;
 };
 
+// ===========================
+// COMPONENTE PRINCIPAL
+// ===========================
+
 export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave }: Props) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -150,6 +158,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     typeof dados.periodicidade === 'number' ? dados.periodicidade : 30
   );
 
+  // ===========================
+  // CARREGAR DADOS COMPLETOS
+  // ===========================
+
   useEffect(() => {
     const carregarDadosCompletos = async () => {
       if (!dados.id) {
@@ -164,8 +176,8 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         console.log('Buscando dados completos para ID:', custodiadoId);
 
         const custodiadoRequest = await custodiadosService.buscarPorId(custodiadoId);
-        const custodiado = custodiadoRequest?.data
-         // { };
+        const custodiado = custodiadoRequest?.data;
+        
         if (custodiado) {
           console.log('Dados completos recebidos:', custodiado);
 
@@ -233,6 +245,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     carregarDadosCompletos();
   }, [dados.id, showToast, dados]);
 
+  // ===========================
+  // UTILITÁRIOS
+  // ===========================
+
   function formatDateForInput(date: string | Date | null | undefined): string {
     if (!date) return '';
 
@@ -245,15 +261,23 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }
   }
 
+  // ===========================
+  // VALIDAÇÃO DO FORMULÁRIO
+  // ===========================
+
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
 
+    // Validação de Nome (2-150 caracteres)
     if (!form.nome?.trim()) {
       newErrors.nome = 'Nome é obrigatório';
     } else if (form.nome.trim().length < 2) {
       newErrors.nome = 'Nome deve ter pelo menos 2 caracteres';
+    } else if (form.nome.trim().length > 150) {
+      newErrors.nome = 'Nome deve ter no máximo 150 caracteres';
     }
 
+    // Validação de Processo
     if (!form.processo?.trim()) {
       newErrors.processo = 'Processo é obrigatório';
     } else {
@@ -275,6 +299,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
+    // Validação de Documentos (CPF e/ou RG)
     const cpfLimpo = String(form.cpf || '').replace(/\D/g, '');
     const rgLimpo = String(form.rg || '').replace(/\D/g, '');
 
@@ -286,77 +311,178 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       newErrors.cpf = 'CPF inválido';
     }
 
+    if (rgLimpo && rgLimpo.length > 20) {
+      newErrors.rg = 'RG deve ter no máximo 20 caracteres';
+    }
+
+    // Validação de Contato
     if (!form.contato?.trim()) {
       newErrors.contato = 'Contato é obrigatório';
     } else if (!ValidationPhone(String(form.contato))) {
-      newErrors.contato = 'Telefone inválido';
+      newErrors.contato = 'Telefone deve ter 10 ou 11 dígitos';
     }
 
+    // Validação de Vara (máx 100 caracteres)
     if (!form.vara?.trim()) {
       newErrors.vara = 'Vara é obrigatória';
+    } else if (form.vara.trim().length > 100) {
+      newErrors.vara = 'Vara deve ter no máximo 100 caracteres';
     }
 
+    // Validação de Comarca (máx 100 caracteres)
     if (!form.comarca?.trim()) {
       newErrors.comarca = 'Comarca é obrigatória';
+    } else if (form.comarca.trim().length > 100) {
+      newErrors.comarca = 'Comarca deve ter no máximo 100 caracteres';
     }
 
+    // Validação de Data da Decisão
     if (!form.decisao) {
       newErrors.decisao = 'Data da decisão é obrigatória';
+    } else {
+      const dataDecisao = new Date(form.decisao);
+      const hoje = new Date();
+      
+      if (dataDecisao > hoje) {
+        newErrors.decisao = 'Data da decisão não pode ser futura';
+      }
     }
 
+    // Validação de Periodicidade (1-365 dias)
     if (periodicidadePersonalizada < 1) {
       newErrors.periodicidade = 'Periodicidade deve ser maior que zero';
     } else if (periodicidadePersonalizada > 365) {
       newErrors.periodicidade = 'Periodicidade não pode ser maior que 365 dias';
     }
 
+    // Validação de Status
     if (!form.status) {
       newErrors.status = 'Status é obrigatório';
     }
 
+    // Validação de Último Comparecimento
     if (!form.ultimoComparecimento) {
       newErrors.ultimoComparecimento = 'Último comparecimento é obrigatório';
+    } else {
+      const ultimoComp = new Date(form.ultimoComparecimento);
+      const hoje = new Date();
+      
+      if (ultimoComp > hoje) {
+        newErrors.ultimoComparecimento = 'Último comparecimento não pode ser futuro';
+      }
     }
 
+    // Validação de Próximo Comparecimento
     if (!form.proximoComparecimento) {
       newErrors.proximoComparecimento = 'Próximo comparecimento é obrigatório';
+    } else if (form.ultimoComparecimento) {
+      const proximoComp = new Date(form.proximoComparecimento);
+      const ultimoComp = new Date(form.ultimoComparecimento);
+      
+      if (proximoComp <= ultimoComp) {
+        newErrors.proximoComparecimento = 'Próximo comparecimento deve ser posterior ao último';
+      }
     }
 
+    // Validação de Endereço
     if (form.endereco) {
+      // CEP (obrigatório, formato 00000-000)
       if (!form.endereco.cep?.trim()) {
         newErrors.cep = 'CEP é obrigatório';
       } else if (!ValidationCEP(String(form.endereco.cep))) {
-        newErrors.cep = 'CEP inválido';
+        newErrors.cep = 'CEP inválido (formato: 00000-000)';
       }
 
+      // Logradouro (5-200 caracteres)
       if (!form.endereco.logradouro?.trim()) {
         newErrors.logradouro = 'Logradouro é obrigatório';
+      } else if (form.endereco.logradouro.trim().length < 5) {
+        newErrors.logradouro = 'Logradouro deve ter pelo menos 5 caracteres';
+      } else if (form.endereco.logradouro.trim().length > 200) {
+        newErrors.logradouro = 'Logradouro deve ter no máximo 200 caracteres';
       }
 
+      // Número (opcional, máx 20 caracteres)
+      if (form.endereco.numero?.trim() && form.endereco.numero.trim().length > 20) {
+        newErrors.numero = 'Número deve ter no máximo 20 caracteres';
+      }
+
+      // Complemento (opcional, 3-100 caracteres)
+      if (form.endereco.complemento?.trim()) {
+        const compTrimmed = form.endereco.complemento.trim();
+        if (compTrimmed.length < 3) {
+          newErrors.complemento = 'Complemento deve ter pelo menos 3 caracteres';
+        } else if (compTrimmed.length > 100) {
+          newErrors.complemento = 'Complemento deve ter no máximo 100 caracteres';
+        }
+      }
+
+      // Bairro (2-100 caracteres)
       if (!form.endereco.bairro?.trim()) {
         newErrors.bairro = 'Bairro é obrigatório';
+      } else if (form.endereco.bairro.trim().length < 2) {
+        newErrors.bairro = 'Bairro deve ter pelo menos 2 caracteres';
+      } else if (form.endereco.bairro.trim().length > 100) {
+        newErrors.bairro = 'Bairro deve ter no máximo 100 caracteres';
       }
 
+      // Cidade (2-100 caracteres)
       if (!form.endereco.cidade?.trim()) {
         newErrors.cidade = 'Cidade é obrigatória';
+      } else if (form.endereco.cidade.trim().length < 2) {
+        newErrors.cidade = 'Cidade deve ter pelo menos 2 caracteres';
+      } else if (form.endereco.cidade.trim().length > 100) {
+        newErrors.cidade = 'Cidade deve ter no máximo 100 caracteres';
       }
 
+      // Estado (2 caracteres, sigla válida)
       if (!form.endereco.estado?.trim()) {
         newErrors.estado = 'Estado é obrigatório';
+      } else if (form.endereco.estado.trim().length !== 2) {
+        newErrors.estado = 'Estado deve ter 2 caracteres (sigla)';
+      } else {
+        const estadosValidos = Object.values(EstadoBrasil);
+        if (!estadosValidos.includes(form.endereco.estado.toUpperCase() as EstadoBrasil)) {
+          newErrors.estado = 'Sigla de estado inválida';
+        }
       }
+    }
+
+    // Validação de Observações (opcional, máx 500 caracteres)
+    if (form.observacoes && form.observacoes.trim().length > 500) {
+      newErrors.observacoes = 'Observações deve ter no máximo 500 caracteres';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // ===========================
+  // HANDLERS
+  // ===========================
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
 
+    // Limpar erro do campo quando ele é modificado
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
 
+    // Limpar erro de documentos quando CPF ou RG são modificados
+    if ((name === 'cpf' || name === 'rg') && errors.documentos) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.documentos;
+        return newErrors;
+      });
+    }
+
+    // Aplicar formatação automática conforme o campo
     const formatters: Record<string, (v: string) => string> = {
       cpf: FormattingCPF,
       rg: FormattingRG,
@@ -371,18 +497,36 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
   function handleEnderecoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
 
+    // Limpar erro do campo quando ele é modificado
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
 
     let formattedValue = value;
 
+    // Formatação automática de CEP
     if (name === 'cep') {
       formattedValue = FormattingCEP(value);
+      
+      // Buscar endereço automaticamente quando CEP estiver completo
+      const cepLimpo = formattedValue.replace(/\D/g, '');
+      if (cepLimpo.length === 8) {
+        buscarEnderecoPorCEP(formattedValue);
+      }
     }
 
+    // Formatação automática de Estado (uppercase, máx 2 caracteres)
     if (name === 'estado') {
       formattedValue = value.toUpperCase().slice(0, 2);
+    }
+
+    // Limitação de caracteres para número
+    if (name === 'numero') {
+      formattedValue = value.replace(/\D/g, '').slice(0, 20);
     }
 
     setForm(prev => ({
@@ -417,27 +561,57 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           }
         }));
 
+        // Limpar erros de endereço após preenchimento automático
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.logradouro;
+          delete newErrors.bairro;
+          delete newErrors.cidade;
+          delete newErrors.estado;
+          return newErrors;
+        });
+
         showToast({
           type: 'success',
           title: 'CEP encontrado',
           message: 'Endereço preenchido automaticamente',
           duration: 3000
         });
+      } else {
+        showToast({
+          type: 'warning',
+          title: 'CEP não encontrado',
+          message: 'Preencha o endereço manualmente',
+          duration: 3000
+        });
       }
     } catch (error) {
       console.error('Erro ao buscar CEP:', error);
+      showToast({
+        type: 'error',
+        title: 'Erro ao buscar CEP',
+        message: 'Verifique sua conexão e tente novamente',
+        duration: 3000
+      });
     } finally {
       setLoading(false);
     }
   }
 
   function handlePeriodicidadeChange(value: string) {
-    const numValue = parseInt(value) || 0;
+    // Permitir apenas números
+    const numValue = parseInt(value.replace(/\D/g, '')) || 0;
 
+    // Limpar erro quando o campo é modificado
     if (errors.periodicidade) {
-      setErrors(prev => ({ ...prev, periodicidade: '' }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.periodicidade;
+        return newErrors;
+      });
     }
 
+    // Validar limite máximo
     if (numValue > 365) {
       setErrors(prev => ({ ...prev, periodicidade: 'Máximo de 365 dias' }));
       return;
@@ -457,6 +631,14 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         message: 'Verifique os campos destacados e tente novamente',
         duration: 5000
       });
+      
+      // Scroll para o primeiro erro
+      const firstErrorField = Object.keys(errors)[0];
+      const element = document.querySelector(`[name="${firstErrorField}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
       return;
     }
 
@@ -526,6 +708,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }
   }
 
+  // ===========================
+  // LOADING STATE
+  // ===========================
+
   if (loadingData) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
@@ -539,33 +725,41 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     );
   }
 
+  // ===========================
+  // RENDER
+  // ===========================
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 overflow-y-auto">
       <form
         onSubmit={handleSubmit}
-        className="relative bg-white p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+        className="relative bg-white p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8"
       >
-        <div className="flex items-center justify-between mb-6 pb-4 border-b">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 pb-4 border-b sticky top-0 bg-white z-10">
           <h3 className="text-2xl font-bold text-primary-dark">Editar Dados do Custodiado</h3>
           <button
             onClick={onClose}
             type="button"
             disabled={loading}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+            aria-label="Fechar"
           >
             <X size={24} />
           </button>
         </div>
 
+        {/* Alerta de Documentos */}
         {errors.documentos && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
               <p className="text-sm text-red-700">{errors.documentos}</p>
             </div>
           </div>
         )}
 
+        {/* Dados Pessoais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <User className="w-5 h-5 text-primary" />
@@ -573,63 +767,82 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Nome */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nome <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.nome ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.nome ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="nome"
                 value={form.nome || ''}
                 onChange={handleChange}
                 disabled={loading}
+                maxLength={150}
+                placeholder="Nome completo"
+                autoComplete="name"
               />
               {errors.nome && <p className="text-red-500 text-xs mt-1">{errors.nome}</p>}
+              <p className="text-gray-500 text-xs mt-1">{(form.nome || '').length}/150 caracteres</p>
             </div>
 
+            {/* Contato */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Contato <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.contato ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.contato ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="contato"
                 value={form.contato || ''}
                 onChange={handleChange}
                 placeholder="(00) 00000-0000"
                 disabled={loading}
+                maxLength={15}
+                autoComplete="tel"
               />
               {errors.contato && <p className="text-red-500 text-xs mt-1">{errors.contato}</p>}
             </div>
 
+            {/* CPF */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                CPF {!form.rg?.trim() && <span className="text-red-500">*</span>}
+              </label>
               <input
-                className={`w-full border ${errors.cpf ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.cpf ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="cpf"
                 value={String(form.cpf || '')}
                 onChange={handleChange}
                 placeholder="000.000.000-00"
                 disabled={loading}
+                maxLength={14}
+                autoComplete="off"
               />
               {errors.cpf && <p className="text-red-500 text-xs mt-1">{errors.cpf}</p>}
             </div>
 
+            {/* RG */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">RG</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                RG {!form.cpf?.trim() && <span className="text-red-500">*</span>}
+              </label>
               <input
-                className={`w-full border ${errors.rg ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.rg ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="rg"
                 value={String(form.rg || '')}
                 onChange={handleChange}
                 placeholder="00.000.000-0"
                 disabled={loading}
+                maxLength={20}
+                autoComplete="off"
               />
               {errors.rg && <p className="text-red-500 text-xs mt-1">{errors.rg}</p>}
             </div>
           </div>
         </div>
 
+        {/* Dados Processuais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-primary" />
@@ -637,17 +850,20 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Número do Processo */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Número do Processo <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.processo ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono`}
+                className={`w-full border ${errors.processo ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono transition-colors`}
                 name="processo"
                 value={form.processo || ''}
                 onChange={handleChange}
                 placeholder="0000000-00.0000.0.00.0000"
                 disabled={loading}
+                maxLength={25}
+                autoComplete="off"
               />
               {errors.processo && <p className="text-red-500 text-xs mt-1">{errors.processo}</p>}
               <p className="text-gray-500 text-xs mt-1">
@@ -655,60 +871,70 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               </p>
             </div>
 
+            {/* Data da Decisão */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Data da Decisão <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                className={`w-full border ${errors.decisao ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.decisao ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="decisao"
                 value={form.decisao || ''}
                 onChange={handleChange}
                 disabled={loading}
+                max={new Date().toISOString().split('T')[0]}
               />
               {errors.decisao && <p className="text-red-500 text-xs mt-1">{errors.decisao}</p>}
             </div>
 
+            {/* Vara */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vara <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.vara ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.vara ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="vara"
                 value={form.vara || ''}
                 onChange={handleChange}
                 disabled={loading}
+                maxLength={100}
+                placeholder="Ex: 1ª Vara Criminal"
               />
               {errors.vara && <p className="text-red-500 text-xs mt-1">{errors.vara}</p>}
             </div>
 
+            {/* Comarca */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Comarca <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.comarca ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.comarca ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="comarca"
                 value={form.comarca || ''}
                 onChange={handleChange}
                 disabled={loading}
+                maxLength={100}
+                placeholder="Ex: Salvador"
               />
               {errors.comarca && <p className="text-red-500 text-xs mt-1">{errors.comarca}</p>}
             </div>
 
+            {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Status <span className="text-red-500">*</span>
               </label>
               <select
-                className={`w-full border ${errors.status ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.status ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="status"
                 value={form.status || ''}
                 onChange={handleChange}
                 disabled={loading}
               >
+                <option value="">Selecione</option>
                 <option value="em conformidade">Em Conformidade</option>
                 <option value="inadimplente">Inadimplente</option>
               </select>
@@ -717,6 +943,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
+        {/* Periodicidade e Datas */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-primary" />
@@ -724,6 +951,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Periodicidade */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <Hash className="w-4 h-4 inline mr-1" />
@@ -733,47 +961,53 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
                 type="number"
                 min="1"
                 max="365"
-                className={`w-full border ${errors.periodicidade ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.periodicidade ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 value={periodicidadePersonalizada}
                 onChange={(e) => handlePeriodicidadeChange(e.target.value)}
                 disabled={loading}
+                placeholder="Ex: 30"
               />
               {errors.periodicidade && <p className="text-red-500 text-xs mt-1">{errors.periodicidade}</p>}
-              <p className="text-gray-500 text-xs mt-1">Digite o número de dias entre comparecimentos</p>
+              <p className="text-gray-500 text-xs mt-1">Digite o número de dias entre comparecimentos (1-365)</p>
             </div>
 
+            {/* Último Comparecimento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Último Comparecimento <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                className={`w-full border ${errors.ultimoComparecimento ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.ultimoComparecimento ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="ultimoComparecimento"
                 value={form.ultimoComparecimento || ''}
                 onChange={handleChange}
                 disabled={loading}
+                max={new Date().toISOString().split('T')[0]}
               />
               {errors.ultimoComparecimento && <p className="text-red-500 text-xs mt-1">{errors.ultimoComparecimento}</p>}
             </div>
 
+            {/* Próximo Comparecimento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Próximo Comparecimento <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                className={`w-full border ${errors.proximoComparecimento ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.proximoComparecimento ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="proximoComparecimento"
                 value={form.proximoComparecimento || ''}
                 onChange={handleChange}
                 disabled={loading}
+                min={form.ultimoComparecimento || undefined}
               />
               {errors.proximoComparecimento && <p className="text-red-500 text-xs mt-1">{errors.proximoComparecimento}</p>}
             </div>
           </div>
         </div>
 
+        {/* Endereço */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-primary" />
@@ -781,128 +1015,155 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* CEP */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 CEP <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.cep ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.cep ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="cep"
                 value={form.endereco?.cep || ''}
                 onChange={handleEnderecoChange}
-                onBlur={(e) => buscarEnderecoPorCEP(e.target.value)}
                 placeholder="00000-000"
                 maxLength={9}
                 disabled={loading}
+                autoComplete="postal-code"
               />
               {errors.cep && <p className="text-red-500 text-xs mt-1">{errors.cep}</p>}
               <p className="text-gray-500 text-xs mt-1">Digite o CEP para buscar o endereço</p>
             </div>
 
+            {/* Logradouro */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Logradouro <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.logradouro ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.logradouro ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="logradouro"
                 value={form.endereco?.logradouro || ''}
                 onChange={handleEnderecoChange}
                 disabled={loading}
+                maxLength={200}
+                placeholder="Ex: Rua das Flores"
+                autoComplete="street-address"
               />
               {errors.logradouro && <p className="text-red-500 text-xs mt-1">{errors.logradouro}</p>}
             </div>
 
+            {/* Número */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
               <input
-                className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                 name="numero"
                 value={form.endereco?.numero || ''}
                 onChange={handleEnderecoChange}
                 disabled={loading}
+                maxLength={20}
+                placeholder="S/N"
               />
+              {errors.numero && <p className="text-red-500 text-xs mt-1">{errors.numero}</p>}
             </div>
 
+            {/* Complemento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
               <input
-                className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className={`w-full border ${errors.complemento ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="complemento"
                 value={form.endereco?.complemento || ''}
                 onChange={handleEnderecoChange}
                 disabled={loading}
+                maxLength={100}
+                placeholder="Ex: Apto 101"
               />
+              {errors.complemento && <p className="text-red-500 text-xs mt-1">{errors.complemento}</p>}
             </div>
 
+            {/* Bairro */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Bairro <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.bairro ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.bairro ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="bairro"
                 value={form.endereco?.bairro || ''}
                 onChange={handleEnderecoChange}
                 disabled={loading}
+                maxLength={100}
+                placeholder="Ex: Centro"
               />
               {errors.bairro && <p className="text-red-500 text-xs mt-1">{errors.bairro}</p>}
             </div>
 
+            {/* Cidade */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Cidade <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.cidade ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.cidade ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="cidade"
                 value={form.endereco?.cidade || ''}
                 onChange={handleEnderecoChange}
                 disabled={loading}
+                maxLength={100}
+                placeholder="Ex: Salvador"
+                autoComplete="address-level2"
               />
               {errors.cidade && <p className="text-red-500 text-xs mt-1">{errors.cidade}</p>}
             </div>
 
+            {/* Estado */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Estado (UF) <span className="text-red-500">*</span>
               </label>
               <input
-                className={`w-full border ${errors.estado ? 'border-red-500' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent`}
+                className={`w-full border ${errors.estado ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent uppercase transition-colors`}
                 name="estado"
                 value={form.endereco?.estado || ''}
                 onChange={handleEnderecoChange}
                 placeholder="BA"
                 maxLength={2}
                 disabled={loading}
+                autoComplete="address-level1"
               />
               {errors.estado && <p className="text-red-500 text-xs mt-1">{errors.estado}</p>}
+              <p className="text-gray-500 text-xs mt-1">Sigla do estado (2 letras)</p>
             </div>
           </div>
         </div>
 
+        {/* Observações */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
           <textarea
-            className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className={`w-full border ${errors.observacoes ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none transition-colors`}
             name="observacoes"
             value={form.observacoes || ''}
             onChange={handleChange}
             rows={3}
             maxLength={500}
             disabled={loading}
+            placeholder="Informações adicionais relevantes"
           />
+          {errors.observacoes && <p className="text-red-500 text-xs mt-1">{errors.observacoes}</p>}
           <p className="text-gray-500 text-xs mt-1">
             {(form.observacoes || '').length}/500 caracteres
           </p>
         </div>
 
-        <div className="pt-4 flex justify-between border-t">
+        {/* Footer com Botões */}
+        <div className="pt-4 flex justify-between border-t sticky bottom-0 bg-white">
           <button
             type="button"
             onClick={onVoltar}
             disabled={loading}
-            className="bg-gray-200 text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-gray-200 text-gray-700 px-6 py-2.5 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             Voltar
           </button>
@@ -910,7 +1171,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           <button
             type="submit"
             disabled={loading}
-            className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
           >
             {loading ? (
               <>

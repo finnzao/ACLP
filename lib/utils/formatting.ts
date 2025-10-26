@@ -270,3 +270,39 @@ export const FormattingSanitizeComparecimento = (data: any): any => {
     }
   };
 };
+
+
+
+/**
+ * Garante que a data seja enviada APENAS no formato YYYY-MM-DD
+ * Remove qualquer informação de hora, timezone ou timestamp
+ * 
+ * @param dataInput - Data em qualquer formato (string, Date, ISO)
+ * @returns String no formato YYYY-MM-DD
+ */
+export const normalizarDataParaEnvio = (dataInput: string | Date): string => {
+  // Se for string no formato correto, retornar direto
+  if (typeof dataInput === 'string' && dataInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dataInput;
+  }
+
+  // Se for string com hora/timezone, limpar
+  if (typeof dataInput === 'string') {
+    return dataInput.split('T')[0].split(' ')[0];
+  }
+
+  // Se for Date object, extrair apenas YYYY-MM-DD
+  if (dataInput instanceof Date) {
+    const year = dataInput.getFullYear();
+    const month = String(dataInput.getMonth() + 1).padStart(2, '0');
+    const day = String(dataInput.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Fallback: retornar data atual
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};

@@ -40,7 +40,11 @@ import {
 } from '@/types/comparecimento';
 
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
-import { authService } from '@/lib/api/authService'; // ✅ Importar authService
+import { authService } from '@/lib/api/authService';
+import { normalizarDataParaEnvio } from '@/lib/utils/formatting';
+
+
+
 
 
 declare global {
@@ -77,7 +81,6 @@ function ConfirmarPresencaPage() {
   const [resultadosBusca, setResultadosBusca] = useState<CustodiadoData[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
-  // ✅ Estado para armazenar o nome do usuário logado
   const [nomeUsuarioLogado, setNomeUsuarioLogado] = useState<string>('');
 
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
@@ -85,7 +88,7 @@ function ConfirmarPresencaPage() {
     horaComparecimento: dateUtils.getCurrentTime(),
     tipoValidacao: TipoValidacao.PRESENCIAL,
     observacoes: '',
-    validadoPor: '' // ✅ Inicialmente vazio, será preenchido com o nome do usuário
+    validadoPor: ''
   });
 
   const [atualizacaoEndereco, setAtualizacaoEndereco] = useState<AtualizacaoEndereco>({
@@ -113,11 +116,11 @@ function ConfirmarPresencaPage() {
     const carregarUsuarioLogado = () => {
       try {
         const userData = authService.getUserData();
-        
+
         if (userData && userData.nome) {
           console.log('[ConfirmarPresenca] 👤 Usuário logado:', userData.nome);
           setNomeUsuarioLogado(userData.nome);
-          
+
           // Atualizar o formulário com o nome do usuário
           setFormulario(prev => ({
             ...prev,
@@ -287,12 +290,31 @@ function ConfirmarPresencaPage() {
     try {
       const horaFormatada = formatarHoraParaAPI(formulario.horaComparecimento);
 
+      const dataParaEnvio = normalizarDataParaEnvio(formulario.dataComparecimento);
+
+      console.log('[ConfirmarPresenca] 📅 Dados temporais sendo enviados:', {
+        dataOriginal: formulario.dataComparecimento,
+        dataProcessada: dataParaEnvio,
+        horaOriginal: formulario.horaComparecimento,
+        horaProcessada: horaFormatada,
+        validacao: {
+          dataFormatoCorreto: /^\d{4}-\d{2}-\d{2}$/.test(dataParaEnvio),
+          horaFormatoCorreto: /^\d{2}:\d{2}:\d{2}$/.test(horaFormatada),
+          temTimezone: dataParaEnvio.includes('T') || dataParaEnvio.includes('Z'),
+        }
+      });
+
+      if (dataParaEnvio.includes('T') || dataParaEnvio.includes('Z')) {
+        error('Erro de formato', 'Data inválida detectada');
+        setEstado('inicial');
+        return;
+      }
+
       console.log('[ConfirmarPresenca] 📦 Construindo payload com:', {
         mudancaEndereco: atualizacaoEndereco.houveAlteracao,
         endereco: atualizacaoEndereco.endereco,
         motivo: atualizacaoEndereco.motivoAlteracao
       });
-
       const dadosComparecimento: ComparecimentoDTO = {
         custodiadoId: custodiado.id,
         dataComparecimento: formulario.dataComparecimento,
@@ -300,7 +322,7 @@ function ConfirmarPresencaPage() {
         tipoValidacao: formulario.tipoValidacao,
         validadoPor: formulario.validadoPor.trim() || 'Sistema',
         observacoes: formulario.observacoes?.trim() || undefined,
-        mudancaEndereco: atualizacaoEndereco.houveAlteracao, // ✅ Campo adicionado
+        mudancaEndereco: atualizacaoEndereco.houveAlteracao,
         motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao,
         novoEndereco: atualizacaoEndereco.houveAlteracao ? {
           cep: atualizacaoEndereco.endereco!.cep,
@@ -358,7 +380,7 @@ function ConfirmarPresencaPage() {
       console.error('Erro ao confirmar comparecimento:', err);
       setEstado('erro');
       setMensagem(err instanceof Error ? err.message : 'Erro desconhecido ao confirmar comparecimento');
-      error('Erro', 'Não foi possível registrar o comparecimento');
+      error('Err  o', 'Não foi possível registrar o comparecimento');
     }
   };
 
@@ -371,7 +393,7 @@ function ConfirmarPresencaPage() {
 
   const handleEnderecoChange = (novoEndereco: Partial<Endereco>) => {
     console.log('[ConfirmarPresenca] 📝 Atualizando endereço:', novoEndereco);
-    
+
     setAtualizacaoEndereco(prev => ({
       ...prev,
       endereco: {  // ✅ CORRIGIDO: era 'novoEndereco'
