@@ -1,142 +1,253 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Lock,CheckCircle, XCircle, Loader2, Shield } from 'lucide-react';
-import Image from 'next/image';
-import { ativacaoService, ValidarTokenResponse } from '@/lib/api/services/ativacao';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
+import { convitesService } from '@/lib/api/services';
+import { authService } from '@/lib/api/authService';
+import {
+  User,
+  Mail,
+  Lock,
+  Building,
+  MapPin,
+  Eye,
+  EyeOff,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Shield,
+  Phone,
+  AlertTriangle
+} from 'lucide-react';
 
-function AtivarContaContent() {
+interface ConviteData {
+  email: string;
+  nome?: string;
+  tipoUsuario: 'ADMIN' | 'USUARIO';
+  comarca?: string;
+  departamento?: string;
+  telefone?: string;
+  expiraEm: string;
+  criadoPor?: string;
+  criadoPorNome?: string;
+}
+
+export default function InvitePage() {
+  const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { showToast } = useToast();
-  
-  const [token] = useState(searchParams.get('token') || '');
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [tokenValido, setTokenValido] = useState(false);
-  const [tokenInfo, setTokenInfo] = useState<ValidarTokenResponse['data'] | null>(null);
-  
-  const [formData, setFormData] = useState({
-    senha: '',
-    confirmaSenha: '',
-    aceitouTermos: false
-  });
-  
-  const [showSenha, setShowSenha] = useState(false);
-  const [showConfirmaSenha, setShowConfirmaSenha] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const token = params.token as string;
 
-  // Validar token ao carregar a página
+  // Estados de carregamento
+  const [validando, setValidando] = useState(true);
+  const [conviteValido, setConviteValido] = useState(false);
+  const [ativando, setAtivando] = useState(false);
+  const [usuarioLogado, setUsuarioLogado] = useState(false);
+  const [verificandoAuth, setVerificandoAuth] = useState(true);
+
+  // Dados do convite
+  const [conviteData, setConviteData] = useState<ConviteData | null>(null);
+
+  // Formulário
+  const [nome, setNome] = useState('');
+  const [senha, setSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [aceitouTermos, setAceitouTermos] = useState(false);
+
+  // UI States
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
+
+  // Verificar APENAS UMA VEZ se usuário já está logado
   useEffect(() => {
-    validarToken();
-  }, [token]);
+    const verificarAutenticacao = async () => {
+      try {
+        const accessToken = authService.getAccessToken();
+        
+        if (accessToken) {
+          // Tentar obter perfil do usuário
+          const profileResponse = await authService.getProfile();
+          
+          if (profileResponse.success && profileResponse.data) {
+            console.log('[InvitePage] Usuário já está logado:', profileResponse.data.email);
+            setUsuarioLogado(true);
+          }
+        }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+      } finally {
+        setVerificandoAuth(false);
+      }
+    };
 
-  const validarToken = async () => {
+    verificarAutenticacao();
+  }, []); // Executar APENAS uma vez ao montar o componente
+
+  // Função validarToken usando useCallback para evitar problemas de dependência
+  const validarToken = useCallback(async () => {
     if (!token) {
-      setTokenValido(false);
-      setLoading(false);
+      showToast({
+        type: 'error',
+        title: 'Token inválido',
+        message: 'Link de convite inválido',
+        duration: 5000
+      });
+      setValidando(false);
       return;
     }
 
+    setValidando(true);
+
     try {
-      const response = await ativacaoService.validarToken(token);
-      
+      const response = await convitesService.validarToken(token);
+
       if (response.success && response.data) {
-        setTokenValido(true);
-        setTokenInfo(response.data);
+        setConviteValido(true);
+        
+        // Extrair dados do convite com valores padrão
+        const dados = response.data;
+        setConviteData({
+          email: dados.email || '',
+          nome: dados.nome || '',
+          tipoUsuario: dados.tipoUsuario as 'ADMIN' | 'USUARIO',
+          comarca: dados.comarca || dados.departamento || 'Não informado',
+          departamento: dados.departamento || 'Não informado',
+          telefone: dados.telefone || '',
+          expiraEm: dados.expiraEm || dados.dataExpiracao || '',
+          criadoPor: dados.criadoPor || '',
+          criadoPorNome: dados.criadoPorNome || dados.criadoPor || 'Administrador'
+        });
+
+        // Preencher campos se já tiverem dados
+        if (dados.nome) setNome(dados.nome);
+        if (dados.telefone) setTelefone(dados.telefone);
       } else {
-        setTokenValido(false);
+        setConviteValido(false);
         showToast({
           type: 'error',
-          title: 'Token Inválido',
-          message: response.message || 'O link de ativação é inválido ou expirou',
+          title: 'Convite inválido',
+          message: response.message || 'Este convite não é válido ou já expirou',
           duration: 5000
         });
       }
     } catch (error) {
       console.error('Erro ao validar token:', error);
-      setTokenValido(false);
+      setConviteValido(false);
       showToast({
         type: 'error',
         title: 'Erro',
-        message: 'Erro ao validar o link de ativação',
+        message: 'Não foi possível validar o convite',
         duration: 5000
       });
     } finally {
-      setLoading(false);
+      setValidando(false);
     }
+  }, [token, showToast]);
+
+  // Validar token ao montar (após verificar autenticação)
+  useEffect(() => {
+    if (!verificandoAuth) {
+      validarToken();
+    }
+  }, [verificandoAuth, validarToken]);
+
+  const calcularForcaSenha = () => {
+    let strength = 0;
+    if (senha.length >= 8) strength++;
+    if (senha.length >= 12) strength++;
+    if (/[a-z]/.test(senha)) strength++;
+    if (/[A-Z]/.test(senha)) strength++;
+    if (/[0-9]/.test(senha)) strength++;
+    if (/[^a-zA-Z0-9]/.test(senha)) strength++;
+    return Math.min(5, strength);
   };
 
-  const validarFormulario = (): boolean => {
-    const newErrors: Record<string, string> = {};
+  const validarFormulario = (): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
 
-    // Validar senha
-    if (!formData.senha) {
-      newErrors.senha = 'Senha é obrigatória';
-    } else if (formData.senha.length < 8) {
-      newErrors.senha = 'A senha deve ter pelo menos 8 caracteres';
-    } else if (!/(?=.*[a-z])/.test(formData.senha)) {
-      newErrors.senha = 'A senha deve conter pelo menos uma letra minúscula';
-    } else if (!/(?=.*[A-Z])/.test(formData.senha)) {
-      newErrors.senha = 'A senha deve conter pelo menos uma letra maiúscula';
-    } else if (!/(?=.*\d)/.test(formData.senha)) {
-      newErrors.senha = 'A senha deve conter pelo menos um número';
-    } else if (!/(?=.*[@$!%*?&])/.test(formData.senha)) {
-      newErrors.senha = 'A senha deve conter pelo menos um caractere especial (@$!%*?&)';
+    if (!nome.trim()) {
+      errors.push('Nome completo é obrigatório');
+    } else if (nome.trim().length < 3) {
+      errors.push('Nome deve ter pelo menos 3 caracteres');
     }
 
-    // Validar confirmação de senha
-    if (!formData.confirmaSenha) {
-      newErrors.confirmaSenha = 'Confirmação de senha é obrigatória';
-    } else if (formData.senha !== formData.confirmaSenha) {
-      newErrors.confirmaSenha = 'As senhas não coincidem';
+    if (!senha) {
+      errors.push('Senha é obrigatória');
+    } else {
+      if (senha.length < 8) {
+        errors.push('Senha deve ter pelo menos 8 caracteres');
+      }
+      if (!/[a-z]/.test(senha)) {
+        errors.push('Senha deve conter letras minúsculas');
+      }
+      if (!/[A-Z]/.test(senha)) {
+        errors.push('Senha deve conter letras maiúsculas');
+      }
+      if (!/[0-9]/.test(senha)) {
+        errors.push('Senha deve conter números');
+      }
+      if (!/[^a-zA-Z0-9]/.test(senha)) {
+        errors.push('Senha deve conter caracteres especiais');
+      }
     }
 
-    // Validar termos
-    if (!formData.aceitouTermos) {
-      newErrors.termos = 'Você deve aceitar os termos de uso';
+    if (senha !== confirmarSenha) {
+      errors.push('As senhas não coincidem');
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!aceitouTermos) {
+      errors.push('Você deve aceitar os termos de uso');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validarFormulario()) {
+    const validacao = validarFormulario();
+
+    if (!validacao.isValid) {
+      showToast({
+        type: 'error',
+        title: 'Dados inválidos',
+        message: validacao.errors[0],
+        duration: 5000
+      });
       return;
     }
 
-    setSubmitting(true);
-    
+    setAtivando(true);
+
     try {
-      const response = await ativacaoService.ativarConta({
+      const result = await convitesService.ativarConta({
         token,
-        senha: formData.senha,
-        confirmaSenha: formData.confirmaSenha,
-        aceitouTermos: formData.aceitouTermos
+        senha,
+        confirmaSenha: confirmarSenha,
+        nome
       });
 
-      if (response.success) {
+      if (result.success) {
         showToast({
           type: 'success',
-          title: 'Conta Ativada!',
-          message: 'Sua conta foi ativada com sucesso. Redirecionando para o login...',
+          title: 'Conta ativada!',
+          message: 'Sua conta foi criada com sucesso. Redirecionando...',
           duration: 3000
         });
 
-        // Redirecionar para login após 2 segundos
         setTimeout(() => {
           router.push('/login');
         }, 2000);
       } else {
         showToast({
           type: 'error',
-          title: 'Erro na Ativação',
-          message: response.message || 'Não foi possível ativar sua conta',
+          title: 'Erro ao ativar conta',
+          message: result.message || 'Não foi possível ativar sua conta',
           duration: 5000
         });
       }
@@ -145,70 +256,98 @@ function AtivarContaContent() {
       showToast({
         type: 'error',
         title: 'Erro',
-        message: 'Ocorreu um erro ao ativar sua conta. Tente novamente.',
+        message: 'Ocorreu um erro ao ativar sua conta',
         duration: 5000
       });
     } finally {
-      setSubmitting(false);
+      setAtivando(false);
     }
   };
 
-  // Indicador de força da senha
-  const calcularForcaSenha = (senha: string): { forca: number; texto: string; cor: string } => {
-    let forca = 0;
-    
-    if (senha.length >= 8) forca++;
-    if (senha.length >= 12) forca++;
-    if (/[a-z]/.test(senha)) forca++;
-    if (/[A-Z]/.test(senha)) forca++;
-    if (/\d/.test(senha)) forca++;
-    if (/[@$!%*?&]/.test(senha)) forca++;
+  const forcaSenha = calcularForcaSenha();
+  const strengthLabels = ['Muito Fraca', 'Fraca', 'Razoável', 'Boa', 'Forte', 'Muito Forte'];
+  const strengthColors = [
+    'bg-red-500',
+    'bg-orange-500',
+    'bg-yellow-500',
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-green-600'
+  ];
 
-    const niveis = [
-      { min: 0, texto: 'Muito Fraca', cor: 'bg-red-500' },
-      { min: 2, texto: 'Fraca', cor: 'bg-orange-500' },
-      { min: 4, texto: 'Média', cor: 'bg-yellow-500' },
-      { min: 5, texto: 'Forte', cor: 'bg-green-500' },
-      { min: 6, texto: 'Muito Forte', cor: 'bg-green-600' }
-    ];
-
-    const nivel = niveis.reverse().find(n => forca >= n.min) || niveis[0];
-    
-    return { forca, texto: nivel.texto, cor: nivel.cor };
-  };
-
-  const forcaSenha = calcularForcaSenha(formData.senha);
-
-  // Loading state
-  if (loading) {
+  // Loading State - verificando autenticação
+  if (verificandoAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 text-primary animate-spin mx-auto mb-4" />
-          <p className="text-lg text-gray-600">Validando link de ativação...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800">Verificando estado de autenticação...</h2>
+          <p className="text-gray-600 mt-2">Por favor, aguarde</p>
         </div>
       </div>
     );
   }
 
-  // Token inválido
-  if (!tokenValido) {
+  // Se usuário já está logado, mostrar aviso
+  if (usuarioLogado) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light px-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle className="w-10 h-10 text-red-600" />
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-10 h-10 text-yellow-600" />
           </div>
-          
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Link Inválido</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Você já está logado</h2>
           <p className="text-gray-600 mb-6">
-            Este link de ativação é inválido ou já expirou. 
-            Por favor, solicite um novo convite ao administrador do sistema.
+            Você já possui uma sessão ativa. Para ativar um novo convite, 
+            faça logout primeiro ou use uma navegação anônima.
           </p>
-          
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              Ir para Dashboard
+            </button>
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Fazer Logout e Voltar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading State - validando convite
+  if (validando) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800">Validando convite...</h2>
+          <p className="text-gray-600 mt-2">Por favor, aguarde</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Invalid Token State
+  if (!conviteValido || !conviteData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-10 h-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Convite Inválido</h2>
+          <p className="text-gray-600 mb-6">
+            Este convite não é válido ou já expirou. Entre em contato com o administrador.
+          </p>
           <button
             onClick={() => router.push('/login')}
-            className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-all"
+            className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors"
           >
             Ir para Login
           </button>
@@ -217,240 +356,298 @@ function AtivarContaContent() {
     );
   }
 
-  // Formulário de ativação
+  // Main Form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background to-primary-light px-4 py-8">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden">
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-10 h-10 text-primary" />
+        <div className="bg-gradient-to-r from-primary to-blue-600 p-8 text-white">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Ativar Conta</h1>
+              <p className="text-blue-100">Complete seu cadastro</p>
+            </div>
           </div>
           
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Ative sua Conta</h2>
-          <p className="text-gray-600">
-            Bem-vindo(a), {tokenInfo?.nome}!
-          </p>
-          <p className="text-sm text-gray-500 mt-1">
-            Configure sua senha para acessar o sistema
-          </p>
-        </div>
-
-        {/* Informações do usuário */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">E-mail:</span>
-              <span className="font-medium text-gray-800">{tokenInfo?.email}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Tipo de Conta:</span>
-              <span className="font-medium text-gray-800">
-                {tokenInfo?.tipo === 'ADMIN' ? 'Administrador' : 'Usuário'}
-              </span>
-            </div>
-            {tokenInfo?.departamento && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Departamento:</span>
-                <span className="font-medium text-gray-800">{tokenInfo.departamento}</span>
-              </div>
-            )}
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 space-y-2">
+            <p className="text-sm text-blue-100">
+              Você foi convidado por: <strong>{conviteData.criadoPorNome}</strong>
+            </p>
+            <p className="text-sm text-blue-100">
+              Perfil: <strong>{conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}</strong>
+            </p>
+            <p className="text-sm text-blue-100">
+              Expira em: <strong>{new Date(conviteData.expiraEm).toLocaleDateString('pt-BR')}</strong>
+            </p>
           </div>
         </div>
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Campo de Senha */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nova Senha <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type={showSenha ? "text" : "password"}
-                value={formData.senha}
-                onChange={(e) => {
-                  setFormData({ ...formData, senha: e.target.value });
-                  if (errors.senha) setErrors({ ...errors, senha: '' });
-                }}
-                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  errors.senha ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Digite sua senha"
-                disabled={submitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowSenha(!showSenha)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                disabled={submitting}
-              >
-                {showSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-            {errors.senha && (
-              <p className="text-red-500 text-sm mt-1">{errors.senha}</p>
-            )}
-
-            {/* Indicador de força da senha */}
-            {formData.senha && (
-              <div className="mt-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-600">Força da senha:</span>
-                  <span className="text-xs font-medium">{forcaSenha.texto}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-300 ${forcaSenha.cor}`}
-                    style={{ width: `${(forcaSenha.forca / 6) * 100}%` }}
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {/* Dados Pré-definidos (Readonly) */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              Dados da Organização
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Campo Email - ReadOnly */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <input
+                    type="email"
+                    value={conviteData.email}
+                    readOnly
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
                   />
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Campo de Confirmação de Senha */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirmar Senha <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type={showConfirmaSenha ? "text" : "password"}
-                value={formData.confirmaSenha}
-                onChange={(e) => {
-                  setFormData({ ...formData, confirmaSenha: e.target.value });
-                  if (errors.confirmaSenha) setErrors({ ...errors, confirmaSenha: '' });
-                }}
-                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                  errors.confirmaSenha ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Digite a senha novamente"
-                disabled={submitting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmaSenha(!showConfirmaSenha)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                disabled={submitting}
-              >
-                {showConfirmaSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+              {/* Campo Comarca - ReadOnly */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Comarca</label>
+                <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400">
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <input
+                    type="text"
+                    value={conviteData.comarca}
+                    readOnly
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
+                  />
+                </div>
+              </div>
+
+              {/* Campo Departamento - ReadOnly */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400">
+                    <Building className="w-5 h-5" />
+                  </div>
+                  <input
+                    type="text"
+                    value={conviteData.departamento}
+                    readOnly
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
+                  />
+                </div>
+              </div>
+
+              {/* Campo Perfil - ReadOnly */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Perfil</label>
+                <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <input
+                    type="text"
+                    value={conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}
+                    readOnly
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
+                  />
+                </div>
+              </div>
             </div>
-            {errors.confirmaSenha && (
-              <p className="text-red-500 text-sm mt-1">{errors.confirmaSenha}</p>
-            )}
           </div>
 
-          {/* Requisitos de senha */}
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs font-medium text-gray-700 mb-2">Requisitos da senha:</p>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li className={`flex items-center gap-1 ${formData.senha.length >= 8 ? 'text-green-600' : ''}`}>
-                {formData.senha.length >= 8 ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                Mínimo de 8 caracteres
+          <hr className="border-gray-200" />
+
+          {/* Dados do Usuário */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" />
+              Seus Dados
+            </h3>
+
+            {/* Campo Nome - Editável */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nome Completo <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-3 text-gray-400">
+                  <User className="w-5 h-5" />
+                </div>
+                <input
+                  type="text"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Digite seu nome completo"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Campo Telefone - Editável */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Telefone (opcional)
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-3 text-gray-400">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <input
+                  type="tel"
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+            </div>
+
+            {/* Campo Senha */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Senha <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-3 text-gray-400">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <input
+                  type={mostrarSenha ? 'text' : 'password'}
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Digite sua senha"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenha(!mostrarSenha)}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  {mostrarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              
+              {senha && (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          i < forcaSenha ? strengthColors[forcaSenha] : 'bg-gray-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className={`text-xs ${forcaSenha < 3 ? 'text-red-600' : 'text-green-600'}`}>
+                    Força da senha: {strengthLabels[forcaSenha]}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Campo Confirmar Senha */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirmar Senha <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-3 text-gray-400">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <input
+                  type={mostrarConfirmarSenha ? 'text' : 'password'}
+                  value={confirmarSenha}
+                  onChange={(e) => setConfirmarSenha(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Confirme sua senha"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  {mostrarConfirmarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              
+              {confirmarSenha && (
+                <p className={`text-xs mt-1 ${senha === confirmarSenha ? 'text-green-600' : 'text-red-600'}`}>
+                  {senha === confirmarSenha ? '✓ Senhas coincidem' : '✗ Senhas não coincidem'}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Requisitos de Senha */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm font-medium text-blue-800 mb-2">Requisitos de senha:</p>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li className={senha.length >= 8 ? 'text-green-600 font-medium' : ''}>
+                {senha.length >= 8 ? '✓' : '○'} Mínimo de 8 caracteres
               </li>
-              <li className={`flex items-center gap-1 ${/[a-z]/.test(formData.senha) ? 'text-green-600' : ''}`}>
-                {/[a-z]/.test(formData.senha) ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                Uma letra minúscula
+              <li className={/[a-z]/.test(senha) && /[A-Z]/.test(senha) ? 'text-green-600 font-medium' : ''}>
+                {/[a-z]/.test(senha) && /[A-Z]/.test(senha) ? '✓' : '○'} Letras maiúsculas e minúsculas
               </li>
-              <li className={`flex items-center gap-1 ${/[A-Z]/.test(formData.senha) ? 'text-green-600' : ''}`}>
-                {/[A-Z]/.test(formData.senha) ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                Uma letra maiúscula
+              <li className={/[0-9]/.test(senha) ? 'text-green-600 font-medium' : ''}>
+                {/[0-9]/.test(senha) ? '✓' : '○'} Pelo menos um número
               </li>
-              <li className={`flex items-center gap-1 ${/\d/.test(formData.senha) ? 'text-green-600' : ''}`}>
-                {/\d/.test(formData.senha) ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                Um número
-              </li>
-              <li className={`flex items-center gap-1 ${/[@$!%*?&]/.test(formData.senha) ? 'text-green-600' : ''}`}>
-                {/[@$!%*?&]/.test(formData.senha) ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                Um caractere especial (@$!%*?&)
+              <li className={/[^a-zA-Z0-9]/.test(senha) ? 'text-green-600 font-medium' : ''}>
+                {/[^a-zA-Z0-9]/.test(senha) ? '✓' : '○'} Pelo menos um caractere especial
               </li>
             </ul>
           </div>
 
-          {/* Checkbox dos Termos */}
-          <div>
-            <label className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={formData.aceitouTermos}
-                onChange={(e) => {
-                  setFormData({ ...formData, aceitouTermos: e.target.checked });
-                  if (errors.termos) setErrors({ ...errors, termos: '' });
-                }}
-                className="mt-1"
-                disabled={submitting}
-              />
-              <span className="text-sm text-gray-600">
-                Li e aceito os <a href="/termos" target="_blank" className="text-primary hover:underline">Termos de Uso</a> e 
-                a <a href="/privacidade" target="_blank" className="text-primary hover:underline"> Política de Privacidade</a> do sistema
-              </span>
+          {/* Termos */}
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="termos"
+              checked={aceitouTermos}
+              onChange={(e) => setAceitouTermos(e.target.checked)}
+              className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+            />
+            <label htmlFor="termos" className="text-sm text-gray-700 cursor-pointer">
+              Eu li e aceito os{' '}
+              <a href="#" className="text-primary hover:underline">
+                termos de uso
+              </a>{' '}
+              e a{' '}
+              <a href="#" className="text-primary hover:underline">
+                política de privacidade
+              </a>
             </label>
-            {errors.termos && (
-              <p className="text-red-500 text-sm mt-1">{errors.termos}</p>
-            )}
           </div>
 
-          {/* Botão de Submit */}
+          {/* Botão Submit */}
           <button
             type="submit"
-            disabled={submitting || !formData.aceitouTermos}
-            className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={ativando || !aceitouTermos}
+            className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
           >
-            {submitting ? (
+            {ativando ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Ativando Conta...
+                Ativando conta...
               </>
             ) : (
               <>
                 <CheckCircle className="w-5 h-5" />
-                Ativar Minha Conta
+                Ativar Conta
               </>
             )}
           </button>
         </form>
-
-        {/* Link para login */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Já tem uma conta ativa?{' '}
-            <button
-              onClick={() => router.push('/login')}
-              className="text-primary hover:underline font-medium"
-              disabled={submitting}
-            >
-              Faça login
-            </button>
-          </p>
-        </div>
-
-        {/* Logo do TJBA */}
-        <div className="mt-6 flex justify-center">
-          <Image
-            src="/img/logo_poderJudiciariodaBahia_transparente.png"
-            alt="TJBA"
-            width={60}
-            height={60}
-            className="opacity-50"
-          />
-        </div>
       </div>
     </div>
-  );
-}
-
-export default function AtivarContaPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-16 h-16 animate-spin text-primary" />
-      </div>
-    }>
-      <AtivarContaContent />
-    </Suspense>
   );
 }

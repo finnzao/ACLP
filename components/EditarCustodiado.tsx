@@ -26,10 +26,6 @@ interface ValidationErrors {
   [key: string]: string;
 }
 
-// ===========================
-// FORMATAÇÃO DE PROCESSO CNJ
-// ===========================
-
 const formatProcessoCNJ = (processo: string): string => {
   if (!processo) return '';
 
@@ -124,15 +120,12 @@ const isValidProcessoCNJ = (processo: string): boolean => {
   return true;
 };
 
-// ===========================
-// COMPONENTE PRINCIPAL
-// ===========================
-
 export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave }: Props) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [dadosOriginais, setDadosOriginais] = useState<Comparecimento | null>(null);
 
   const [form, setForm] = useState<Comparecimento>(() => ({
     ...dados,
@@ -158,10 +151,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     typeof dados.periodicidade === 'number' ? dados.periodicidade : 30
   );
 
-  // ===========================
-  // CARREGAR DADOS COMPLETOS
-  // ===========================
-
   useEffect(() => {
     const carregarDadosCompletos = async () => {
       if (!dados.id) {
@@ -173,15 +162,11 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
 
       try {
         const custodiadoId = typeof dados.id === 'string' ? parseInt(dados.id) : dados.id;
-        console.log('Buscando dados completos para ID:', custodiadoId);
-
         const custodiadoRequest = await custodiadosService.buscarPorId(custodiadoId);
         const custodiado = custodiadoRequest?.data;
         
         if (custodiado) {
-          console.log('Dados completos recebidos:', custodiado);
-
-          setForm({
+          const dadosCompletos = {
             ...dados,
             ...custodiado,
             cpf: FormattingCPF(String(custodiado.cpf || dados.cpf || '')),
@@ -221,7 +206,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
             },
             observacoes: String(custodiado.observacoes || dados.observacoes || ''),
             status: (custodiado.status || dados.status) as any
-          });
+          };
+
+          setForm(dadosCompletos);
+          setDadosOriginais(dadosCompletos);
 
           setPeriodicidadePersonalizada(
             typeof custodiado.periodicidade === 'number'
@@ -245,10 +233,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     carregarDadosCompletos();
   }, [dados.id, showToast, dados]);
 
-  // ===========================
-  // UTILITÁRIOS
-  // ===========================
-
   function formatDateForInput(date: string | Date | null | undefined): string {
     if (!date) return '';
 
@@ -261,14 +245,43 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }
   }
 
-  // ===========================
-  // VALIDAÇÃO DO FORMULÁRIO
-  // ===========================
+  const verificarMudancas = (): boolean => {
+    if (!dadosOriginais) return true;
+
+    const normalizar = (valor: any): string => {
+      if (valor === null || valor === undefined) return '';
+      return String(valor).trim();
+    };
+
+    const camposSimples = ['nome', 'cpf', 'rg', 'contato', 'processo', 'vara', 'comarca', 'decisao', 
+                          'ultimoComparecimento', 'proximoComparecimento', 'status', 'observacoes'];
+
+    for (const campo of camposSimples) {
+      if (normalizar(form[campo as keyof Comparecimento]) !== normalizar(dadosOriginais[campo as keyof Comparecimento])) {
+        return true;
+      }
+    }
+
+    if (periodicidadePersonalizada !== dadosOriginais.periodicidade) {
+      return true;
+    }
+
+    if (form.endereco && dadosOriginais.endereco) {
+      const camposEndereco = ['cep', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
+      for (const campo of camposEndereco) {
+        if (normalizar(form.endereco[campo as keyof typeof form.endereco]) !== 
+            normalizar(dadosOriginais.endereco[campo as keyof typeof dadosOriginais.endereco])) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
 
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
 
-    // Validação de Nome (2-150 caracteres)
     if (!form.nome?.trim()) {
       newErrors.nome = 'Nome é obrigatório';
     } else if (form.nome.trim().length < 2) {
@@ -277,7 +290,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       newErrors.nome = 'Nome deve ter no máximo 150 caracteres';
     }
 
-    // Validação de Processo
     if (!form.processo?.trim()) {
       newErrors.processo = 'Processo é obrigatório';
     } else {
@@ -299,7 +311,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
-    // Validação de Documentos (CPF e/ou RG)
     const cpfLimpo = String(form.cpf || '').replace(/\D/g, '');
     const rgLimpo = String(form.rg || '').replace(/\D/g, '');
 
@@ -315,28 +326,24 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       newErrors.rg = 'RG deve ter no máximo 20 caracteres';
     }
 
-    // Validação de Contato
     if (!form.contato?.trim()) {
       newErrors.contato = 'Contato é obrigatório';
     } else if (!ValidationPhone(String(form.contato))) {
       newErrors.contato = 'Telefone deve ter 10 ou 11 dígitos';
     }
 
-    // Validação de Vara (máx 100 caracteres)
     if (!form.vara?.trim()) {
       newErrors.vara = 'Vara é obrigatória';
     } else if (form.vara.trim().length > 100) {
       newErrors.vara = 'Vara deve ter no máximo 100 caracteres';
     }
 
-    // Validação de Comarca (máx 100 caracteres)
     if (!form.comarca?.trim()) {
       newErrors.comarca = 'Comarca é obrigatória';
     } else if (form.comarca.trim().length > 100) {
       newErrors.comarca = 'Comarca deve ter no máximo 100 caracteres';
     }
 
-    // Validação de Data da Decisão
     if (!form.decisao) {
       newErrors.decisao = 'Data da decisão é obrigatória';
     } else {
@@ -348,19 +355,16 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
-    // Validação de Periodicidade (1-365 dias)
     if (periodicidadePersonalizada < 1) {
       newErrors.periodicidade = 'Periodicidade deve ser maior que zero';
     } else if (periodicidadePersonalizada > 365) {
       newErrors.periodicidade = 'Periodicidade não pode ser maior que 365 dias';
     }
 
-    // Validação de Status
     if (!form.status) {
       newErrors.status = 'Status é obrigatório';
     }
 
-    // Validação de Último Comparecimento
     if (!form.ultimoComparecimento) {
       newErrors.ultimoComparecimento = 'Último comparecimento é obrigatório';
     } else {
@@ -372,7 +376,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
-    // Validação de Próximo Comparecimento
     if (!form.proximoComparecimento) {
       newErrors.proximoComparecimento = 'Próximo comparecimento é obrigatório';
     } else if (form.ultimoComparecimento) {
@@ -384,16 +387,13 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
-    // Validação de Endereço
     if (form.endereco) {
-      // CEP (obrigatório, formato 00000-000)
       if (!form.endereco.cep?.trim()) {
         newErrors.cep = 'CEP é obrigatório';
       } else if (!ValidationCEP(String(form.endereco.cep))) {
         newErrors.cep = 'CEP inválido (formato: 00000-000)';
       }
 
-      // Logradouro (5-200 caracteres)
       if (!form.endereco.logradouro?.trim()) {
         newErrors.logradouro = 'Logradouro é obrigatório';
       } else if (form.endereco.logradouro.trim().length < 5) {
@@ -402,12 +402,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         newErrors.logradouro = 'Logradouro deve ter no máximo 200 caracteres';
       }
 
-      // Número (opcional, máx 20 caracteres)
       if (form.endereco.numero?.trim() && form.endereco.numero.trim().length > 20) {
         newErrors.numero = 'Número deve ter no máximo 20 caracteres';
       }
 
-      // Complemento (opcional, 3-100 caracteres)
       if (form.endereco.complemento?.trim()) {
         const compTrimmed = form.endereco.complemento.trim();
         if (compTrimmed.length < 3) {
@@ -417,7 +415,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         }
       }
 
-      // Bairro (2-100 caracteres)
       if (!form.endereco.bairro?.trim()) {
         newErrors.bairro = 'Bairro é obrigatório';
       } else if (form.endereco.bairro.trim().length < 2) {
@@ -426,7 +423,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         newErrors.bairro = 'Bairro deve ter no máximo 100 caracteres';
       }
 
-      // Cidade (2-100 caracteres)
       if (!form.endereco.cidade?.trim()) {
         newErrors.cidade = 'Cidade é obrigatória';
       } else if (form.endereco.cidade.trim().length < 2) {
@@ -435,7 +431,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         newErrors.cidade = 'Cidade deve ter no máximo 100 caracteres';
       }
 
-      // Estado (2 caracteres, sigla válida)
       if (!form.endereco.estado?.trim()) {
         newErrors.estado = 'Estado é obrigatório';
       } else if (form.endereco.estado.trim().length !== 2) {
@@ -448,7 +443,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
-    // Validação de Observações (opcional, máx 500 caracteres)
     if (form.observacoes && form.observacoes.trim().length > 500) {
       newErrors.observacoes = 'Observações deve ter no máximo 500 caracteres';
     }
@@ -457,14 +451,9 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     return Object.keys(newErrors).length === 0;
   };
 
-  // ===========================
-  // HANDLERS
-  // ===========================
-
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
 
-    // Limpar erro do campo quando ele é modificado
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -473,7 +462,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       });
     }
 
-    // Limpar erro de documentos quando CPF ou RG são modificados
     if ((name === 'cpf' || name === 'rg') && errors.documentos) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -482,7 +470,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       });
     }
 
-    // Aplicar formatação automática conforme o campo
     const formatters: Record<string, (v: string) => string> = {
       cpf: FormattingCPF,
       rg: FormattingRG,
@@ -497,7 +484,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
   function handleEnderecoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
 
-    // Limpar erro do campo quando ele é modificado
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -508,23 +494,19 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
 
     let formattedValue = value;
 
-    // Formatação automática de CEP
     if (name === 'cep') {
       formattedValue = FormattingCEP(value);
       
-      // Buscar endereço automaticamente quando CEP estiver completo
       const cepLimpo = formattedValue.replace(/\D/g, '');
       if (cepLimpo.length === 8) {
         buscarEnderecoPorCEP(formattedValue);
       }
     }
 
-    // Formatação automática de Estado (uppercase, máx 2 caracteres)
     if (name === 'estado') {
       formattedValue = value.toUpperCase().slice(0, 2);
     }
 
-    // Limitação de caracteres para número
     if (name === 'numero') {
       formattedValue = value.replace(/\D/g, '').slice(0, 20);
     }
@@ -561,7 +543,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           }
         }));
 
-        // Limpar erros de endereço após preenchimento automático
         setErrors(prev => {
           const newErrors = { ...prev };
           delete newErrors.logradouro;
@@ -599,10 +580,8 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
   }
 
   function handlePeriodicidadeChange(value: string) {
-    // Permitir apenas números
     const numValue = parseInt(value.replace(/\D/g, '')) || 0;
 
-    // Limpar erro quando o campo é modificado
     if (errors.periodicidade) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -611,7 +590,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       });
     }
 
-    // Validar limite máximo
     if (numValue > 365) {
       setErrors(prev => ({ ...prev, periodicidade: 'Máximo de 365 dias' }));
       return;
@@ -632,13 +610,22 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         duration: 5000
       });
       
-      // Scroll para o primeiro erro
       const firstErrorField = Object.keys(errors)[0];
       const element = document.querySelector(`[name="${firstErrorField}"]`);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       
+      return;
+    }
+
+    if (!verificarMudancas()) {
+      showToast({
+        type: 'info',
+        title: 'Nenhuma alteração',
+        message: 'Não foram detectadas mudanças nos dados',
+        duration: 3000
+      });
       return;
     }
 
@@ -672,15 +659,13 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         throw new Error('ID do custodiado inválido');
       }
 
-      console.log('Atualizando custodiado:', custodiadoId, dadosAtualizacao);
-
       const resultado = await custodiadosService.atualizar(custodiadoId, dadosAtualizacao);
 
       if (resultado.success) {
         showToast({
           type: 'success',
           title: 'Sucesso',
-          message: 'Dados atualizados com sucesso!',
+          message: 'Dados atualizados com sucesso',
           duration: 3000
         });
 
@@ -708,10 +693,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     }
   }
 
-  // ===========================
-  // LOADING STATE
-  // ===========================
-
   if (loadingData) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
@@ -725,17 +706,12 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     );
   }
 
-  // ===========================
-  // RENDER
-  // ===========================
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 overflow-y-auto">
       <form
         onSubmit={handleSubmit}
         className="relative bg-white p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8"
       >
-        {/* Header */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b sticky top-0 bg-white z-10">
           <h3 className="text-2xl font-bold text-primary-dark">Editar Dados do Custodiado</h3>
           <button
@@ -749,7 +725,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </button>
         </div>
 
-        {/* Alerta de Documentos */}
         {errors.documentos && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2">
@@ -759,7 +734,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         )}
 
-        {/* Dados Pessoais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <User className="w-5 h-5 text-primary" />
@@ -767,7 +741,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Nome */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nome <span className="text-red-500">*</span>
@@ -786,7 +759,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <p className="text-gray-500 text-xs mt-1">{(form.nome || '').length}/150 caracteres</p>
             </div>
 
-            {/* Contato */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Contato <span className="text-red-500">*</span>
@@ -804,7 +776,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.contato && <p className="text-red-500 text-xs mt-1">{errors.contato}</p>}
             </div>
 
-            {/* CPF */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 CPF {!form.rg?.trim() && <span className="text-red-500">*</span>}
@@ -822,7 +793,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.cpf && <p className="text-red-500 text-xs mt-1">{errors.cpf}</p>}
             </div>
 
-            {/* RG */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 RG {!form.cpf?.trim() && <span className="text-red-500">*</span>}
@@ -842,7 +812,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Dados Processuais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-primary" />
@@ -850,7 +819,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Número do Processo */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Número do Processo <span className="text-red-500">*</span>
@@ -871,7 +839,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               </p>
             </div>
 
-            {/* Data da Decisão */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Data da Decisão <span className="text-red-500">*</span>
@@ -888,7 +855,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.decisao && <p className="text-red-500 text-xs mt-1">{errors.decisao}</p>}
             </div>
 
-            {/* Vara */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vara <span className="text-red-500">*</span>
@@ -905,7 +871,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.vara && <p className="text-red-500 text-xs mt-1">{errors.vara}</p>}
             </div>
 
-            {/* Comarca */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Comarca <span className="text-red-500">*</span>
@@ -922,7 +887,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.comarca && <p className="text-red-500 text-xs mt-1">{errors.comarca}</p>}
             </div>
 
-            {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Status <span className="text-red-500">*</span>
@@ -943,7 +907,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Periodicidade e Datas */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-primary" />
@@ -951,7 +914,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Periodicidade */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <Hash className="w-4 h-4 inline mr-1" />
@@ -971,7 +933,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <p className="text-gray-500 text-xs mt-1">Digite o número de dias entre comparecimentos (1-365)</p>
             </div>
 
-            {/* Último Comparecimento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Último Comparecimento <span className="text-red-500">*</span>
@@ -988,7 +949,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.ultimoComparecimento && <p className="text-red-500 text-xs mt-1">{errors.ultimoComparecimento}</p>}
             </div>
 
-            {/* Próximo Comparecimento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Próximo Comparecimento <span className="text-red-500">*</span>
@@ -1007,7 +967,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Endereço */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-primary" />
@@ -1015,7 +974,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* CEP */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 CEP <span className="text-red-500">*</span>
@@ -1034,7 +992,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <p className="text-gray-500 text-xs mt-1">Digite o CEP para buscar o endereço</p>
             </div>
 
-            {/* Logradouro */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Logradouro <span className="text-red-500">*</span>
@@ -1052,7 +1009,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.logradouro && <p className="text-red-500 text-xs mt-1">{errors.logradouro}</p>}
             </div>
 
-            {/* Número */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
               <input
@@ -1067,7 +1023,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.numero && <p className="text-red-500 text-xs mt-1">{errors.numero}</p>}
             </div>
 
-            {/* Complemento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
               <input
@@ -1082,7 +1037,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.complemento && <p className="text-red-500 text-xs mt-1">{errors.complemento}</p>}
             </div>
 
-            {/* Bairro */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Bairro <span className="text-red-500">*</span>
@@ -1099,7 +1053,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.bairro && <p className="text-red-500 text-xs mt-1">{errors.bairro}</p>}
             </div>
 
-            {/* Cidade */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Cidade <span className="text-red-500">*</span>
@@ -1117,7 +1070,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               {errors.cidade && <p className="text-red-500 text-xs mt-1">{errors.cidade}</p>}
             </div>
 
-            {/* Estado */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Estado (UF) <span className="text-red-500">*</span>
@@ -1138,7 +1090,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
-        {/* Observações */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
           <textarea
@@ -1157,7 +1108,6 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </p>
         </div>
 
-        {/* Footer com Botões */}
         <div className="pt-4 flex justify-between border-t sticky bottom-0 bg-white">
           <button
             type="button"

@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// painel-web/components/FormValidation.tsx
 'use client';
 
 import { AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react';

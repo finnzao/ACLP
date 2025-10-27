@@ -141,7 +141,7 @@ export function ToastProvider({
 }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // CORREÇÃO: Usar useCallback com array de dependências vazio para função estável
+  //Usar useCallback com array de dependências vazio para função estável
   const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newToast: Toast = {

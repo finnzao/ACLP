@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 import { convitesService } from '@/lib/api/services';
+import { authService } from '@/lib/api/authService';
 import {
   User,
   Mail,
@@ -16,7 +17,8 @@ import {
   CheckCircle,
   AlertCircle,
   Shield,
-  Phone
+  Phone,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ConviteData {
@@ -41,6 +43,8 @@ export default function InvitePage() {
   const [validando, setValidando] = useState(true);
   const [conviteValido, setConviteValido] = useState(false);
   const [ativando, setAtivando] = useState(false);
+  const [usuarioLogado, setUsuarioLogado] = useState(false);
+  const [verificandoAuth, setVerificandoAuth] = useState(true);
 
   // Dados do convite
   const [conviteData, setConviteData] = useState<ConviteData | null>(null);
@@ -56,11 +60,39 @@ export default function InvitePage() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
-  // Validar token ao montar
+  // Verificar APENAS UMA VEZ se usuário já está logado
   useEffect(() => {
-    validarToken();
+    const verificarAutenticacao = async () => {
+      try {
+        const accessToken = authService.getAccessToken();
+        
+        if (accessToken) {
+          // Tentar obter perfil do usuário
+          const profileResponse = await authService.getProfile();
+          
+          if (profileResponse.success && profileResponse.data) {
+            console.log('[InvitePage] Usuário já está logado:', profileResponse.data.email);
+            setUsuarioLogado(true);
+          }
+        }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+
+      } finally {
+        setVerificandoAuth(false);
+      }
+    };
+
+    verificarAutenticacao();
+  }, []); // Executar APENAS uma vez ao montar o componente
+
+  // Validar token ao montar (após verificar autenticação)
+  useEffect(() => {
+    if (!verificandoAuth) {
+      validarToken();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [verificandoAuth, token]);
 
   const validarToken = async () => {
     if (!token) {
@@ -70,7 +102,7 @@ export default function InvitePage() {
         message: 'Link de convite inválido',
         duration: 5000
       });
-      router.push('/login');
+      setValidando(false);
       return;
     }
 
@@ -88,12 +120,12 @@ export default function InvitePage() {
           email: dados.email || '',
           nome: dados.nome || '',
           tipoUsuario: dados.tipoUsuario as 'ADMIN' | 'USUARIO',
-          comarca: dados.comarca || dados.departamento || 'Não informado', // Fallback para comarca
+          comarca: dados.comarca || dados.departamento || 'Não informado',
           departamento: dados.departamento || 'Não informado',
           telefone: dados.telefone || '',
           expiraEm: dados.expiraEm || dados.dataExpiracao || '',
           criadoPor: dados.criadoPor || '',
-          criadoPorNome: dados.criadoPorNome || dados.criadoPor || 'Administrador' // Fallback para nome
+          criadoPorNome: dados.criadoPorNome || dados.criadoPor || 'Administrador'
         });
 
         // Preencher campos se já tiverem dados
@@ -244,7 +276,52 @@ export default function InvitePage() {
     'bg-green-600'
   ];
 
-  // Loading State
+  // Loading State - verificando autenticação
+  if (verificandoAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800">Verificando estado de autenticação...</h2>
+          <p className="text-gray-600 mt-2">Por favor, aguarde</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se usuário já está logado, mostrar aviso
+  if (usuarioLogado) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-10 h-10 text-yellow-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Você já está logado</h2>
+          <p className="text-gray-600 mb-6">
+            Você já possui uma sessão ativa. Para ativar um novo convite, 
+            faça logout primeiro ou use uma navegação anônima.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              Ir para Dashboard
+            </button>
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Fazer Logout e Voltar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading State - validando convite
   if (validando) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
