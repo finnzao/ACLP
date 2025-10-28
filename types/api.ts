@@ -117,6 +117,7 @@ export interface CustodiadoData extends CustodiadoDTO {
   comparecimentoHoje?: boolean;
   atrasado?: boolean;
   enderecoCompleto?: string;
+  urgente?:boolean;
   cidadeEstado?: string;
 }
 

@@ -42,7 +42,7 @@ interface ComparecimentoBase {
   processo: string;
   vara: string;
   comarca: string;
-  decisao: string;
+  dataDecisao?: string | null;
   periodicidade: Periodicidade;
   dataComparecimentoInicial: string;
   status: StatusComparecimento;

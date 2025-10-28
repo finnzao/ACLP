@@ -532,20 +532,7 @@ export default function DashboardPage() {
             </h1>
             <p className="text-text-muted mt-1">Visão geral do sistema de controle de comparecimentos</p>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleRefresh}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-              title="Atualizar resumo do sistema"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Atualizar
-            </button>
-            <div className="text-right">
-              <p className="text-sm text-text-muted">Última atualização</p>
-              <p className="font-semibold">{new Date().toLocaleString('pt-BR')}</p>
-            </div>
-          </div>
+        
         </div>
 
         {/* Cards de Estatísticas */}
@@ -842,10 +829,6 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Rodapé simplificado */}
-        <div className="text-center text-sm text-gray-500 mt-8">
-          <p>🕐 Última sincronização: {new Date().toLocaleString('pt-BR')}</p>
-        </div>
       </div>
     </>
   );

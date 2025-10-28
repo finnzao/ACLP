@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { InputGroup } from '@/components/InputGroup';
 import { useAuth, usePermissions } from '@/contexts/AuthContext';
 import { useUserManagement } from '@/hooks/useUserManagement';
@@ -29,6 +29,7 @@ import {
   Link as LinkIcon,
   Calendar
 } from 'lucide-react';
+import { extractDateFromTimestamp } from '@/lib/utils/dateutils';
 
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   const calculateStrength = () => {
@@ -98,7 +99,6 @@ export default function ConfiguracoesPage() {
     alterarSenha, 
     atualizarPerfil,
     criarConvite,
-    gerarLinkConvite,
     listarConvites,
     reenviarConvite,
     cancelarConvite
@@ -126,9 +126,6 @@ export default function ConfiguracoesPage() {
   const [novoConviteTipo, setNovoConviteTipo] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
   const [mostrarFormConviteEmail, setMostrarFormConviteEmail] = useState(false);
   
-  const [tipoUsuarioLink, setTipoUsuarioLink] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
-  const [diasValidadeLink, setDiasValidadeLink] = useState(30);
-  const [mostrarFormGerarLink, setMostrarFormGerarLink] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -138,13 +135,8 @@ export default function ConfiguracoesPage() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (activeTab === 'convites' && isAdmin()) {
-      carregarConvites();
-    }
-  }, [activeTab]);
-
-  const carregarConvites = async () => {
+  // ✅ CORREÇÃO: Mover carregarConvites para useCallback para evitar warning
+  const carregarConvites = useCallback(async () => {
     setLoadingConvites(true);
     try {
       const result = await listarConvites();
@@ -177,7 +169,14 @@ export default function ConfiguracoesPage() {
     } finally {
       setLoadingConvites(false);
     }
-  };
+  }, [listarConvites, showToast]); // ✅ Adicionadas dependências corretas
+
+  // ✅ CORREÇÃO: Adicionar carregarConvites e isAdmin às dependências
+  useEffect(() => {
+    if (activeTab === 'convites' && isAdmin()) {
+      carregarConvites();
+    }
+  }, [activeTab, isAdmin, carregarConvites]); // ✅ Todas as dependências incluídas
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -279,23 +278,6 @@ export default function ConfiguracoesPage() {
       setNovoConviteTipo('USUARIO');
       setMostrarFormConviteEmail(false);
       carregarConvites();
-    }
-  };
-
-  const handleGerarLink = async () => {
-    const result = await gerarLinkConvite({
-      tipoUsuario: tipoUsuarioLink,
-      diasValidade: diasValidadeLink
-    });
-  
-    if (result.success) {
-      if (result.data?.link) {
-        navigator.clipboard.writeText(result.data.link);
-      }
-      carregarConvites();
-      setMostrarFormGerarLink(false);
-      setTipoUsuarioLink('USUARIO');
-      setDiasValidadeLink(30);
     }
   };
 
@@ -619,95 +601,6 @@ export default function ConfiguracoesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 hover:border-blue-500 transition-colors">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <LinkIcon className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">Link Genérico</h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Gere um link reutilizável para compartilhar por qualquer meio
-                    </p>
-                  </div>
-                </div>
-                
-                {!mostrarFormGerarLink ? (
-                  <button
-                    onClick={() => setMostrarFormGerarLink(true)}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <LinkIcon className="w-4 h-4" />
-                    Gerar Link
-                  </button>
-                ) : (
-                  <div className="space-y-3 border-t pt-3 mt-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tipo de Usuário
-                      </label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="USUARIO"
-                            checked={tipoUsuarioLink === 'USUARIO'}
-                            onChange={() => setTipoUsuarioLink('USUARIO')}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm">Usuário</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            value="ADMIN"
-                            checked={tipoUsuarioLink === 'ADMIN'}
-                            onChange={() => setTipoUsuarioLink('ADMIN')}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm">Administrador</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Validade (dias)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="365"
-                        value={diasValidadeLink}
-                        onChange={(e) => setDiasValidadeLink(parseInt(e.target.value) || 30)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => setMostrarFormGerarLink(false)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={handleGerarLink}
-                        disabled={loading}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {loading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <LinkIcon className="w-4 h-4" />
-                        )}
-                        Gerar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div className="border-2 border-dashed border-green-300 rounded-lg p-4 hover:border-green-500 transition-colors">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -833,7 +726,7 @@ export default function ConfiguracoesPage() {
                         </p>
                         <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          Expira em: {new Date(convite.expiraEm).toLocaleDateString('pt-BR')}
+                          Expira em: {extractDateFromTimestamp(convite.expiraEm)}
                         </p>
                         {convite.comarca && (
                           <p className="text-xs text-gray-500">

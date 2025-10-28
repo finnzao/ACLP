@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 import { convitesService } from '@/lib/api/services';
-import { authService } from '@/lib/api/authService';
 import {
   User,
-  Mail,
   Lock,
   Building,
   MapPin,
@@ -16,21 +14,15 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Shield,
-  Phone,
-  AlertTriangle
+  Shield
 } from 'lucide-react';
+import { extractDateFromTimestamp } from '@/lib/utils/dateutils';
 
 interface ConviteData {
-  email: string;
-  nome?: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
   comarca?: string;
   departamento?: string;
-  telefone?: string;
   expiraEm: string;
-  criadoPor?: string;
-  criadoPorNome?: string;
 }
 
 export default function InvitePage() {
@@ -43,8 +35,6 @@ export default function InvitePage() {
   const [validando, setValidando] = useState(true);
   const [conviteValido, setConviteValido] = useState(false);
   const [ativando, setAtivando] = useState(false);
-  const [usuarioLogado, setUsuarioLogado] = useState(false);
-  const [verificandoAuth, setVerificandoAuth] = useState(true);
 
   // Dados do convite
   const [conviteData, setConviteData] = useState<ConviteData | null>(null);
@@ -53,40 +43,19 @@ export default function InvitePage() {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [telefone, setTelefone] = useState('');
   const [aceitouTermos, setAceitouTermos] = useState(false);
 
   // UI States
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
-  // Verificar APENAS UMA VEZ se usuário já está logado
+  // Validar token ao montar
   useEffect(() => {
-    const verificarAutenticacao = async () => {
-      try {
-        const accessToken = authService.getAccessToken();
-        
-        if (accessToken) {
-          // Tentar obter perfil do usuário
-          const profileResponse = await authService.getProfile();
-          
-          if (profileResponse.success && profileResponse.data) {
-            console.log('[InvitePage] Usuário já está logado:', profileResponse.data.email);
-            setUsuarioLogado(true);
-          }
-        }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (error) {
-      } finally {
-        setVerificandoAuth(false);
-      }
-    };
+    validarToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
-    verificarAutenticacao();
-  }, []); // Executar APENAS uma vez ao montar o componente
-
-  // Função validarToken usando useCallback para evitar problemas de dependência
-  const validarToken = useCallback(async () => {
+  const validarToken = async () => {
     if (!token) {
       showToast({
         type: 'error',
@@ -94,7 +63,7 @@ export default function InvitePage() {
         message: 'Link de convite inválido',
         duration: 5000
       });
-      setValidando(false);
+      router.push('/login');
       return;
     }
 
@@ -106,23 +75,13 @@ export default function InvitePage() {
       if (response.success && response.data) {
         setConviteValido(true);
         
-        // Extrair dados do convite com valores padrão
         const dados = response.data;
         setConviteData({
-          email: dados.email || '',
-          nome: dados.nome || '',
           tipoUsuario: dados.tipoUsuario as 'ADMIN' | 'USUARIO',
-          comarca: dados.comarca || dados.departamento || 'Não informado',
+          comarca: dados.comarca || 'Não informado',
           departamento: dados.departamento || 'Não informado',
-          telefone: dados.telefone || '',
-          expiraEm: dados.expiraEm || dados.dataExpiracao || '',
-          criadoPor: dados.criadoPor || '',
-          criadoPorNome: dados.criadoPorNome || dados.criadoPor || 'Administrador'
+          expiraEm: dados.expiraEm || ''
         });
-
-        // Preencher campos se já tiverem dados
-        if (dados.nome) setNome(dados.nome);
-        if (dados.telefone) setTelefone(dados.telefone);
       } else {
         setConviteValido(false);
         showToast({
@@ -144,14 +103,7 @@ export default function InvitePage() {
     } finally {
       setValidando(false);
     }
-  }, [token, showToast]);
-
-  // Validar token ao montar (após verificar autenticação)
-  useEffect(() => {
-    if (!verificandoAuth) {
-      validarToken();
-    }
-  }, [verificandoAuth, validarToken]);
+  };
 
   const calcularForcaSenha = () => {
     let strength = 0;
@@ -275,52 +227,7 @@ export default function InvitePage() {
     'bg-green-600'
   ];
 
-  // Loading State - verificando autenticação
-  if (verificandoAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-800">Verificando estado de autenticação...</h2>
-          <p className="text-gray-600 mt-2">Por favor, aguarde</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Se usuário já está logado, mostrar aviso
-  if (usuarioLogado) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-10 h-10 text-yellow-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Você já está logado</h2>
-          <p className="text-gray-600 mb-6">
-            Você já possui uma sessão ativa. Para ativar um novo convite, 
-            faça logout primeiro ou use uma navegação anônima.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors"
-            >
-              Ir para Dashboard
-            </button>
-            <button
-              onClick={() => router.push('/login')}
-              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Fazer Logout e Voltar
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Loading State - validando convite
+  // Loading State
   if (validando) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -359,272 +266,179 @@ export default function InvitePage() {
   // Main Form
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary to-blue-600 p-8 text-white">
-          <div className="flex items-center gap-3 mb-4">
+        <div className="bg-gradient-to-r from-primary to-blue-600 p-6 text-white">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-7 h-7" />
+              <Shield className="w-7 h-7" />
             </div>
             <div>
               <h1 className="text-2xl font-bold">Ativar Conta</h1>
-              <p className="text-blue-100">Complete seu cadastro</p>
+              <p className="text-sm text-blue-100">Complete seu cadastro</p>
             </div>
           </div>
           
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 space-y-2">
-            <p className="text-sm text-blue-100">
-              Você foi convidado por: <strong>{conviteData.criadoPorNome}</strong>
-            </p>
-            <p className="text-sm text-blue-100">
-              Perfil: <strong>{conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}</strong>
-            </p>
-            <p className="text-sm text-blue-100">
-              Expira em: <strong>{new Date(conviteData.expiraEm).toLocaleDateString('pt-BR')}</strong>
-            </p>
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 space-y-1.5">
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4" />
+              <span className="text-blue-100">Comarca: <strong>{conviteData.comarca}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Building className="w-4 h-4" />
+              <span className="text-blue-100">Departamento: <strong>{conviteData.departamento}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <User className="w-4 h-4" />
+              <span className="text-blue-100">Perfil: <strong>{conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-blue-100">Expira em: <strong>{extractDateFromTimestamp(conviteData.expiraEm)}</strong></span>
+            </div>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          {/* Dados Pré-definidos (Readonly) */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              Dados da Organização
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Campo Email - ReadOnly */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <div className="relative">
-                  <div className="absolute left-3 top-3 text-gray-400">
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="email"
-                    value={conviteData.email}
-                    readOnly
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                  />
-                </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Campo Nome */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Nome Completo <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-3 text-gray-400">
+                <User className="w-5 h-5" />
               </div>
-
-              {/* Campo Comarca - ReadOnly */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Comarca</label>
-                <div className="relative">
-                  <div className="absolute left-3 top-3 text-gray-400">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="text"
-                    value={conviteData.comarca}
-                    readOnly
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                  />
-                </div>
-              </div>
-
-              {/* Campo Departamento - ReadOnly */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-                <div className="relative">
-                  <div className="absolute left-3 top-3 text-gray-400">
-                    <Building className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="text"
-                    value={conviteData.departamento}
-                    readOnly
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                  />
-                </div>
-              </div>
-
-              {/* Campo Perfil - ReadOnly */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Perfil</label>
-                <div className="relative">
-                  <div className="absolute left-3 top-3 text-gray-400">
-                    <User className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="text"
-                    value={conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}
-                    readOnly
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                  />
-                </div>
-              </div>
+              <input
+                type="text"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Digite seu nome completo"
+                required
+              />
             </div>
           </div>
 
-          <hr className="border-gray-200" />
-
-          {/* Dados do Usuário */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <User className="w-5 h-5 text-primary" />
-              Seus Dados
-            </h3>
-
-            {/* Campo Nome - Editável */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nome Completo <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-3 text-gray-400">
-                  <User className="w-5 h-5" />
-                </div>
-                <input
-                  type="text"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Digite seu nome completo"
-                  required
-                />
+          {/* Campo Senha */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Senha <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-3 text-gray-400">
+                <Lock className="w-5 h-5" />
               </div>
+              <input
+                type={mostrarSenha ? 'text' : 'password'}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Digite sua senha"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarSenha(!mostrarSenha)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                {mostrarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
-
-            {/* Campo Telefone - Editável */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telefone (opcional)
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-3 text-gray-400">
-                  <Phone className="w-5 h-5" />
+            
+            {senha && (
+              <div className="mt-2">
+                <div className="flex gap-1 mb-1">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors ${
+                        i < forcaSenha ? strengthColors[forcaSenha] : 'bg-gray-200'
+                      }`}
+                    />
+                  ))}
                 </div>
-                <input
-                  type="tel"
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
-            </div>
-
-            {/* Campo Senha */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Senha <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-3 text-gray-400">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <input
-                  type={mostrarSenha ? 'text' : 'password'}
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Digite sua senha"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarSenha(!mostrarSenha)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  {mostrarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              
-              {senha && (
-                <div className="mt-2">
-                  <div className="flex gap-1 mb-1">
-                    {[...Array(5)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${
-                          i < forcaSenha ? strengthColors[forcaSenha] : 'bg-gray-200'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className={`text-xs ${forcaSenha < 3 ? 'text-red-600' : 'text-green-600'}`}>
-                    Força da senha: {strengthLabels[forcaSenha]}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Campo Confirmar Senha */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirmar Senha <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-3 text-gray-400">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <input
-                  type={mostrarConfirmarSenha ? 'text' : 'password'}
-                  value={confirmarSenha}
-                  onChange={(e) => setConfirmarSenha(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Confirme sua senha"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  {mostrarConfirmarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              
-              {confirmarSenha && (
-                <p className={`text-xs mt-1 ${senha === confirmarSenha ? 'text-green-600' : 'text-red-600'}`}>
-                  {senha === confirmarSenha ? '✓ Senhas coincidem' : '✗ Senhas não coincidem'}
+                <p className={`text-xs ${forcaSenha < 3 ? 'text-red-600' : 'text-green-600'}`}>
+                  Força: {strengthLabels[forcaSenha]}
                 </p>
-              )}
+              </div>
+            )}
+          </div>
+
+          {/* Campo Confirmar Senha */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Confirmar Senha <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-3 text-gray-400">
+                <Lock className="w-5 h-5" />
+              </div>
+              <input
+                type={mostrarConfirmarSenha ? 'text' : 'password'}
+                value={confirmarSenha}
+                onChange={(e) => setConfirmarSenha(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Confirme sua senha"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                {mostrarConfirmarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
+            
+            {confirmarSenha && (
+              <p className={`text-xs mt-1.5 flex items-center gap-1 ${senha === confirmarSenha ? 'text-green-600' : 'text-red-600'}`}>
+                {senha === confirmarSenha ? (
+                  <>
+                    <CheckCircle className="w-3 h-3" />
+                    Senhas coincidem
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3 h-3" />
+                    Senhas não coincidem
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           {/* Requisitos de Senha */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-blue-800 mb-2">Requisitos de senha:</p>
-            <ul className="text-xs text-blue-700 space-y-1">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs font-medium text-blue-800 mb-1.5">Requisitos de senha:</p>
+            <ul className="text-xs text-blue-700 space-y-0.5">
               <li className={senha.length >= 8 ? 'text-green-600 font-medium' : ''}>
                 {senha.length >= 8 ? '✓' : '○'} Mínimo de 8 caracteres
               </li>
               <li className={/[a-z]/.test(senha) && /[A-Z]/.test(senha) ? 'text-green-600 font-medium' : ''}>
-                {/[a-z]/.test(senha) && /[A-Z]/.test(senha) ? '✓' : '○'} Letras maiúsculas e minúsculas
+                {/[a-z]/.test(senha) && /[A-Z]/.test(senha) ? '✓' : '○'} Maiúsculas e minúsculas
               </li>
               <li className={/[0-9]/.test(senha) ? 'text-green-600 font-medium' : ''}>
                 {/[0-9]/.test(senha) ? '✓' : '○'} Pelo menos um número
               </li>
               <li className={/[^a-zA-Z0-9]/.test(senha) ? 'text-green-600 font-medium' : ''}>
-                {/[^a-zA-Z0-9]/.test(senha) ? '✓' : '○'} Pelo menos um caractere especial
+                {/[^a-zA-Z0-9]/.test(senha) ? '✓' : '○'} Caractere especial
               </li>
             </ul>
           </div>
 
           {/* Termos */}
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2">
             <input
               type="checkbox"
               id="termos"
               checked={aceitouTermos}
               onChange={(e) => setAceitouTermos(e.target.checked)}
-              className="mt-1 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+              className="mt-0.5 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
             />
-            <label htmlFor="termos" className="text-sm text-gray-700 cursor-pointer">
-              Eu li e aceito os{' '}
-              <a href="#" className="text-primary hover:underline">
-                termos de uso
-              </a>{' '}
-              e a{' '}
-              <a href="#" className="text-primary hover:underline">
-                política de privacidade
-              </a>
+            <label htmlFor="termos" className="text-xs text-gray-700 cursor-pointer">
+              Aceito os termos de uso e política de privacidade
             </label>
           </div>
 
@@ -637,7 +451,7 @@ export default function InvitePage() {
             {ativando ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Ativando conta...
+                Ativando...
               </>
             ) : (
               <>

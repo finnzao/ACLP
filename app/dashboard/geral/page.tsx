@@ -24,6 +24,7 @@ import {
   RefreshCw,
   MapPin
 } from 'lucide-react';
+import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 
 interface CustodiadoFormatado {
   id: number;
@@ -54,6 +55,7 @@ interface CustodiadoFormatado {
   atrasado?: boolean;
   diasAtraso?: number;
   comparecimentoHoje?: boolean;
+  urgente?: boolean; // ✅ Adicionado para usar o valor do backend
   enderecoCompleto?: string;
   cidadeEstado?: string;
 }
@@ -154,7 +156,7 @@ function GeralPage() {
       return [];
     }
 
-    console.log('[GeralPage]Transformando', dadosExtraidos.length, 'custodiados');
+    console.log('[GeralPage] Transformando', dadosExtraidos.length, 'custodiados');
 
     const transformarCustodiado = (custodiado: CustodiadoData): CustodiadoFormatado => {
       // Função auxiliar para garantir string
@@ -184,6 +186,10 @@ function GeralPage() {
         dataComparecimentoInicial: ensureString(custodiado.dataComparecimentoInicial),
         ultimoComparecimento: ensureString(custodiado.ultimoComparecimento),
         proximoComparecimento: processarProximoComparecimento(custodiado.proximoComparecimento),
+        // ✅ CORREÇÃO: Usar o valor de urgente que vem do backend
+        urgente: (custodiado as any).urgente || false,
+        diasAtraso: (custodiado as any).diasAtraso || 0,
+        comparecimentoHoje: (custodiado as any).comparecimentoHoje || false,
         endereco: custodiado.endereco ? {
           cep: custodiado.endereco.cep,
           logradouro: custodiado.endereco.logradouro,
@@ -225,6 +231,7 @@ function GeralPage() {
   }, [searchParams]);
 
 
+  // ✅ CORREÇÃO: useEffect consolidado para detectar atualização
   useEffect(() => {
     const updated = searchParams.get('updated');
     const needsRefetch = typeof window !== 'undefined'
@@ -255,16 +262,13 @@ function GeralPage() {
         window.history.replaceState({}, '', cleanUrl);
       }
     }
-  }, [searchParams, showToast]);
+  }, [searchParams, showToast, refetchCustodiados]); // ✅ Adicionado refetchCustodiados
 
-  // ✅ NOVO: Listener para evento customizado de comparecimento registrado
+  // ✅ CORREÇÃO: useEffect para ouvir evento de comparecimento registrado
   useEffect(() => {
-    const handleComparecimentoRegistrado = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('[GeralPage] 📢 Evento de comparecimento detectado:', customEvent.detail);
+    const handleComparecimentoRegistrado = () => {
+      console.log('[GeralPage] 📢 Evento de comparecimento detectado');
       console.log('[GeralPage] 🔄 Atualizando lista de custodiados...');
-
-      // Forçar atualização imediata
       refetchCustodiados();
     };
 
@@ -273,80 +277,7 @@ function GeralPage() {
     return () => {
       window.removeEventListener('comparecimento-registrado', handleComparecimentoRegistrado);
     };
-  }, [refetchCustodiados]);
-
-  // ✅ MELHORADO: useEffect para detectar atualização via URL ou sessionStorage
-  useEffect(() => {
-    const updated = searchParams.get('updated');
-    const needsRefetch = typeof window !== 'undefined'
-      ? sessionStorage.getItem('needsRefetch')
-      : null;
-
-    if (updated || needsRefetch === 'true') {
-      console.log('[GeralPage] ✅ Detectado atualização recente');
-      console.log('[GeralPage] - updated param:', updated);
-      console.log('[GeralPage] - needsRefetch:', needsRefetch);
-
-      // Mostrar feedback visual ao usuário
-      showToast({
-        type: 'success',
-        title: 'Lista Atualizada',
-        message: 'Comparecimento registrado e dados atualizados com sucesso',
-        duration: 3000
-      });
-
-      // ✅ CORREÇÃO: Forçar atualização dos dados COM delay
-      setTimeout(() => {
-        console.log('[GeralPage] 🔄 Iniciando refetch dos dados...');
-        refetchCustodiados();
-      }, 300);
-
-      // Limpar flags e parâmetros da URL
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('needsRefetch');
-        sessionStorage.removeItem('lastUpdate');
-
-        // Limpar parâmetro da URL sem recarregar a página
-        setTimeout(() => {
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, '', cleanUrl);
-          console.log('[GeralPage] ✅ URL e flags limpas');
-        }, 1000);
-      }
-    }
-  }, [searchParams, showToast, refetchCustodiados]);
-
-  useEffect(() => {
-    const updated = searchParams.get('updated');
-    const needsRefetch = typeof window !== 'undefined'
-      ? sessionStorage.getItem('needsRefetch')
-      : null;
-
-    if (updated || needsRefetch === 'true') {
-      console.log('[GeralPage] ✅ Detectado atualização recente, forçando refetch dos dados');
-
-      // Mostrar feedback visual ao usuário
-      showToast({
-        type: 'success',
-        title: 'Lista Atualizada',
-        message: 'Comparecimento registrado e dados atualizados com sucesso',
-        duration: 3000
-      });
-
-      // Forçar atualização dos dados
-      refetchCustodiados();
-
-      // Limpar flags e parâmetros da URL
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('needsRefetch');
-        sessionStorage.removeItem('lastUpdate');
-
-        // Limpar parâmetro da URL sem recarregar a página
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, '', cleanUrl);
-      }
-    }
-  }, [searchParams, showToast]);
+  }, [refetchCustodiados]); // ✅ Adicionado refetchCustodiados
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -680,11 +611,13 @@ function GeralPage() {
               const hoje = isToday(item.proximoComparecimento);
               const atrasado = isOverdue(item.proximoComparecimento);
               const diasRestantes = getDaysUntil(item.proximoComparecimento);
+              // ✅ CORREÇÃO: Usar a propriedade urgente do backend
+              const urgente = item.urgente || false;
 
               return (
                 <div
                   key={item.id || index}
-                  className={`bg-white rounded-lg shadow-sm p-4 ${atrasado ? 'border-l-4 border-red-500' : hoje ? 'border-l-4 border-yellow-500' : ''}`}
+                  className={`bg-white rounded-lg shadow-sm p-4 ${urgente ? 'border-l-4 border-red-500' : atrasado ? 'border-l-4 border-orange-500' : hoje ? 'border-l-4 border-yellow-500' : ''}`}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2 flex-1">
@@ -715,12 +648,12 @@ function GeralPage() {
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar className="w-4 h-4 flex-shrink-0" />
                       <div className="flex-1">
-                        <p className={`text-xs ${atrasado ? 'text-red-600 font-medium' : hoje ? 'text-yellow-600 font-medium' : ''}`}>
-                          Próximo: {item.proximoComparecimento ? new Date(item.proximoComparecimento).toLocaleDateString('pt-BR') : '-'}
+                        <p className={`text-xs ${urgente ? 'text-red-600 font-bold' : atrasado ? 'text-orange-600 font-medium' : hoje ? 'text-yellow-600 font-medium' : ''}`}>
+                          Próximo: {item.proximoComparecimento ? formatToBrazilianDate(item.proximoComparecimento) : '-'}
                         </p>
-                        {(atrasado || hoje || (diasRestantes > 0 && diasRestantes <= 7)) && (
+                        {(urgente || atrasado || hoje || (diasRestantes > 0 && diasRestantes <= 7)) && (
                           <p className="text-xs text-gray-500">
-                            {atrasado ? `${Math.abs(diasRestantes)} dias de atraso` : hoje ? 'Hoje' : `${diasRestantes} dias`}
+                            {urgente ? `URGENTE - ${Math.abs(diasRestantes)} dias de atraso` : atrasado ? `${Math.abs(diasRestantes)} dias de atraso` : hoje ? 'Hoje' : `${diasRestantes} dias`}
                           </p>
                         )}
                       </div>
@@ -728,19 +661,25 @@ function GeralPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    {atrasado && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs flex-1">
+                    {urgente && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs flex-1 font-bold">
                         <AlertTriangle className="w-3 h-3" />
-                        Urgente
+                        URGENTE
                       </span>
                     )}
-                    {hoje && !atrasado && (
+                    {!urgente && atrasado && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs flex-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Atrasado
+                      </span>
+                    )}
+                    {!urgente && !atrasado && hoje && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs flex-1">
                         <Clock className="w-3 h-3" />
                         Hoje
                       </span>
                     )}
-                    {!atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
+                    {!urgente && !atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs flex-1">
                         <Clock className="w-3 h-3" />
                         Próximo
@@ -931,11 +870,13 @@ function GeralPage() {
                     const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
                     const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
                     const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
+                    // ✅ CORREÇÃO: Usar a propriedade urgente do backend
+                    const urgente = item.urgente || false;
 
                     return (
                       <tr
                         key={item.id || index}
-                        className={`border-b border-border hover:bg-gray-50 transition-colors ${atrasado ? 'bg-red-50' : hoje ? 'bg-yellow-50' : ''}`}
+                        className={`border-b border-border hover:bg-gray-50 transition-colors ${urgente ? 'bg-red-50' : atrasado ? 'bg-orange-50' : hoje ? 'bg-yellow-50' : ''}`}
                       >
                         <td className="p-3">
                           <div>
@@ -953,30 +894,36 @@ function GeralPage() {
                           </span>
                         </td>
                         <td className="p-3 text-center text-sm">
-                          {item.ultimoComparecimento ? new Date(item.ultimoComparecimento).toLocaleDateString('pt-BR') : '-'}
+                          {item.ultimoComparecimento ? formatToBrazilianDate(item.ultimoComparecimento) : '-'}
                         </td>
                         <td className="p-3 text-center">
-                          <div className={`text-sm font-medium ${atrasado ? 'text-red-600' : hoje ? 'text-yellow-600' : 'text-text-base'}`}>
-                            {item.proximoComparecimento ? new Date(item.proximoComparecimento).toLocaleDateString('pt-BR') : '-'}
+                          <div className={`text-sm font-medium ${urgente ? 'text-red-600 font-bold' : atrasado ? 'text-orange-600' : hoje ? 'text-yellow-600' : 'text-text-base'}`}>
+                            {item.proximoComparecimento ? formatToBrazilianDate(item.proximoComparecimento) : '-'}
                           </div>
                           <div className="text-xs text-text-muted">
-                            {atrasado ? `${Math.abs(diasRestantes)} dias atraso` : hoje ? 'Hoje' : diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
+                            {urgente ? `URGENTE - ${Math.abs(diasRestantes)} dias` : atrasado ? `${Math.abs(diasRestantes)} dias atraso` : hoje ? 'Hoje' : diasRestantes > 0 ? `${diasRestantes} dias` : 'Vencido'}
                           </div>
                         </td>
                         <td className="p-3 text-center">
-                          {atrasado && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                          {urgente && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">
                               <AlertTriangle className="w-3 h-3" />
-                              Urgente
+                              URGENTE
                             </span>
                           )}
-                          {hoje && (
+                          {!urgente && atrasado && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                              <AlertTriangle className="w-3 h-3" />
+                              Atrasado
+                            </span>
+                          )}
+                          {!urgente && !atrasado && hoje && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
                               <Clock className="w-3 h-3" />
                               Hoje
                             </span>
                           )}
-                          {!atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
+                          {!urgente && !atrasado && !hoje && diasRestantes <= 7 && diasRestantes > 0 && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
                               <Clock className="w-3 h-3" />
                               Próximo

@@ -1,4 +1,3 @@
-// painel-web/components/DetalhesCustodiado.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -15,6 +14,59 @@ import {
   FormattingPhone as formatContato,
   FormattingCEP as formatCEP
 } from '@/lib/utils/formatting';
+
+
+const dateUtils = {
+  parseLocalDate: (dateString: string): Date => {
+    if (!dateString) return new Date();
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  },
+
+  formatToBR: (date: string | Date | null | undefined): string => {
+    if (!date) return 'Não informado';
+    
+    // Se for string, usa parseLocalDate para evitar problema de timezone
+    const dateObj = typeof date === 'string' ? dateUtils.parseLocalDate(date) : date;
+    
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const year = dateObj.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  },
+
+  // Retorna data atual no formato YYYY-MM-DD
+  getCurrentDate: (): string => {
+    const hoje = new Date();
+    const year = hoje.getFullYear();
+    const month = String(hoje.getMonth() + 1).padStart(2, '0');
+    const day = String(hoje.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  },
+
+  // Calcula dias até uma data (usando timezone local corretamente)
+  getDaysUntil: (dateString: string): number => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0); // Zera horas para comparação justa
+    
+    const targetDate = dateUtils.parseLocalDate(dateString);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = targetDate.getTime() - hoje.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  },
+
+  // Verifica se a data é hoje
+  isToday: (dateString: string): boolean => {
+    return dateString === dateUtils.getCurrentDate();
+  },
+
+  // Verifica se a data está atrasada
+  isOverdue: (dateString: string): boolean => {
+    return dateUtils.getDaysUntil(dateString) < 0;
+  }
+};
 
 interface Props {
   dados: Comparecimento;
@@ -39,29 +91,6 @@ const getStatusKey = (status: string | undefined): StatusKey => {
   }
 
   return 'inadimplente';
-};
-
-const dateUtils = {
-  formatToBR: (date: string | Date | null | undefined): string => {
-    if (!date) return 'Não informado';
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString('pt-BR');
-  },
-  getCurrentDate: (): string => {
-    return new Date().toISOString().split('T')[0];
-  },
-  getDaysUntil: (date: string): number => {
-    const today = new Date();
-    const targetDate = new Date(date);
-    const diffTime = targetDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  },
-  isToday: (date: string): boolean => {
-    return date === dateUtils.getCurrentDate();
-  },
-  isOverdue: (date: string): boolean => {
-    return dateUtils.getDaysUntil(date) < 0;
-  }
 };
 
 export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onExcluir }: Props) {
@@ -208,129 +237,72 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           </div>
         )}
 
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className={`px-4 py-2 rounded-full text-sm font-medium ${STATUS_COLORS[statusKey].bg} ${STATUS_COLORS[statusKey].text}`}>
-              {STATUS_LABELS[statusKey]}
-            </span>
-            
-            {isComparecimentoHoje && (
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium flex items-center gap-1">
-                <AlertTriangle className="w-4 h-4" />
-                Comparecimento Hoje
-              </span>
-            )}
-            
-            {isComparecimentoAtrasado && (
-              <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium flex items-center gap-1">
-                <AlertTriangle className="w-4 h-4" />
-                Em Atraso
-              </span>
-            )}
-          </div>
-
-          {(isComparecimentoHoje || isComparecimentoAtrasado) && (
-            <div className={`p-4 rounded-lg border ${
-              isComparecimentoAtrasado ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <p className={`text-sm font-medium ${
-                isComparecimentoAtrasado ? 'text-red-800' : 'text-yellow-800'
-              }`}>
-                {isComparecimentoAtrasado 
-                  ? `Comparecimento em atraso há ${Math.abs(diasRestantes)} dias`
-                  : 'Esta pessoa deve comparecer hoje'
-                }
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-gray-50 rounded-lg p-4 mb-6">
-          <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <div className={`rounded-lg p-4 mb-6 ${STATUS_COLORS[statusKey]}`}>
+          <h4 className="font-semibold mb-3 flex items-center gap-2">
             <UserCheck className="w-5 h-5" />
             Dados Pessoais
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div className="md:col-span-2">
-              <span className="font-medium text-gray-700">Nome:</span>
-              <p className="text-gray-600 mt-1">{dadosCompletos.nome}</p>
+              <span className="font-medium">Nome Completo:</span>
+              <p className="mt-1 text-lg font-semibold">{dadosCompletos.nome}</p>
             </div>
             <div>
-              <span className="font-medium text-gray-700">CPF:</span>
-              <p className="text-gray-600 mt-1 font-mono">
+              <span className="font-medium">CPF:</span>
+              <p className="mt-1 font-mono">
                 {dadosCompletos.cpf ? formatCPF(String(dadosCompletos.cpf)) : 'Não informado'}
               </p>
             </div>
             <div>
-              <span className="font-medium text-gray-700">RG:</span>
-              <p className="text-gray-600 mt-1 font-mono">
+              <span className="font-medium">RG:</span>
+              <p className="mt-1 font-mono">
                 {dadosCompletos.rg ? formatRG(String(dadosCompletos.rg)) : 'Não informado'}
               </p>
             </div>
             <div>
-              <span className="font-medium text-gray-700 flex items-center gap-1">
-                <Phone className="w-4 h-4" />
-                Contato:
+              <span className="font-medium flex items-center gap-1">
+                <Phone className="w-3 h-3" />
+                Telefone:
               </span>
-              <p className="text-gray-600 mt-1">{formatContato(String(dadosCompletos.contato))}</p>
+              <p className="mt-1 font-mono">
+                {dadosCompletos.contato ? formatContato(String(dadosCompletos.contato)) : 'Não informado'}
+              </p>
             </div>
-            {dadosCompletos.observacoes && (
-              <div className="md:col-span-2">
-                <span className="font-medium text-gray-700">Observações:</span>
-                <p className="text-gray-600 mt-1 italic">{dadosCompletos.observacoes}</p>
-              </div>
-            )}
+            <div>
+              <span className="font-medium flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Status:
+              </span>
+              <p className="mt-1 font-semibold uppercase">{STATUS_LABELS[statusKey]}</p>
+            </div>
           </div>
         </div>
 
         {dadosCompletos.endereco && (
-          <div className="bg-green-50 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-green-50 rounded-lg p-4 mb-6 relative">
+            <div className="flex justify-between items-start mb-3">
               <h4 className="font-semibold text-green-800 flex items-center gap-2">
                 <MapPin className="w-5 h-5" />
-                Endereço Residencial
+                Endereço Atual
               </h4>
-              
               <button
                 onClick={handleVerHistoricoEnderecos}
-                className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 hover:text-green-900 bg-white hover:bg-green-100 border border-green-200 rounded-lg transition-all"
-                title="Ver histórico completo de endereços"
+                className="text-xs text-green-600 hover:text-green-800 flex items-center gap-1 transition-colors"
               >
-                <History className="w-3.5 h-3.5" />
-                <span>Histórico</span>
+                <History className="w-3 h-3" />
+                Ver histórico
               </button>
             </div>
-            
-            <div className="mb-4 p-3 bg-white rounded-lg border border-green-200">
-              <p className="text-green-700 text-sm font-medium">
-                {dadosCompletos.endereco.enderecoCompleto || 
-                 `${dadosCompletos.endereco.logradouro}, ${dadosCompletos.endereco.numero}${dadosCompletos.endereco.complemento ? `, ${dadosCompletos.endereco.complemento}` : ''}, ${dadosCompletos.endereco.bairro}, ${dadosCompletos.endereco.cidade} - ${dadosCompletos.endereco.estado}, CEP: ${formatCEP(dadosCompletos.endereco.cep)}`}
-              </p>
-            </div>
-
-            {dadosCompletos.endereco.ativo && (
-              <div className="mb-3 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-700">Endereço Ativo</span>
-                {dadosCompletos.endereco.periodoResidencia && (
-                  <span className="text-sm text-green-600 ml-2">
-                    • {dadosCompletos.endereco.periodoResidencia}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="font-medium text-green-700">CEP:</span>
                 <p className="text-green-600">{formatCEP(dadosCompletos.endereco.cep)}</p>
               </div>
               
-              <div className="md:col-span-2">
+              <div>
                 <span className="font-medium text-green-700">Logradouro:</span>
                 <p className="text-green-600">
-                  {dadosCompletos.endereco.logradouro}
-                  {dadosCompletos.endereco.numero && `, ${dadosCompletos.endereco.numero}`}
+                  {dadosCompletos.endereco.logradouro}, {dadosCompletos.endereco.numero}
                   {dadosCompletos.endereco.complemento && ` - ${dadosCompletos.endereco.complemento}`}
                 </p>
               </div>
@@ -418,7 +390,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
             </div>
             <div>
               <span className="font-medium text-blue-700">Data da Decisão:</span>
-              <p className="text-blue-600 mt-1">{dateUtils.formatToBR(dadosCompletos.decisao)}</p>
+              <p className="text-blue-600 mt-1">{dateUtils.formatToBR(dadosCompletos.dataDecisao)}</p>
             </div>
             <div>
               <span className="font-medium text-blue-700 flex items-center gap-1">
@@ -440,7 +412,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
             <div>
               <span className="font-medium text-yellow-700">Primeiro Comparecimento:</span>
-              <p className="text-yellow-600 mt-1">{dateUtils.formatToBR(dadosCompletos.primeiroComparecimento)}</p>
+              <p className="text-yellow-600 mt-1">{dateUtils.formatToBR(dadosCompletos.dataComparecimentoInicial)}</p>
             </div>
             <div>
               <span className="font-medium text-yellow-700">Último Comparecimento:</span>

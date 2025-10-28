@@ -6,6 +6,7 @@ import { Search, User, FileText, ChevronRight, Loader2, Filter, X, Calendar } fr
 import usuarios from '@/db/usuarios_mock.json';
 import type { Comparecimento } from '@/types';
 import { StatusFiltro } from '@/constants/status';
+import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 
 export default function BuscarPage() {
   const router = useRouter();
@@ -243,7 +244,7 @@ export default function BuscarPage() {
                       
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <Calendar className="w-3.5 h-3.5" />
-                        <span>Próximo: {new Date(pessoa.proximoComparecimento).toLocaleDateString('pt-BR')}</span>
+                        <span>Próximo: {formatToBrazilianDate(pessoa.proximoComparecimento)}</span>
                       </div>
 
                       <div className="flex items-center gap-2">

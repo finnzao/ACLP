@@ -6,6 +6,7 @@ import { Download, FileSpreadsheet, Filter } from 'lucide-react';
 import { exportFilteredData } from '@/lib/utils/excelExport';
 import { exportFilteredHistorico } from '@/lib/utils/historicoExport';
 import type { ComparecimentoResponse } from '@/types/api';
+import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 
 interface ExportButtonProps<T = any> {
   dados: T[];
@@ -200,9 +201,9 @@ export default function ExportButton<T = any>({
                   {filterInfo?.dataInicio && filterInfo?.dataFim && (
                     <div className="text-xs text-gray-600">
                       <span className="font-medium">Período:</span> {
-                        new Date(filterInfo.dataInicio).toLocaleDateString('pt-BR')
+                        formatToBrazilianDate(filterInfo.dataInicio)
                       } até {
-                        new Date(filterInfo.dataFim).toLocaleDateString('pt-BR')
+                        formatToBrazilianDate(filterInfo.dataFim)
                       }
                     </div>
                   )}
