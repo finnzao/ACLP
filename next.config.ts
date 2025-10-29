@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Garantir que está em produção
-  env: {
-    NODE_ENV: process.env.NODE_ENV || 'production',
-  },
 
   // Configurações de produção
   poweredByHeader: false,
@@ -13,6 +9,12 @@ const nextConfig: NextConfig = {
   // Otimizações
   swcMinify: true,
   compress: true,
+
+  // Variáveis públicas (apenas NEXT_PUBLIC_*)
+  env: {
+    NEXT_PUBLIC_APP_NAME: 'Sistema de Controle de Comparecimento',
+    NEXT_PUBLIC_APP_VERSION: '1.0.0',
+  },
 
   // Redirecionamentos (se necessário)
   async redirects() {
@@ -50,6 +52,10 @@ const nextConfig: NextConfig = {
           {
             key: 'X-XSS-Protection',
             value: '1; mode=block'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
           },
         ],
       },
