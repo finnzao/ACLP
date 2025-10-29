@@ -83,7 +83,7 @@ interface UpdateProfileRequest {
 interface ChangePasswordRequest {
   senhaAtual: string;
   novaSenha: string;
-  confirmaSenha: string;
+  confirmarSenha: string;
 }
 
 interface TokenPayload {

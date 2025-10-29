@@ -135,7 +135,6 @@ export default function ConfiguracoesPage() {
     }
   }, [user]);
 
-  // ✅ CORREÇÃO: Mover carregarConvites para useCallback para evitar warning
   const carregarConvites = useCallback(async () => {
     setLoadingConvites(true);
     try {
@@ -169,14 +168,13 @@ export default function ConfiguracoesPage() {
     } finally {
       setLoadingConvites(false);
     }
-  }, [listarConvites, showToast]); // ✅ Adicionadas dependências corretas
+  }, [listarConvites, showToast]);
 
-  // ✅ CORREÇÃO: Adicionar carregarConvites e isAdmin às dependências
   useEffect(() => {
     if (activeTab === 'convites' && isAdmin()) {
       carregarConvites();
     }
-  }, [activeTab, isAdmin, carregarConvites]); // ✅ Todas as dependências incluídas
+  }, [activeTab, isAdmin, carregarConvites]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -241,10 +239,20 @@ export default function ConfiguracoesPage() {
   };
 
   const handleAlterarSenha = async () => {
+    if (novaSenha === senhaAtual) {
+      showToast({
+        type: 'error',
+        title: 'Senha inválida',
+        message: 'A nova senha deve ser diferente da senha atual',
+        duration: 3000
+      });
+      return;
+    }
+
     const result = await alterarSenha({
       senhaAtual,
       novaSenha,
-      confirmaSenha: confirmarSenha
+      confirmarSenha: confirmarSenha
     });
 
     if (result.success) {
@@ -514,6 +522,13 @@ export default function ConfiguracoesPage() {
                   </button>
                 </div>
                 <PasswordStrengthIndicator password={novaSenha} />
+                
+                {novaSenha && senhaAtual && novaSenha === senhaAtual && (
+                  <p className="text-orange-500 text-sm mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    A nova senha deve ser diferente da senha atual
+                  </p>
+                )}
               </div>
               
               <div>
@@ -544,7 +559,7 @@ export default function ConfiguracoesPage() {
                     As senhas não coincidem
                   </p>
                 )}
-                {confirmarSenha && novaSenha === confirmarSenha && (
+                {confirmarSenha && novaSenha === confirmarSenha && novaSenha !== senhaAtual && (
                   <p className="text-green-500 text-sm mt-1 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" />
                     Senhas coincidem
@@ -572,7 +587,13 @@ export default function ConfiguracoesPage() {
 
               <button 
                 onClick={handleAlterarSenha}
-                disabled={loading || !senhaAtual || !novaSenha || novaSenha !== confirmarSenha}
+                disabled={
+                  loading || 
+                  !senhaAtual || 
+                  !novaSenha || 
+                  novaSenha !== confirmarSenha ||
+                  novaSenha === senhaAtual  // ✅ Desabilitar se as senhas forem iguais
+                }
                 className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (

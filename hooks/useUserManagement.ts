@@ -7,7 +7,7 @@ import { httpClient } from '@/lib/http/client';
 export interface AlterarSenhaData {
   senhaAtual: string;
   novaSenha: string;
-  confirmaSenha: string;
+  confirmarSenha: string;
 }
 
 export interface AtualizarPerfilData {
@@ -54,7 +54,7 @@ export function useUserManagement() {
       return { success: false };
     }
 
-    if (data.novaSenha !== data.confirmaSenha) {
+    if (data.novaSenha !== data.confirmarSenha) {
       showToast({
         type: 'error',
         title: 'Erro de validação',
