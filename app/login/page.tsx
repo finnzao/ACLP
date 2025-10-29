@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { FaUser, FaLock, FaChevronRight } from 'react-icons/fa';
-import { Crown, User, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -237,30 +237,13 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Informações sobre acesso */}
-          <div className="mt-8 w-full">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <h4 className="text-white font-medium mb-2 text-sm">Acesso ao Sistema</h4>
-              <ul className="text-xs text-white/80 space-y-1">
-                <li className="flex items-center gap-2">
-                  <Crown className="w-3 h-3 text-yellow-300" />
-                  <span>Administradores: Acesso completo</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <User className="w-3 h-3 text-blue-300" />
-                  <span>Usuários: Registro de comparecimentos</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
           {/* Footer */}
           <div className="mt-6 text-center">
             <p className="text-white/60 text-xs">
-              Sistema protegido por autenticação JWT
+              Sistema SCC
             </p>
             <p className="text-white/40 text-xs mt-1">
-              Versão 2.0.0 - {new Date().getFullYear()}
+              Versão 1.0.0 - {new Date().getFullYear()}
             </p>
           </div>
         </div>
