@@ -173,7 +173,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
             rg: FormattingRG(String(custodiado.rg || dados.rg || '')),
             processo: formatProcessoCNJ(String(custodiado.processo || dados.processo)),
             contato: FormattingPhone(String(custodiado.contato || dados.contato)),
-            decisao: formatDateForInput(custodiado.dataDecisao || dados.decisao),
+            decisao: formatDateForInput(custodiado.dataDecisao || dados.dataDecisao),
             dataComparecimentoInicial: formatDateForInput(
               custodiado.dataComparecimentoInicial || dados.dataComparecimentoInicial || dados.primeiroComparecimento
             ),
@@ -344,10 +344,10 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       newErrors.comarca = 'Comarca deve ter no máximo 100 caracteres';
     }
 
-    if (!form.decisao) {
+    if (!form.dataDecisao) {
       newErrors.decisao = 'Data da decisão é obrigatória';
     } else {
-      const dataDecisao = new Date(form.decisao);
+      const dataDecisao = new Date(form.dataDecisao);
       const hoje = new Date();
       
       if (dataDecisao > hoje) {
@@ -640,9 +640,9 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         processo: formatProcessoCNJ(String(form.processo)).replace(/\D/g, ''),
         vara: String(form.vara).trim(),
         comarca: String(form.comarca).trim(),
-        dataDecisao: String(form.decisao),
+        dataDecisao: String(form.dataDecisao),
         periodicidade: periodicidadePersonalizada,
-        dataComparecimentoInicial: String(form.dataComparecimentoInicial || form.decisao),
+        dataComparecimentoInicial: String(form.dataComparecimentoInicial || form.dataDecisao),
         observacoes: String(form.observacoes || '').trim(),
         cep: String(form.endereco?.cep || '').replace(/\D/g, ''),
         logradouro: String(form.endereco?.logradouro || '').trim(),
@@ -847,7 +847,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
                 type="date"
                 className={`w-full border ${errors.decisao ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="decisao"
-                value={form.decisao || ''}
+                value={form.dataDecisao || ''}
                 onChange={handleChange}
                 disabled={loading}
                 max={new Date().toISOString().split('T')[0]}
