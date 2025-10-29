@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/lib/api/authService';
 import { httpClient } from '@/lib/http/client';
@@ -39,6 +39,19 @@ const PermissionsContext = createContext<PermissionsContextType | undefined>(und
 interface AuthProviderProps {
   children: ReactNode;
 }
+
+// Lista de rotas públicas que não precisam de autenticação
+const PUBLIC_ROUTES = [
+  '/login',
+  '/invite',
+  '/recuperar-senha',
+  '/redefinir-senha'
+];
+
+// Função helper para verificar se está em rota pública
+const isPublicRoute = (pathname: string): boolean => {
+  return PUBLIC_ROUTES.some(route => pathname.startsWith(route));
+};
 
 const PERMISSIONS = {
   ADMIN: {
@@ -78,14 +91,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const clearAuthData = () => {
+  const clearAuthData = useCallback(() => {
     console.log('[AuthContext] Limpando dados de autenticação');
     authService.clearAuth();
     document.cookie = 'auth-token=; path=/; max-age=0';
     setUser(null);
-  };
+  }, []);
 
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
+    // Não tenta carregar usuário em rotas públicas
+    if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+      console.log('[AuthContext] Em rota pública, não carregando usuário');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       console.log('[AuthContext] Carregando dados do usuário');
 
@@ -168,7 +188,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearAuthData]);
 
   useEffect(() => {
     const handleTokenExpired = () => {
@@ -182,12 +202,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       window.removeEventListener('token-expired', handleTokenExpired);
     };
-  }, [router]);
+  }, [router, clearAuthData]);
 
   useEffect(() => {
     loadUser();
 
     const intervalId = setInterval(() => {
+      // Verifica se está em rota pública antes de fazer qualquer verificação
+      if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+        console.log('[AuthContext] Em rota pública, pulando verificação de token');
+        return;
+      }
+
       const token = authService.getAccessToken();
       
       if (!token) {
@@ -259,7 +285,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, 60000);
 
     return () => clearInterval(intervalId);
-  }, [router]);
+  }, [router, loadUser, clearAuthData]);
 
   const login = async (email: string, senha: string, rememberMe: boolean = false): Promise<boolean> => {
     try {
