@@ -63,21 +63,20 @@ class HttpClient {
       ...config?.headers
     };
 
-    this.timeout = config?.timeout || 30000;
+    this.timeout = config?.timeout || 60000;
     this.retries = config?.retries || 3;
     this.onUnauthorized = config?.onUnauthorized;
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[HttpClient] Inicializado com baseURL:', this.baseURL);
+      console.log('[HttpClient] Timeout configurado:', this.timeout, 'ms');
     }
   }
 
-  // Configurar callback de unauthorized
   setUnauthorizedHandler(handler: () => void) {
     this.onUnauthorized = handler;
   }
 
-  // Verificar se está autenticado
   private isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false;
 
@@ -85,13 +84,11 @@ class HttpClient {
     return !!token;
   }
 
-  // Obter token
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('access-token');
   }
 
-  // Verificar se é rota pública
   private isPublicRoute(endpoint: string): boolean {
     return this.publicRoutes.some(route => endpoint.includes(route));
   }
@@ -270,7 +267,6 @@ class HttpClient {
     this.clearAuthData();
   }
 
-  // Método Principal de Requisição
   private async makeRequest<T>(
     endpoint: string,
     config: RequestConfig = {}
@@ -284,10 +280,8 @@ class HttpClient {
       requireAuth = true
     } = config;
 
-    // Verificar se é rota pública
     const isPublic = this.isPublicRoute(endpoint);
 
-    // Só bloquear se não for rota pública E requireAuth for true
     if (!isPublic && requireAuth && !this.isAuthenticated()) {
       console.error('[HttpClient] Requisição bloqueada: usuário não autenticado');
 
@@ -303,7 +297,6 @@ class HttpClient {
       };
     }
 
-    // Só adicionar token se não for rota pública E requireAuth for true
     if (!isPublic && requireAuth) {
       const token = this.getToken();
       if (token && !headers['Authorization']) {
@@ -323,7 +316,8 @@ class HttpClient {
         headers: this.sanitizeHeadersForLog(requestHeaders),
         body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
         requireAuth,
-        isPublic
+        isPublic,
+        timeout: `${timeout}ms`
       });
     }
 
@@ -460,7 +454,7 @@ class HttpClient {
     if (!error) return 'Erro desconhecido';
 
     if (error.name === 'AbortError') {
-      return 'Timeout na requisição';
+      return 'Tempo de requisição excedido. Por favor, tente novamente.';
     }
 
     if (error.message.includes('fetch')) {

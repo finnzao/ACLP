@@ -52,14 +52,9 @@ export function clearAuthHeaders() {
   console.log('[Services] Token de autenticação removido');
 }
 
-// ===========================
 // Custodiados Service
-// ===========================
 
 export const custodiadosService = {
-  /**
-   * Lista todos os custodiados com cache e tratamento robusto de erros
-   */
   async listar(options?: {
     forceRefresh?: boolean;
     cacheTimeout?: number;
@@ -122,7 +117,6 @@ export const custodiadosService = {
         data: []
       };
 
-      // Verificar estrutura: { success: true, data: [...] }
       if (parsedData && parsedData.success && Array.isArray(parsedData.data)) {
         console.log('[CustodiadosService] Estrutura correta encontrada:', parsedData.data.length);
         result = {
@@ -131,7 +125,6 @@ export const custodiadosService = {
           data: parsedData.data
         };
       }
-      // Verificar se é array direto
       else if (Array.isArray(parsedData)) {
         console.log('[CustodiadosService] Dados são array direto:', parsedData.length);
         result = {
@@ -140,7 +133,6 @@ export const custodiadosService = {
           data: parsedData
         };
       }
-      // Procurar array em alguma propriedade do objeto
       else if (parsedData && typeof parsedData === 'object') {
         for (const [key, value] of Object.entries(parsedData)) {
           if (Array.isArray(value)) {
@@ -445,9 +437,7 @@ export const custodiadosService = {
   }
 };
 
-// ===========================
 // Comparecimentos Service
-// ===========================
 
 export const comparecimentosService = {
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
@@ -598,21 +588,17 @@ export const comparecimentosService = {
       console.log('[ComparecimentosService] Resposta recebida:', response);
 
       if (response.success && response.data) {
-        // Caso 1: Se response.data tem a estrutura { success, data: {...} }
         if (response.data.data && typeof response.data.data === 'object') {
           console.log('[ComparecimentosService] Retornando response.data.data');
           return response.data.data as ResumoSistemaResponse;
         }
 
-        // Caso 2: Se response.data JÁ é o objeto de resumo direto
         if (response.data.totalCustodiados !== undefined) {
           console.log('[ComparecimentosService] Retornando response.data diretamente');
           return response.data as ResumoSistemaResponse;
         }
 
-        // Caso 3: Se response tem data aninhado (response.data é ApiResponse)
         if (typeof response.data === 'object' && response.data !== null) {
-          // Tentar encontrar o objeto com os dados esperados
           const possibleData = response.data.data || response.data;
           if (possibleData && possibleData.totalCustodiados !== undefined) {
             console.log('[ComparecimentosService] Retornando dados aninhados');
@@ -636,7 +622,6 @@ export const comparecimentosService = {
     } catch (error: any) {
       console.error('[ComparecimentosService] Erro ao obter resumo:', error);
 
-      // Retornar estrutura padrão em caso de erro
       return {
         totalCustodiados: 0,
         custodiadosEmConformidade: 0,
@@ -667,7 +652,6 @@ export const comparecimentosService = {
       console.log('[ComparecimentosService] Resposta de listarTodos:', response);
 
       if (response.success && response.data) {
-        // Estrutura paginada: { comparecimentos: [], paginaAtual, ... }
         if (response.data.comparecimentos && Array.isArray(response.data.comparecimentos)) {
           console.log('[ComparecimentosService] Estrutura paginada detectada');
           return {
@@ -687,7 +671,6 @@ export const comparecimentosService = {
           };
         }
 
-        // Array direto
         if (Array.isArray(response.data)) {
           console.log('[ComparecimentosService] Array direto detectado');
           return {
@@ -707,7 +690,6 @@ export const comparecimentosService = {
           };
         }
 
-        // Estrutura aninhada
         if (response.data.data && response.data.data.comparecimentos) {
           console.log('[ComparecimentosService] Estrutura aninhada detectada');
           const nested = response.data.data;
@@ -747,9 +729,6 @@ export const comparecimentosService = {
     }
   },
 
-  /**
-   * ✅ NOVO: Filtrar comparecimentos
-   */
   async filtrar(params: {
     dataInicio?: string;
     dataFim?: string;
@@ -815,9 +794,7 @@ export const comparecimentosService = {
   }
 };
 
-// ===========================
 // Usuários Service
-// ===========================
 
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
@@ -831,14 +808,10 @@ export const usuariosService = {
     return await apiClient.post<UsuarioResponse>('/usuarios', data);
   },
 
-  /**
-   * Atualizar usuário
-   */
   async atualizar(id: number, data: Partial<UsuarioDTO>): Promise<ApiResponse<UsuarioResponse>> {
     console.log(`[UsuariosService] Atualizando usuário ID: ${id}`);
     console.log('[UsuariosService] Dados recebidos:', data);
     
-    // Filtrar campos undefined/null para não enviar ao backend
     const dadosLimpos: Record<string, any> = {};
     
     Object.entries(data).forEach(([key, value]) => {
@@ -862,7 +835,6 @@ export const usuariosService = {
     } catch (error: any) {
       console.error('[UsuariosService] Erro ao atualizar:', error);
       
-      // Log detalhado do erro
       if (error.response) {
         console.error('[UsuariosService] Status:', error.response.status);
         console.error('[UsuariosService] Data:', error.response.data);
@@ -972,7 +944,46 @@ export interface ReenviarConviteDTO {
 export const convitesService = {
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
     console.log('[ConvitesService] Criando convite para:', data.email);
-    return await apiClient.post<ConviteResponse>('/usuarios/convites', data);
+    
+    try {
+      const response = await apiClient.post<ConviteResponse>(
+        '/usuarios/convites', 
+        data,
+        { timeout: 10000 }
+      );
+      
+      console.log('[ConvitesService] Resposta recebida:', response);
+      
+      if (response.success || response.status === 201) {
+        return {
+          ...response,
+          success: true,
+          message: response.message || 'Convite criado! O email será enviado em breve.',
+          status: response.status || 201
+        };
+      }
+      
+      return response;
+      
+    } catch (error: any) {
+      console.error('[ConvitesService] Erro ao criar convite:', error);
+      
+      if (error.name === 'AbortError') {
+        return {
+          success: true,
+          status: 202,
+          message: 'Convite está sendo processado. O email será enviado em breve.',
+          timestamp: new Date().toISOString()
+        };
+      }
+      
+      return {
+        success: false,
+        status: error.status || 500,
+        message: error.message || 'Erro ao criar convite',
+        timestamp: new Date().toISOString()
+      };
+    }
   },
 
   async listarConvites(status?: string): Promise<ApiResponse<ConviteResponse[]>> {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
-import { convitesService } from '@/lib/api/services';
+import { convitesService } from '@/lib/api/services/convite';
 import {
   User,
   Lock,
@@ -14,11 +14,13 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Shield
+  Shield,
+  Mail
 } from 'lucide-react';
 import { extractDateFromTimestamp } from '@/lib/utils/dateutils';
 
 interface ConviteData {
+  email: string; // Email sempre presente
   tipoUsuario: 'ADMIN' | 'USUARIO';
   comarca?: string;
   departamento?: string;
@@ -43,7 +45,7 @@ export default function InvitePage() {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [aceitouTermos, setAceitouTermos] = useState(false);
+  const [cargo, setCargo] = useState('');
 
   // UI States
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -72,13 +74,18 @@ export default function InvitePage() {
     try {
       const response = await convitesService.validarToken(token);
 
+      console.log('[InvitePage] Resposta da validação:', response);
+
       if (response.success && response.data) {
         setConviteValido(true);
         
         const dados = response.data;
+        
+        // Email sempre presente
         setConviteData({
+          email: dados.email,
           tipoUsuario: dados.tipoUsuario as 'ADMIN' | 'USUARIO',
-          comarca: dados.comarca || 'Não informado',
+          comarca: dados.comarca || 'Não informada',
           departamento: dados.departamento || 'Não informado',
           expiraEm: dados.expiraEm || ''
         });
@@ -149,10 +156,6 @@ export default function InvitePage() {
       errors.push('As senhas não coincidem');
     }
 
-    if (!aceitouTermos) {
-      errors.push('Você deve aceitar os termos de uso');
-    }
-
     return {
       isValid: errors.length === 0,
       errors
@@ -179,16 +182,19 @@ export default function InvitePage() {
     try {
       const result = await convitesService.ativarConta({
         token,
+        nome,
         senha,
         confirmaSenha: confirmarSenha,
-        nome
+        cargo: cargo || undefined
       });
+
+      console.log('[InvitePage] Resultado da ativação:', result);
 
       if (result.success) {
         showToast({
           type: 'success',
           title: 'Conta ativada!',
-          message: 'Sua conta foi criada com sucesso. Redirecionando...',
+          message: 'Sua conta foi criada com sucesso. Redirecionando para o login...',
           duration: 3000
         });
 
@@ -281,16 +287,20 @@ export default function InvitePage() {
           
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 space-y-1.5">
             <div className="flex items-center gap-2 text-sm">
+              <Mail className="w-4 h-4" />
+              <span className="text-blue-100">Email: <strong>{conviteData.email}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <User className="w-4 h-4" />
+              <span className="text-blue-100">Perfil: <strong>{conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
               <MapPin className="w-4 h-4" />
               <span className="text-blue-100">Comarca: <strong>{conviteData.comarca}</strong></span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Building className="w-4 h-4" />
               <span className="text-blue-100">Departamento: <strong>{conviteData.departamento}</strong></span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <User className="w-4 h-4" />
-              <span className="text-blue-100">Perfil: <strong>{conviteData.tipoUsuario === 'ADMIN' ? 'Administrador' : 'Usuário'}</strong></span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle className="w-4 h-4" />
@@ -317,6 +327,25 @@ export default function InvitePage() {
                 className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Digite seu nome completo"
                 required
+              />
+            </div>
+          </div>
+
+          {/* Campo Cargo (Opcional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Cargo (Opcional)
+            </label>
+            <div className="relative">
+              <div className="absolute left-3 top-3 text-gray-400">
+                <Building className="w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Ex: Analista, Técnico, etc."
               />
             </div>
           </div>
@@ -428,24 +457,10 @@ export default function InvitePage() {
             </ul>
           </div>
 
-          {/* Termos */}
-          <div className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              id="termos"
-              checked={aceitouTermos}
-              onChange={(e) => setAceitouTermos(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-            />
-            <label htmlFor="termos" className="text-xs text-gray-700 cursor-pointer">
-              Aceito os termos de uso e política de privacidade
-            </label>
-          </div>
-
           {/* Botão Submit */}
           <button
             type="submit"
-            disabled={ativando || !aceitouTermos}
+            disabled={ativando}
             className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
           >
             {ativando ? (

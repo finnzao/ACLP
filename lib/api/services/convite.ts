@@ -1,19 +1,14 @@
-// painel-web/lib/api/services/convites.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpClient } from '@/lib/http/client';
 import type { ApiResponse } from '@/types/api';
 
+// DTO para criar convite específico (com email)
 export interface ConviteDTO {
   email: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
 }
 
-export interface GerarLinkDTO {
-  tipoUsuario: 'ADMIN' | 'USUARIO';
-  quantidadeUsos?: number;
-  diasValidade?: number;
-}
-
+// Resposta do convite
 export interface ConviteResponse {
   id: number;
   email: string;
@@ -25,33 +20,31 @@ export interface ConviteResponse {
   criadoPorNome?: string;
   comarca?: string;
   departamento?: string;
-  usosRestantes?: number;
-  totalUsos?: number;
 }
 
+// Resposta da validação de token
 export interface ValidarTokenResponse {
   valido: boolean;
-  email?: string;
+  email: string; // Email sempre presente
   tipoUsuario?: string;
   comarca?: string;
   departamento?: string;
   expiraEm?: string;
-  criadoPorNome?: string;
   mensagem?: string;
-  camposEditaveis?: string[];
 }
 
+// DTO para ativar conta
 export interface AtivarContaDTO {
   token: string;
-  nome?: string;
+  nome: string;
   senha: string;
   confirmaSenha: string;
-  telefone?: string;
+  cargo?: string;
 }
 
 export const convitesService = {
   /**
-   * Criar convite com email específico
+   * Criar convite específico com email
    */
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
     console.log('[ConvitesService] Criando convite:', data);
@@ -73,35 +66,6 @@ export const convitesService = {
       return {
         success: false,
         message: error.message || 'Erro ao criar convite',
-        status: error.status || 500,
-        timestamp: new Date().toISOString()
-      };
-    }
-  },
-
-  /**
-   * Gerar link genérico
-   */
-  async gerarLinkConvite(data: GerarLinkDTO): Promise<ApiResponse<ConviteResponse>> {
-    console.log('[ConvitesService] Gerando link genérico:', data);
-    
-    try {
-      const response = await httpClient.post<ConviteResponse>(
-        '/usuarios/convites/gerar-link',
-        data
-      );
-
-      console.log('[ConvitesService] Resposta:', response);
-
-      return {
-        ...response,
-        message: response.message || 'Link gerado com sucesso'
-      };
-    } catch (error: any) {
-      console.error('[ConvitesService] Erro ao gerar link:', error);
-      return {
-        success: false,
-        message: error.message || 'Erro ao gerar link',
         status: error.status || 500,
         timestamp: new Date().toISOString()
       };
@@ -204,13 +168,13 @@ export const convitesService = {
   /**
    * Reenviar convite
    */
-  async reenviarConvite(id: number, data: { novaValidadeHoras?: number }): Promise<ApiResponse<void>> {
+  async reenviarConvite(id: number): Promise<ApiResponse<void>> {
     console.log('[ConvitesService] Reenviando convite:', id);
     
     try {
       const response = await httpClient.post<void>(
         `/usuarios/convites/${id}/reenviar`,
-        data
+        {}
       );
 
       return {
@@ -231,8 +195,7 @@ export const convitesService = {
   /**
    * Cancelar convite
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async cancelarConvite(id: number, motivo?: string): Promise<ApiResponse<void>> {
+  async cancelarConvite(id: number): Promise<ApiResponse<void>> {
     console.log('[ConvitesService] Cancelando convite:', id);
     
     try {
