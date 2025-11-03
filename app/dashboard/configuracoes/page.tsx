@@ -107,10 +107,11 @@ export default function ConfiguracoesPage() {
   const [activeTab, setActiveTab] = useState<Tab>('perfil');
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
-  const [nomeUsuario, setNomeUsuario] = useState(user?.nome || '');
-  const [emailUsuario, setEmailUsuario] = useState(user?.email || '');
-  const [departamentoUsuario, setDepartamentoUsuario] = useState(user?.departamento || '');
+  const [nomeUsuario, setNomeUsuario] = useState('');
+  const [emailUsuario, setEmailUsuario] = useState('');
+  const [departamentoUsuario, setDepartamentoUsuario] = useState('');
   
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
@@ -126,13 +127,24 @@ export default function ConfiguracoesPage() {
   const [novoConviteTipo, setNovoConviteTipo] = useState<'ADMIN' | 'USUARIO'>('USUARIO');
   const [mostrarFormConviteEmail, setMostrarFormConviteEmail] = useState(false);
   
-
   useEffect(() => {
-    if (user) {
-      setNomeUsuario(user.nome || '');
-      setEmailUsuario(user.email || '');
-      setDepartamentoUsuario(user.departamento || '');
-    }
+    const initializeUserData = async () => {
+      setIsInitialLoading(true);
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (user) {
+        setNomeUsuario(user.nome || '');
+        setEmailUsuario(user.email || '');
+        setDepartamentoUsuario(user.departamento || '');
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setIsInitialLoading(false);
+    };
+
+    initializeUserData();
   }, [user]);
 
   const carregarConvites = useCallback(async () => {
@@ -171,10 +183,10 @@ export default function ConfiguracoesPage() {
   }, [listarConvites, showToast]);
 
   useEffect(() => {
-    if (activeTab === 'convites' && isAdmin()) {
+    if (activeTab === 'convites' && isAdmin() && !isInitialLoading) {
       carregarConvites();
     }
-  }, [activeTab, isAdmin, carregarConvites]);
+  }, [activeTab, isAdmin, carregarConvites, isInitialLoading]);
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -333,6 +345,24 @@ export default function ConfiguracoesPage() {
       </span>
     );
   };
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Carregando configurações...
+          </h3>
+          <p className="text-sm text-gray-600">
+            Aguarde enquanto carregamos seus dados
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -592,7 +622,7 @@ export default function ConfiguracoesPage() {
                   !senhaAtual || 
                   !novaSenha || 
                   novaSenha !== confirmarSenha ||
-                  novaSenha === senhaAtual  // ✅ Desabilitar se as senhas forem iguais
+                  novaSenha === senhaAtual
                 }
                 className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
