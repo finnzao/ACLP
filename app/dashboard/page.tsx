@@ -77,7 +77,7 @@ interface ProximoComparecimento {
 
 export default function DashboardPage() {
   const { resumo, loading: loadingResumo, error: errorResumo, refetch } = useResumoSistema();
-  
+
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,
     emConformidade: 0,
@@ -124,7 +124,7 @@ export default function DashboardPage() {
       const totalCustodiados = resumo.totalCustodiados || 30;
       const emConformidade = resumo.custodiadosEmConformidade || 6;
       const inadimplentes = resumo.custodiadosInadimplentes || 24;
-      
+
       setStats({
         total: totalCustodiados,
         emConformidade,
@@ -153,7 +153,7 @@ export default function DashboardPage() {
       }
 
       let alertas: ProximoComparecimento[] = [];
-      
+
       if (resumo.proximosComparecimentos?.custodiadosAtrasados) {
         alertas = resumo.proximosComparecimentos.custodiadosAtrasados.slice(0, 5).map((item: any) => ({
           id: item.id,
@@ -291,7 +291,7 @@ export default function DashboardPage() {
               <Zap className="w-5 h-5 text-primary" />
               <h2 className="font-bold text-gray-800">Ações Rápidas</h2>
             </div>
-            
+
             <div className="space-y-3">
               {/* Botão Principal - Confirmar Comparecimento */}
               <Link
@@ -391,7 +391,7 @@ export default function DashboardPage() {
               <Activity className="w-5 h-5 text-primary" />
               Estatísticas
             </h2>
-            
+
             <div className="space-y-3">
               <Link
                 href={createFilterLink({ status: 'em conformidade' })}
@@ -447,7 +447,7 @@ export default function DashboardPage() {
                 <UserX className="w-5 h-5 text-red-600" />
                 Análise de Atrasos
               </h2>
-              
+
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-red-50 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-red-600">{analiseAtrasos.totalCustodiadosAtrasados}</p>
@@ -474,7 +474,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between items-center text-sm p-2 bg-red-50 rounded">
                   <span className="font-semibold text-red-700">Mais de 90 dias</span>
-                  <span className="font-bold text-red-700">{analiseAtrasos.totalAtrasadosMais90Dias || 19}</span>
+                  <span className="font-bold text-red-700">{analiseAtrasos.totalAtrasadosMais90Dias || 0}</span>
                 </div>
               </div>
             </div>
@@ -486,7 +486,7 @@ export default function DashboardPage() {
               <ListFilter className="w-5 h-5 text-gray-600" />
               Outras Ações
             </h2>
-            
+
             <div className="space-y-2">
               <Link
                 href={createFilterLink({ status: 'inadimplente' })}
@@ -532,7 +532,7 @@ export default function DashboardPage() {
             </h1>
             <p className="text-text-muted mt-1">Visão geral do sistema de controle de comparecimentos</p>
           </div>
-        
+
         </div>
 
         {/* Cards de Estatísticas */}
@@ -627,7 +627,7 @@ export default function DashboardPage() {
               <UserX className="w-5 h-5" />
               Análise de Atrasos
             </h3>
-            
+
             {analiseAtrasos && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -656,7 +656,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex justify-between items-center p-2 bg-red-50 rounded">
                     <span className="text-sm font-medium text-red-700">Mais de 90 dias</span>
-                    <span className="font-bold text-red-700">{analiseAtrasos.totalAtrasadosMais90Dias || 19}</span>
+                    <span className="font-bold text-red-700">{analiseAtrasos.totalAtrasadosMais90Dias || 0}</span>
                   </div>
                 </div>
 
@@ -695,7 +695,7 @@ export default function DashboardPage() {
                 <Tooltip formatter={(value, name) => [value, name]} />
               </PieChart>
             </ResponsiveContainer>
-            
+
             <div className="mt-4 flex justify-center gap-6">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded"></div>
@@ -715,7 +715,7 @@ export default function DashboardPage() {
             <History className="w-5 h-5" />
             Análise de Comparecimentos - Últimos 6 Meses
           </h3>
-          
+
           {resumo?.relatorioUltimosMeses && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div className="bg-blue-50 p-4 rounded-lg">
@@ -723,13 +723,13 @@ export default function DashboardPage() {
                 <p className="text-3xl font-bold text-blue-800">{resumo.relatorioUltimosMeses.totalComparecimentos}</p>
                 <p className="text-xs text-blue-500 mt-1">Média: {resumo.relatorioUltimosMeses.mediaComparecimentosMensal}/mês</p>
               </div>
-              
+
               <div className="bg-green-50 p-4 rounded-lg">
                 <p className="text-sm text-green-600">Comparecimentos Presenciais</p>
                 <p className="text-3xl font-bold text-green-800">{resumo.relatorioUltimosMeses.comparecimentosPresenciais}</p>
                 <p className="text-xs text-green-500 mt-1">{resumo.relatorioUltimosMeses.percentualPresencial?.toFixed(1)}% do total</p>
               </div>
-              
+
               <div className="bg-purple-50 p-4 rounded-lg">
                 <p className="text-sm text-purple-600">Mudanças de Endereço</p>
                 <p className="text-3xl font-bold text-purple-800">{resumo.relatorioUltimosMeses.mudancasEndereco}</p>
@@ -745,7 +745,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="mesNome" />
                 <YAxis />
                 <Tooltip formatter={(value, name) => [
-                  typeof value === 'number' ? value.toFixed(1) + '%' : value, 
+                  typeof value === 'number' ? value.toFixed(1) + '%' : value,
                   name
                 ]} />
                 <Legend />

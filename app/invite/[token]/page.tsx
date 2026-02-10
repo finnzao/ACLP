@@ -20,7 +20,7 @@ import {
 import { extractDateFromTimestamp } from '@/lib/utils/dateutils';
 
 interface ConviteData {
-  email: string; // Email sempre presente
+  email: string;
   tipoUsuario: 'ADMIN' | 'USUARIO';
   comarca?: string;
   departamento?: string;
@@ -41,7 +41,7 @@ export default function InvitePage() {
   // Dados do convite
   const [conviteData, setConviteData] = useState<ConviteData | null>(null);
 
-  // Formulário
+  // Formulário - apenas nome + senha (fluxo simplificado)
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
@@ -74,14 +74,10 @@ export default function InvitePage() {
     try {
       const response = await convitesService.validarToken(token);
 
-      console.log('[InvitePage] Resposta da validação:', response);
-
       if (response.success && response.data) {
         setConviteValido(true);
-        
+
         const dados = response.data;
-        
-        // Email sempre presente
         setConviteData({
           email: dados.email,
           tipoUsuario: dados.tipoUsuario as 'ADMIN' | 'USUARIO',
@@ -180,6 +176,8 @@ export default function InvitePage() {
     setAtivando(true);
 
     try {
+      // Fluxo simplificado: apenas token + nome + senha
+      // Sem verificação de email (o admin já controla quem recebe o convite)
       const result = await convitesService.ativarConta({
         token,
         nome,
@@ -187,8 +185,6 @@ export default function InvitePage() {
         confirmaSenha: confirmarSenha,
         cargo: cargo || undefined
       });
-
-      console.log('[InvitePage] Resultado da ativação:', result);
 
       if (result.success) {
         showToast({
@@ -284,7 +280,7 @@ export default function InvitePage() {
               <p className="text-sm text-blue-100">Complete seu cadastro</p>
             </div>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 space-y-1.5">
             <div className="flex items-center gap-2 text-sm">
               <Mail className="w-4 h-4" />
@@ -309,7 +305,7 @@ export default function InvitePage() {
           </div>
         </div>
 
-        {/* Form */}
+        {/* Form - Fluxo simplificado: nome + cargo(opcional) + senha */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Campo Nome */}
           <div>
@@ -375,7 +371,7 @@ export default function InvitePage() {
                 {mostrarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             {senha && (
               <div className="mt-2">
                 <div className="flex gap-1 mb-1">
@@ -420,7 +416,7 @@ export default function InvitePage() {
                 {mostrarConfirmarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            
+
             {confirmarSenha && (
               <p className={`text-xs mt-1.5 flex items-center gap-1 ${senha === confirmarSenha ? 'text-green-600' : 'text-red-600'}`}>
                 {senha === confirmarSenha ? (
@@ -457,7 +453,7 @@ export default function InvitePage() {
             </ul>
           </div>
 
-          {/* Botão Submit */}
+          {/* Botão Submit - sem dependência de termos */}
           <button
             type="submit"
             disabled={ativando}

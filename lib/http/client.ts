@@ -55,7 +55,7 @@ class HttpClient {
   ];
 
   constructor(config?: ClientConfig) {
-    this.baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    this.baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
     this.defaultHeaders = {
       'Content-Type': 'application/json',
